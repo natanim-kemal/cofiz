@@ -4,6 +4,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class BusinessSettingsScreen extends StatefulWidget {
   const BusinessSettingsScreen({super.key});
@@ -27,7 +28,8 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
     _nameController = TextEditingController(text: settings.companyName);
     _addressController = TextEditingController(text: settings.companyAddress);
     _phoneController = TextEditingController(text: settings.companyPhone);
-    _limitController = TextEditingController(text: settings.distributionLimit.toString());
+    _limitController =
+        TextEditingController(text: settings.distributionLimit.toString());
   }
 
   @override
@@ -47,37 +49,32 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
   void _saveSettings() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      
+
       try {
         final settings = Provider.of<SettingsProvider>(context, listen: false);
-        
+
         await settings.updateCompanyInfo(
           name: _nameController.text,
           address: _addressController.text,
           phone: _phoneController.text,
         );
-        
+
         await settings.updateDistributionLimit(
           double.tryParse(_limitController.text) ?? 5000.0,
         );
 
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.businessSettingsSaved),
-              backgroundColor: Colors.green,
-            ),
+          AppToast.show(
+            AppLocalizations.of(context)!.businessSettingsSaved,
+            success: true,
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${AppLocalizations.of(context)!.errorSavingSettings("e")}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppToast.show(
+              '${AppLocalizations.of(context)!
+                  .errorSavingSettings('e')}');
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -105,13 +102,16 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader(context, AppLocalizations.of(context)!.companyInformation),
+              _buildSectionHeader(
+                  context, AppLocalizations.of(context)!.companyInformation),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _nameController,
                 label: AppLocalizations.of(context)!.companyName,
                 icon: Icons.business,
-                validator: (v) => v?.isNotEmpty == true ? null : AppLocalizations.of(context)!.required,
+                validator: (v) => v?.isNotEmpty == true
+                    ? null
+                    : AppLocalizations.of(context)!.required,
                 readOnly: !canEdit,
               ),
               const SizedBox(height: 16),
@@ -131,18 +131,22 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
               ),
 
               const SizedBox(height: 32),
-              
-              _buildSectionHeader(context, AppLocalizations.of(context)!.businessLimits),
+
+              _buildSectionHeader(
+                  context, AppLocalizations.of(context)!.businessLimits),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _limitController,
-                label: AppLocalizations.of(context)!.maxDistributionLimit('ETB'),
+                label:
+                    AppLocalizations.of(context)!.maxDistributionLimit('ETB'),
                 icon: Icons.attach_money,
                 keyboardType: TextInputType.number,
                 readOnly: !canEdit,
-                 validator: (v) {
-                  if (v == null || v.isEmpty) return AppLocalizations.of(context)!.required;
-                  if (double.tryParse(v) == null) return AppLocalizations.of(context)!.invalidNumber;
+                validator: (v) {
+                  if (v == null || v.isEmpty)
+                    return AppLocalizations.of(context)!.required;
+                  if (double.tryParse(v) == null)
+                    return AppLocalizations.of(context)!.invalidNumber;
                   return null;
                 },
               ),
@@ -209,14 +213,14 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
       validator: readOnly ? null : validator,
       readOnly: readOnly,
       style: TextStyle(
-        color: readOnly 
+        color: readOnly
             ? (isDark ? Colors.grey.shade400 : Colors.grey.shade600)
             : (isDark ? Colors.white : Colors.black87),
       ),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey),
-        suffixIcon: readOnly 
+        suffixIcon: readOnly
             ? Icon(Icons.lock, size: 18, color: Colors.grey.shade400)
             : null,
         border: OutlineInputBorder(
@@ -227,8 +231,10 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
           borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
         ),
         filled: true,
-        fillColor: readOnly 
-            ? (isDark ? Colors.grey.shade800.withOpacity(0.5) : Colors.grey.shade100)
+        fillColor: readOnly
+            ? (isDark
+                ? Colors.grey.shade800.withOpacity(0.5)
+                : Colors.grey.shade100)
             : (isDark ? Colors.grey.shade900 : Colors.grey.shade50),
       ),
     );

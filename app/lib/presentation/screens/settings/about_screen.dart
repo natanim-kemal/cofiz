@@ -45,8 +45,8 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
   }
 
   Future<void> _launchUrl(String urlString) async {
-     try {
-       final url = Uri.parse(urlString);
+    try {
+      final url = Uri.parse(urlString);
       if (await canLaunchUrl(url)) {
         await launchUrl(url);
       }
@@ -63,78 +63,87 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
         title: Text(AppLocalizations.of(context)?.aboutCofiz ?? 'About Cofiz'),
         backgroundColor: theme.appBarTheme.backgroundColor ?? AppColors.primary,
         foregroundColor: Colors.white,
-       iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
           const BackgroundPattern(),
           SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            Image.asset(
-              'assets/icon-bg.png',
-              width: 100,
-              height: 100,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                Image.asset(
+                  'assets/icon-bg.png',
+                  width: 100,
+                  height: 100,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Cofiz',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppLocalizations.of(context)!.version('1.1.9'),
+                  style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                _buildSection(context, AppLocalizations.of(context)!.legal),
+                _buildTile(
+                  context,
+                  AppLocalizations.of(context)?.termsOfService ??
+                      'Terms of Service',
+                  Icons.description_outlined,
+                  () => _showContentDialog(
+                      context,
+                      AppLocalizations.of(context)?.termsOfService ??
+                          'Terms of Service',
+                      _loremIpsum),
+                ),
+                _buildTile(
+                  context,
+                  AppLocalizations.of(context)?.privacyPolicy ??
+                      'Privacy Policy',
+                  Icons.privacy_tip_outlined,
+                  () => _showContentDialog(
+                      context,
+                      AppLocalizations.of(context)?.privacyPolicy ??
+                          'Privacy Policy',
+                      _loremIpsum),
+                ),
+                const SizedBox(height: 24),
+                _buildSection(context, AppLocalizations.of(context)!.support),
+                _buildTile(
+                  context,
+                  AppLocalizations.of(context)?.contactSupport ??
+                      'Contact Support',
+                  Icons.email_outlined,
+                  () => _launchEmail(),
+                ),
+                _buildTile(
+                  context,
+                  AppLocalizations.of(context)?.visitWebsite ?? 'Visit Website',
+                  Icons.language,
+                  () => _launchUrl('https://example.com'),
+                ),
+                const SizedBox(height: 40),
+                Text(
+                  AppLocalizations.of(context)?.copyright ??
+                      '© 2026 Cofiz app. All rights reserved.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white30 : Colors.grey.shade400,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Cofiz',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context)!.version('1.1.9'),
-              style: TextStyle(
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 40),
-            
-            _buildSection(context, AppLocalizations.of(context)!.legal),
-            _buildTile(
-              context, 
-              AppLocalizations.of(context)?.termsOfService ?? 'Terms of Service', 
-              Icons.description_outlined,
-              () => _showContentDialog(context, AppLocalizations.of(context)?.termsOfService ?? 'Terms of Service', _loremIpsum),
-            ),
-            _buildTile(
-              context, 
-              AppLocalizations.of(context)?.privacyPolicy ?? 'Privacy Policy', 
-              Icons.privacy_tip_outlined,
-              () => _showContentDialog(context, AppLocalizations.of(context)?.privacyPolicy ?? 'Privacy Policy', _loremIpsum),
-            ),
-
-            const SizedBox(height: 24),
-            _buildSection(context, AppLocalizations.of(context)!.support),
-            _buildTile(
-              context, 
-              AppLocalizations.of(context)?.contactSupport ?? 'Contact Support', 
-              Icons.email_outlined,
-              () => _launchEmail(),
-            ),
-            _buildTile(
-              context, 
-              AppLocalizations.of(context)?.visitWebsite ?? 'Visit Website', 
-              Icons.language,
-              () => _launchUrl('https://example.com'),
-            ),
-            
-            const SizedBox(height: 40),
-            Text(
-              AppLocalizations.of(context)?.copyright ?? '© 2026 Cofiz app. All rights reserved.',
-              style: TextStyle(
-                fontSize: 12,
-                 color: isDark ? Colors.white30 : Colors.grey.shade400,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
         ],
       ),
     );
@@ -156,11 +165,12 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
     );
   }
 
-  Widget _buildTile(BuildContext context, String title, IconData icon, VoidCallback onTap) {
+  Widget _buildTile(
+      BuildContext context, String title, IconData icon, VoidCallback onTap) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-     return Container(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -175,16 +185,9 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
       ),
       child: ListTile(
         onTap: onTap,
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 20),
-        ),
+        leading: Icon(icon, color: AppColors.primary, size: 24),
         title: Text(
-          title, 
+          title,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),

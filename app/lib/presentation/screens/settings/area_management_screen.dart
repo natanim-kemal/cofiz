@@ -4,6 +4,7 @@ import '../../../core/services/area_service.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class AreaManagementScreen extends StatefulWidget {
   const AreaManagementScreen({super.key});
@@ -44,21 +45,20 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
   Future<void> _addArea() async {
     final name = _newAreaController.text.trim();
     if (name.isEmpty) return;
-    
+
     if (_areas.contains(name)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.areaAlreadyExists), backgroundColor: Colors.orange),
-      );
+      AppToast.show(AppLocalizations.of(context)!.areaAlreadyExists);
       return;
     }
-    
+
     await _areaService.addArea(name);
     _newAreaController.clear();
     await _loadAreas();
-    
+
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.areaAdded(name)), backgroundColor: Colors.green),
+      AppToast.show(
+        AppLocalizations.of(context)!.areaAdded(name),
+        success: true,
       );
     }
   }
@@ -68,7 +68,8 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.deleteArea),
-        content: Text(AppLocalizations.of(context)!.deleteAreaConfirmation(area)),
+        content:
+            Text(AppLocalizations.of(context)!.deleteAreaConfirmation(area)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -76,19 +77,21 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(AppLocalizations.of(context)!.delete, style: const TextStyle(color: Colors.red)),
+            child: Text(AppLocalizations.of(context)!.delete,
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-    
+
     if (confirm == true) {
       await _areaService.removeArea(area);
       await _loadAreas();
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.areaDeleted(area)), backgroundColor: Colors.green),
+        AppToast.show(
+          AppLocalizations.of(context)!.areaDeleted(area),
+          success: true,
         );
       }
     }
@@ -96,7 +99,7 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
 
   Future<void> _editArea(String oldName) async {
     final controller = TextEditingController(text: oldName);
-    
+
     final newName = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -121,14 +124,15 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
         ],
       ),
     );
-    
+
     if (newName != null && newName.isNotEmpty && newName != oldName) {
       await _areaService.updateArea(oldName, newName);
       await _loadAreas();
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.areaRenamed(newName)), backgroundColor: Colors.green),
+        AppToast.show(
+          AppLocalizations.of(context)!.areaRenamed(newName),
+          success: true,
         );
       }
     }
@@ -166,7 +170,8 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                      fillColor:
+                          isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                     ),
                     onSubmitted: (_) => _addArea(),
                   ),
@@ -179,7 +184,8 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -188,9 +194,9 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Areas list
           Expanded(
             child: _isLoading
@@ -200,13 +206,16 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.location_off, size: 64, color: Colors.grey.shade400),
+                            Icon(Icons.location_off,
+                                size: 64, color: Colors.grey.shade400),
                             const SizedBox(height: 16),
                             Text(
                               AppLocalizations.of(context)!.noAreasYet,
                               style: TextStyle(
                                 fontSize: 18,
-                                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                color: isDark
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -214,7 +223,9 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                               AppLocalizations.of(context)!.addYourFirstArea,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                                color: isDark
+                                    ? Colors.grey.shade500
+                                    : Colors.grey.shade500,
                               ),
                             ),
                           ],
@@ -229,45 +240,41 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                             final area = _areas[index];
                             final isDefault = _areaService.isDefaultArea(area);
                             final canEditDelete = isAdmin || !isDefault;
-                            
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               decoration: BoxDecoration(
                                 color: theme.cardColor,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isDefault 
-                                      ? Colors.grey.withOpacity(0.3)
-                                      : AppColors.primary.withOpacity(0.3),
-                                ),
                               ),
                               child: ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: (isDefault ? Colors.grey : AppColors.primary).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    isDefault ? Icons.lock : Icons.location_on, 
-                                    color: isDefault ? Colors.grey : AppColors.primary,
-                                  ),
+                                leading: Icon(
+                                  isDefault ? Icons.lock : Icons.location_on,
+                                  color: isDefault
+                                      ? Colors.grey
+                                      : AppColors.primary,
+                                  size: 24,
                                 ),
                                 title: Text(
                                   area,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w500,
-                                    color: isDefault && !isAdmin 
-                                        ? (isDark ? Colors.grey.shade400 : Colors.grey.shade600)
+                                    color: isDefault && !isAdmin
+                                        ? (isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600)
                                         : null,
                                   ),
                                 ),
                                 subtitle: isDefault && !isAdmin
                                     ? Text(
-                                        AppLocalizations.of(context)!.defaultArea,
+                                        AppLocalizations.of(context)!
+                                            .defaultArea,
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                                          color: isDark
+                                              ? Colors.grey.shade500
+                                              : Colors.grey.shade500,
                                         ),
                                       )
                                     : null,
@@ -276,12 +283,14 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(Icons.edit, size: 20),
+                                            icon: const Icon(Icons.edit,
+                                                size: 20),
                                             onPressed: () => _editArea(area),
                                             color: Colors.blue,
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.delete, size: 20),
+                                            icon: const Icon(Icons.delete,
+                                                size: 20),
                                             onPressed: () => _deleteArea(area),
                                             color: Colors.red,
                                           ),

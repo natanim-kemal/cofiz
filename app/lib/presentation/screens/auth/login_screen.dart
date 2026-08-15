@@ -6,6 +6,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../main.dart';
 import '../../widgets/background_pattern.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -40,13 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success) {
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage ?? 'Login failed'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppToast.show(authProvider.errorMessage ?? 'Login failed');
       }
     }
   }
@@ -103,22 +98,23 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(context);
-                
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+                final authProvider =
+                    Provider.of<AuthProvider>(context, listen: false);
                 final success = await authProvider.resetPassword(
                   email: emailController.text.trim(),
                 );
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success
-                            ? AppLocalizations.of(context)!.passwordResetLinkSent(emailController.text.trim())
-                            : authProvider.errorMessage ?? AppLocalizations.of(context)!.failedToSendResetLink,
-                      ),
-                      backgroundColor: success ? Colors.green : Colors.red,
-                    ),
+                  AppToast.show(
+                    success
+                        ? AppLocalizations.of(context)!
+                            .passwordResetLinkSent(
+                                emailController.text.trim())
+                        : authProvider.errorMessage ??
+                            AppLocalizations.of(context)!
+                                .failedToSendResetLink,
+                    success: success,
                   );
                 }
               }
@@ -144,137 +140,156 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, 
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
           const BackgroundPattern(),
           Center(
             child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
-              child: Form(
-                key: _formKey,
-                child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.center,
-                child: Image.asset(
-                  'assets/icon-bg.png',
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.contain,
-                ),
-              ).animate().fadeIn(duration: 600.ms),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: Alignment.center,
+                          child: Image.asset(
+                            'assets/icon-bg.png',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.contain,
+                          ),
+                        ).animate().fadeIn(duration: 600.ms),
 
-              const SizedBox(height: 40),
+                        const SizedBox(height: 40),
 
-              // Title
-              Text(
-                AppLocalizations.of(context)!.welcome,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : Colors.black87,
-                  letterSpacing: -0.5,
-                ),
-              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
-              
-              const SizedBox(height: 8),
-              
-              Text(
-                AppLocalizations.of(context)!.signInToWorkspace,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                ),
-              ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: 60),
-
-              // Minimal Form
-              _buildMinimalTextField(
-                controller: _emailController,
-                label: AppLocalizations.of(context)!.email,
-                isLast: false,
-                isDark: isDark,
-              ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
-              
-              const SizedBox(height: 24),
-              
-              _buildMinimalTextField(
-                controller: _passwordController,
-                label: AppLocalizations.of(context)!.password,
-                isObscure: true,
-                isLast: true,
-                isDark: isDark,
-              ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: 60),
-
-              // Minimal Button
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 0),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            color: Colors.white, 
-                            strokeWidth: 2
+                        // Title
+                        Text(
+                          AppLocalizations.of(context)!.welcome,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black87,
+                            letterSpacing: -0.5,
                           ),
                         )
-                      : Text(
-                          AppLocalizations.of(context)!.signIn,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                            .animate()
+                            .fadeIn(delay: 200.ms)
+                            .slideY(begin: 0.1, end: 0),
+
+                        const SizedBox(height: 8),
+
+                        Text(
+                          AppLocalizations.of(context)!.signInToWorkspace,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? AppColors.textMutedDark
+                                : AppColors.textMutedLight,
                           ),
-                        ),
-                ),
-              ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.1, end: 0),
-              
-              const SizedBox(height: 24),
-              
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    _showForgotPasswordDialog(context);
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context)!.forgotPassword,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                        )
+                            .animate()
+                            .fadeIn(delay: 300.ms)
+                            .slideY(begin: 0.1, end: 0),
+
+                        const SizedBox(height: 60),
+
+                        // Minimal Form
+                        _buildMinimalTextField(
+                          controller: _emailController,
+                          label: AppLocalizations.of(context)!.email,
+                          isLast: false,
+                          isDark: isDark,
+                        )
+                            .animate()
+                            .fadeIn(delay: 400.ms)
+                            .slideY(begin: 0.1, end: 0),
+
+                        const SizedBox(height: 24),
+
+                        _buildMinimalTextField(
+                          controller: _passwordController,
+                          label: AppLocalizations.of(context)!.password,
+                          isObscure: true,
+                          isLast: true,
+                          isDark: isDark,
+                        )
+                            .animate()
+                            .fadeIn(delay: 500.ms)
+                            .slideY(begin: 0.1, end: 0),
+
+                        const SizedBox(height: 60),
+
+                        // Minimal Button
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _login,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 0),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 2),
+                                  )
+                                : Text(
+                                    AppLocalizations.of(context)!.signIn,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        )
+                            .animate()
+                            .fadeIn(delay: 600.ms)
+                            .slideY(begin: 0.1, end: 0),
+
+                        const SizedBox(height: 24),
+
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              _showForgotPasswordDialog(context);
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: isDark
+                                  ? AppColors.textMutedDark
+                                  : AppColors.textMutedLight,
+                            ),
+                            child: Text(
+                              AppLocalizations.of(context)!.forgotPassword,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: isDark
+                                    ? AppColors.textMutedDark
+                                    : AppColors.textMutedLight,
+                              ),
+                            ),
+                          ),
+                        ).animate().fadeIn(delay: 700.ms),
+                      ],
                     ),
                   ),
                 ),
-              ).animate().fadeIn(delay: 700.ms),
-            ],
+              ),
+            ),
           ),
-        ),
-      ),
-    ),
-  ),
-),
         ],
       ),
     );
@@ -288,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required bool isDark,
   }) {
     final theme = Theme.of(context);
-    
+
     return TextFormField(
       controller: controller,
       obscureText: isObscure,
@@ -334,7 +349,8 @@ class _LoginScreenState extends State<LoginScreen> {
         errorStyle: const TextStyle(fontSize: 11, height: 0.8),
         // Underline border style for minimalism
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black.withOpacity(0.2)),
+          borderSide: BorderSide(
+              color: isDark ? Colors.white24 : Colors.black.withOpacity(0.2)),
         ),
         focusedBorder: const UnderlineInputBorder(
           borderSide: BorderSide(color: AppColors.primary, width: 2),

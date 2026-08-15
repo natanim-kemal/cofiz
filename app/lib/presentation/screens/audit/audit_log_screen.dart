@@ -18,13 +18,13 @@ class AuditLogScreen extends StatefulWidget {
 class _AuditLogScreenState extends State<AuditLogScreen> {
   final AuditService _auditService = AuditService();
   AuditAction? _selectedFilter;
-  
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     // Only admins can view audit logs
     if (authProvider.userRole?.canManageUsers != true) {
       return Scaffold(
@@ -37,31 +37,31 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
           children: [
             const BackgroundPattern(),
             Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.lock_outline,
-                size: 64,
-                color: Colors.grey.shade400,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.lock_outline,
+                    size: 64,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    AppLocalizations.of(context)!.accessDenied,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    AppLocalizations.of(context)!.adminAuditLogsOnly,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                AppLocalizations.of(context)!.accessDenied,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(context)!.adminAuditLogsOnly,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
             ),
           ],
         ),
@@ -87,19 +87,19 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               ),
               const PopupMenuDivider(),
               ...AuditAction.values.map((action) => PopupMenuItem(
-                value: action,
-                child: Row(
-                  children: [
-                    Icon(
-                      _getActionIcon(action),
-                      size: 18,
-                      color: _getActionColor(action),
+                    value: action,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getActionIcon(action),
+                          size: 18,
+                          color: _getActionColor(action),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(action.displayName),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(action.displayName),
-                  ],
-                ),
-              )),
+                  )),
             ],
           ),
         ],
@@ -108,140 +108,148 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         children: [
           const BackgroundPattern(),
           Column(
-        children: [
-          // Filter indicator
-          if (_selectedFilter != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
-              child: Row(
-                children: [
-                  Icon(
-                    _getActionIcon(_selectedFilter!),
-                    size: 16,
-                    color: _getActionColor(_selectedFilter!),
+            children: [
+              // Filter indicator
+              if (_selectedFilter != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getActionIcon(_selectedFilter!),
+                        size: 16,
+                        color: _getActionColor(_selectedFilter!),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        AppLocalizations.of(context)!
+                            .filtering(_selectedFilter!.displayName),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => setState(() => _selectedFilter = null),
+                        child: Text(AppLocalizations.of(context)!.clear),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    AppLocalizations.of(context)!.filtering(_selectedFilter!.displayName),
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => setState(() => _selectedFilter = null),
-                    child: Text(AppLocalizations.of(context)!.clear),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Logs list
-          Expanded(
-            child: StreamBuilder<List<AuditLog>>(
-              stream: _selectedFilter != null
-                  ? _auditService.getActionLogsStream(_selectedFilter!, limit: 100)
-                  : _auditService.getLogsStream(limit: 100),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                ),
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
-                        const SizedBox(height: 16),
-                        Text(
-                          AppLocalizations.of(context)!.errorLoadingLogs,
-                          style: TextStyle(color: Colors.red.shade700),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          snapshot.error.toString(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  );
-                }
+              // Logs list
+              Expanded(
+                child: StreamBuilder<List<AuditLog>>(
+                  stream: _selectedFilter != null
+                      ? _auditService.getActionLogsStream(_selectedFilter!,
+                          limit: 100)
+                      : _auditService.getLogsStream(limit: 100),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                final logs = snapshot.data ?? [];
-
-                if (logs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.history,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          AppLocalizations.of(context)!.noAuditLogs,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          AppLocalizations.of(context)!.activityLogsWillAppear,
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                // Group logs by date
-                final groupedLogs = <String, List<AuditLog>>{};
-                for (final log in logs) {
-                  final dateKey = DateFormat('MMMM d, yyyy').format(log.timestamp);
-                  groupedLogs.putIfAbsent(dateKey, () => []).add(log);
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: groupedLogs.length,
-                  itemBuilder: (context, index) {
-                    final dateKey = groupedLogs.keys.elementAt(index);
-                    final dayLogs = groupedLogs[dateKey]!;
-                    
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            dateKey,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 48, color: Colors.red.shade300),
+                            const SizedBox(height: 16),
+                            Text(
+                              AppLocalizations.of(context)!.errorLoadingLogs,
+                              style: TextStyle(color: Colors.red.shade700),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            Text(
+                              snapshot.error.toString(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                        ...dayLogs.map((log) => _buildLogTile(log, isDark)),
-                      ],
+                      );
+                    }
+
+                    final logs = snapshot.data ?? [];
+
+                    if (logs.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.history,
+                              size: 64,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              AppLocalizations.of(context)!.noAuditLogs,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              AppLocalizations.of(context)!
+                                  .activityLogsWillAppear,
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Group logs by date
+                    final groupedLogs = <String, List<AuditLog>>{};
+                    for (final log in logs) {
+                      final dateKey =
+                          DateFormat('MMMM d, yyyy').format(log.timestamp);
+                      groupedLogs.putIfAbsent(dateKey, () => []).add(log);
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: groupedLogs.length,
+                      itemBuilder: (context, index) {
+                        final dateKey = groupedLogs.keys.elementAt(index);
+                        final dayLogs = groupedLogs[dateKey]!;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                dateKey,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                            ...dayLogs.map((log) => _buildLogTile(log, isDark)),
+                          ],
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    ],
-  ),
-);
+    );
   }
 
   Widget _buildLogTile(AuditLog log, bool isDark) {
@@ -263,20 +271,13 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Action icon
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _getActionColor(log.action).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              _getActionIcon(log.action),
-              color: _getActionColor(log.action),
-              size: 20,
-            ),
+          Icon(
+            _getActionIcon(log.action),
+            color: _getActionColor(log.action),
+            size: 24,
           ),
           const SizedBox(width: 12),
-          
+
           // Content
           Expanded(
             child: Column(
@@ -309,8 +310,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: isDark 
-                              ? Colors.grey.shade700 
+                          color: isDark
+                              ? Colors.grey.shade700
                               : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -318,8 +319,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                           '${entry.key}: ${entry.value}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark 
-                                ? Colors.grey.shade300 
+                            color: isDark
+                                ? Colors.grey.shade300
                                 : Colors.grey.shade700,
                           ),
                         ),
@@ -353,6 +354,10 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         return Icons.delete;
       case AuditAction.transactionCreated:
         return Icons.attach_money;
+      case AuditAction.incomeRecorded:
+        return Icons.trending_up;
+      case AuditAction.expenseRecorded:
+        return Icons.receipt_long;
       case AuditAction.settingsChanged:
         return Icons.settings;
       case AuditAction.dataExported:
@@ -382,6 +387,10 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         return Colors.purple;
       case AuditAction.transactionCreated:
         return Colors.orange;
+      case AuditAction.incomeRecorded:
+        return Colors.green;
+      case AuditAction.expenseRecorded:
+        return Colors.red;
       case AuditAction.dataExported:
       case AuditAction.dataImported:
         return Colors.teal;

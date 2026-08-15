@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
+import '../widgets/app_toast.dart';
 
 class WorkerCredentialsDialog extends StatelessWidget {
   final String workerName;
@@ -42,14 +43,16 @@ class WorkerCredentialsDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _buildCredentialField(context, AppLocalizations.of(context)!.email, email),
+            _buildCredentialField(
+                context, AppLocalizations.of(context)!.email, email),
             const SizedBox(height: 12),
-            _buildCredentialField(context, AppLocalizations.of(context)!.password, password),
+            _buildCredentialField(
+                context, AppLocalizations.of(context)!.password, password),
             const SizedBox(height: 20),
             Text(
               AppLocalizations.of(context)!.sendCredentialsToWorker,
               style: TextStyle(
-                fontSize: 12, 
+                fontSize: 12,
                 color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
               ),
             ),
@@ -76,10 +79,11 @@ class WorkerCredentialsDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildCredentialField(BuildContext context, String label, String value) {
+  Widget _buildCredentialField(
+      BuildContext context, String label, String value) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -126,12 +130,11 @@ class WorkerCredentialsDialog extends StatelessWidget {
     );
 
     final smsUri = 'sms:$phone?body=$message';
-    
+
     launchUrl(Uri.parse(smsUri)).then((success) {
       if (!success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.couldNotOpenSms)),
-        );
+        AppToast.show(
+            AppLocalizations.of(context)!.couldNotOpenSms);
       }
     });
   }
@@ -147,11 +150,6 @@ ${l10n.password}: $password
 ''';
 
     Clipboard.setData(ClipboardData(text: credentials));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.credentialsCopied),
-        backgroundColor: Colors.green,
-      ),
-    );
+    AppToast.show(AppLocalizations.of(context)!.credentialsCopied);
   }
 }

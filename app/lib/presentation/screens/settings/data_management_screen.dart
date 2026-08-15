@@ -8,6 +8,7 @@ import '../../../core/providers/worker_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class DataManagementScreen extends StatefulWidget {
   const DataManagementScreen({super.key});
@@ -22,8 +23,10 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   Future<void> _exportData() async {
     setState(() => _isLoading = true);
     try {
-      final workerProvider = Provider.of<WorkerProvider>(context, listen: false);
-      final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+      final workerProvider =
+          Provider.of<WorkerProvider>(context, listen: false);
+      final transactionProvider =
+          Provider.of<TransactionProvider>(context, listen: false);
 
       final data = {
         'timestamp': DateTime.now().toIso8601String(),
@@ -33,12 +36,14 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
           'total_transactions': transactionProvider.allTransactions.length,
         },
         'workers': workerProvider.workers.map((w) => w.toJson()).toList(),
-        'transactions': transactionProvider.allTransactions.map((t) => t.toJson()).toList(),
+        'transactions':
+            transactionProvider.allTransactions.map((t) => t.toJson()).toList(),
       };
 
       final jsonString = const JsonEncoder.withIndent('  ').convert(data);
       final dir = await getApplicationDocumentsDirectory();
-      final fileName = 'cofiz_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+      final fileName =
+          'cofiz_backup_${DateTime.now().millisecondsSinceEpoch}.json';
       final file = File('${dir.path}/$fileName');
       await file.writeAsString(jsonString);
 
@@ -47,7 +52,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: Text(AppLocalizations.of(context)!.backupSuccessful),
-            content: Text(AppLocalizations.of(context)!.dataExportedTo(file.path)),
+            content:
+                Text(AppLocalizations.of(context)!.dataExportedTo(file.path)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -59,12 +65,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${AppLocalizations.of(context)!.exportFailed("e")}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppToast.show(
+            '${AppLocalizations.of(context)!.exportFailed('e')}');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -76,9 +78,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.clearCache),
-        content: Text(
-          AppLocalizations.of(context)!.clearCacheConfirmation
-        ),
+        content: Text(AppLocalizations.of(context)!.clearCacheConfirmation),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -86,7 +86,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(AppLocalizations.of(context)!.clear, style: const TextStyle(color: Colors.red)),
+            child: Text(AppLocalizations.of(context)!.clear,
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -97,15 +98,16 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.clear();
-        
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AppLocalizations.of(context)!.cacheCleared)),
+          AppToast.show(
+            AppLocalizations.of(context)!.cacheCleared,
+            success: true,
           );
         }
       } catch (e) {
-         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (mounted) {
+          AppToast.show('Error: $e');
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -129,7 +131,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader(context, AppLocalizations.of(context)!.backupAndExport),
+            _buildSectionHeader(
+                context, AppLocalizations.of(context)!.backupAndExport),
             const SizedBox(height: 16),
             _buildActionTile(
               context,
@@ -138,7 +141,6 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
               subtitle: AppLocalizations.of(context)!.exportDataSubtitle,
               onTap: _exportData,
             ),
-            
             const SizedBox(height: 32),
             _buildSectionHeader(context, AppLocalizations.of(context)!.storage),
             const SizedBox(height: 16),
@@ -177,7 +179,8 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final color = isDestructive ? Colors.red : (isDark ? Colors.white : Colors.black87);
+    final color =
+        isDestructive ? Colors.red : (isDark ? Colors.white : Colors.black87);
 
     return Container(
       decoration: BoxDecoration(
@@ -193,17 +196,19 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       ),
       child: ListTile(
         onTap: _isLoading ? null : onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: (isDestructive ? Colors.red : AppColors.primary).withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: _isLoading 
-            ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) 
-            : Icon(icon, color: isDestructive ? Colors.red : AppColors.primary),
-        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: _isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                icon,
+                color: isDestructive ? Colors.red : AppColors.primary,
+                size: 28,
+              ),
         title: Text(
           title,
           style: TextStyle(

@@ -13,6 +13,7 @@ import 'area_management_screen.dart';
 import 'data_management_screen.dart';
 import 'about_screen.dart';
 import '../audit/audit_log_screen.dart';
+import '../../widgets/app_toast.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -43,7 +44,8 @@ class SettingsScreen extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(right: 8.0),
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          icon:
+                              const Icon(Icons.arrow_back, color: Colors.white),
                           onPressed: () => Navigator.pop(context),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -74,36 +76,42 @@ class SettingsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               children: [
-                _buildSectionHeader(theme, localizations.business),
-                if (isAdmin || authProvider.isViewer)
+                if (isAdmin || authProvider.isViewer) ...[
+                  _buildSectionHeader(theme, localizations.business),
                   _buildSettingsTile(
                     context,
                     icon: Icons.store,
                     title: localizations.businessInformation,
                     subtitle: settingsProvider.companyName,
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    trailing:
+                        const Icon(Icons.chevron_right, color: Colors.grey),
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const BusinessSettingsScreen()),
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                const BusinessSettingsScreen()),
                       );
                     },
                   ),
-                _buildSettingsTile(
-                  context,
-                  icon: Icons.location_on,
-                  title: localizations.manageAreas,
-                  subtitle: localizations.purchaseLocations,
-                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AreaManagementScreen()),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-                
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.location_on,
+                    title: localizations.manageAreas,
+                    subtitle: localizations.purchaseLocations,
+                    trailing:
+                        const Icon(Icons.chevron_right, color: Colors.grey),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const AreaManagementScreen()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
                 _buildSectionHeader(theme, localizations.general),
                 _buildSettingsTile(
                   context,
@@ -113,7 +121,8 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const ProfileEditScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const ProfileEditScreen()),
                     );
                   },
                 ),
@@ -125,30 +134,33 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const NotificationSettingsScreen()),
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const NotificationSettingsScreen()),
                     );
                   },
                   trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                 ),
-                
+
                 const SizedBox(height: 24),
                 _buildSectionHeader(theme, localizations.preferences),
-                 _buildSettingsTile(
+                _buildSettingsTile(
                   context,
                   icon: Icons.dark_mode_outlined,
                   title: localizations.darkMode,
-                  subtitle: localizations.systemDefault, 
+                  subtitle: localizations.systemDefault,
                   trailing: Switch(
-                    value: isDark, 
-                    onChanged: (val) => themeProvider.toggleTheme(val), 
-                    activeColor: AppColors.primary
-                  ),
+                      value: isDark,
+                      onChanged: (val) => themeProvider.toggleTheme(val),
+                      activeColor: AppColors.primary),
                 ),
                 _buildSettingsTile(
                   context,
                   icon: Icons.language,
                   title: localizations.changeLanguage,
-                  subtitle: settingsProvider.locale.languageCode == 'am' ? 'Amharic (አማርኛ)' : 'English',
+                  subtitle: settingsProvider.locale.languageCode == 'am'
+                      ? 'Amharic (አማርኛ)'
+                      : 'English',
                   onTap: () => _showLanguageBottomSheet(context),
                 ),
 
@@ -160,7 +172,7 @@ class SettingsScreen extends StatelessWidget {
                   title: localizations.changePassword,
                   onTap: () => _showChangePasswordDialog(context),
                 ),
-                 _buildSettingsTile(
+                _buildSettingsTile(
                   context,
                   icon: Icons.security,
                   title: localizations.twoFactorAuth,
@@ -175,16 +187,18 @@ class SettingsScreen extends StatelessWidget {
                     icon: Icons.backup_outlined,
                     title: localizations.dataManagement,
                     subtitle: localizations.backupExportClearCache,
-                     onTap: () {
+                    onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const DataManagementScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const DataManagementScreen()),
                       );
                     },
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                    trailing:
+                        const Icon(Icons.chevron_right, color: Colors.grey),
                   ),
                 ],
-                
+
                 // Audit Logs - Admin only
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, _) {
@@ -199,14 +213,16 @@ class SettingsScreen extends StatelessWidget {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const AuditLogScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const AuditLogScreen()),
                         );
                       },
-                      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                      trailing:
+                          const Icon(Icons.chevron_right, color: Colors.grey),
                     );
                   },
                 ),
-                
+
                 const SizedBox(height: 24),
                 _buildSectionHeader(theme, localizations.app),
                 _buildSettingsTile(
@@ -214,10 +230,11 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.info_outline,
                   title: localizations.aboutCofiz,
                   subtitle: localizations.version("1.1.9"),
-                   onTap: () {
+                  onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const AboutScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const AboutScreen()),
                     );
                   },
                   trailing: const Icon(Icons.chevron_right, color: Colors.grey),
@@ -239,17 +256,20 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
-                            child: Text(localizations.signOut, style: const TextStyle(color: Colors.red)),
+                            child: Text(localizations.signOut,
+                                style: const TextStyle(color: Colors.red)),
                           ),
                         ],
                       ),
                     );
 
                     if (confirmed == true && context.mounted) {
-                      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                      final authProvider =
+                          Provider.of<AuthProvider>(context, listen: false);
                       await authProvider.signOut();
                       if (context.mounted) {
-                        Navigator.of(context).popUntil((route) => route.isFirst);
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst);
                       }
                     }
                   },
@@ -304,21 +324,18 @@ class SettingsScreen extends StatelessWidget {
       ),
       child: ListTile(
         onTap: onTap,
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 20),
-        ),
+        leading: Icon(icon, color: AppColors.primary, size: 24),
         title: Text(
-          title, 
+          title,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
-        subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(color: AppColors.textMutedDark, fontSize: 12)) : null,
+        subtitle: subtitle != null
+            ? Text(subtitle,
+                style: const TextStyle(
+                    color: AppColors.textMutedDark, fontSize: 12))
+            : null,
         trailing: trailing,
       ),
     );
@@ -326,16 +343,17 @@ class SettingsScreen extends StatelessWidget {
 
   // ... helper methods (language bottom sheet, change password) ...
   // Coping logic from previous file or rewriting
-  
+
   void _showChangePasswordDialog(BuildContext context) {
     // ...
-     showDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(AppLocalizations.of(context)?.changePasswordDialogTitle ?? 'Change Password'),
-        content: Text(
-          AppLocalizations.of(context)?.changePasswordDialogContent ?? 'To change your password, we will send a password reset link to your email address. Do you want to proceed?'
-        ),
+        title: Text(AppLocalizations.of(context)?.changePasswordDialogTitle ??
+            'Change Password'),
+        content: Text(AppLocalizations.of(context)
+                ?.changePasswordDialogContent ??
+            'To change your password, we will send a password reset link to your email address. Do you want to proceed?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -344,24 +362,27 @@ class SettingsScreen extends StatelessWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final authProvider =
+                  Provider.of<AuthProvider>(context, listen: false);
               final email = authProvider.user?.email;
-              
+
               if (email != null) {
                 final success = await authProvider.resetPassword(email: email);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(success 
-                        ? AppLocalizations.of(context)!.passwordResetEmailSent(email) 
-                        : AppLocalizations.of(context)!.failedToSendResetEmail(authProvider.errorMessage ?? 'Unknown')
-                      ),
-                    ),
+                  AppToast.show(
+                    success
+                        ? AppLocalizations.of(context)!
+                            .passwordResetEmailSent(email)
+                        : AppLocalizations.of(context)!
+                            .failedToSendResetEmail(
+                                authProvider.errorMessage ?? 'Unknown'),
+                    success: success,
                   );
                 }
               }
             },
-            child: Text(AppLocalizations.of(context)?.sendEmail ?? 'Send Email'),
+            child:
+                Text(AppLocalizations.of(context)?.sendEmail ?? 'Send Email'),
           ),
         ],
       ),
@@ -370,38 +391,42 @@ class SettingsScreen extends StatelessWidget {
 
   void _showLanguageBottomSheet(BuildContext context) {
     showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-               Text(
-                 AppLocalizations.of(context)?.selectLanguage ?? 'Select Language',
-                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-               ),
-               const SizedBox(height: 16),
-               _buildLanguageOption(context, 'English', const Locale('en')),
-               _buildLanguageOption(context, 'Amharic (አማርኛ)', const Locale('am')),
-            ],
-          ),
-        );
-      }
-    );
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context)?.selectLanguage ??
+                      'Select Language',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                _buildLanguageOption(context, 'English', const Locale('en')),
+                _buildLanguageOption(
+                    context, 'Amharic (አማርኛ)', const Locale('am')),
+              ],
+            ),
+          );
+        });
   }
 
-  Widget _buildLanguageOption(BuildContext context, String name, Locale locale) {
+  Widget _buildLanguageOption(
+      BuildContext context, String name, Locale locale) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final isSelected = settings.locale.languageCode == locale.languageCode;
-    
+
     return ListTile(
       title: Text(name),
-      trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         settings.setLocale(locale);
         Navigator.pop(context);

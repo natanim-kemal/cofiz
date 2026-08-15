@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -35,19 +36,18 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     if (_formKey.currentState!.validate()) {
       final success = await Provider.of<AuthProvider>(context, listen: false)
           .updateUserProfile(displayName: _nameController.text.trim());
-      
+
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AppLocalizations.of(context)!.profileUpdatedSuccessfully)),
+          AppToast.show(
+            AppLocalizations.of(context)!.profileUpdatedSuccessfully,
+            success: true,
           );
           Navigator.pop(context);
         } else {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text(
-               Provider.of<AuthProvider>(context, listen: false).errorMessage ?? AppLocalizations.of(context)!.updateFailed
-             )),
-          );
+          AppToast.show(
+              Provider.of<AuthProvider>(context, listen: false).errorMessage ??
+                  AppLocalizations.of(context)!.updateFailed);
         }
       }
     }
@@ -58,14 +58,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.editProfile, style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+        title: Text(AppLocalizations.of(context)!.editProfile,
+            style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: theme.iconTheme.color ?? (isDark ? Colors.white : Colors.black)),
+        iconTheme: IconThemeData(
+            color: theme.iconTheme.color ??
+                (isDark ? Colors.white : Colors.black)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -111,7 +114,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
                 Text(
                   AppLocalizations.of(context)!.fullName,
                   style: TextStyle(
@@ -135,7 +137,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.white10 : Colors.transparent),
+                      borderSide: BorderSide(
+                          color: isDark ? Colors.white10 : Colors.transparent),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -149,9 +152,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     return null;
                   },
                 ),
-                
                 const SizedBox(height: 24),
-                
                 Text(
                   AppLocalizations.of(context)!.emailAddress,
                   style: TextStyle(
@@ -164,10 +165,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 TextFormField(
                   controller: _emailController,
                   readOnly: true,
-                  style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
+                  style: TextStyle(
+                      color:
+                          theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                    fillColor:
+                        isDark ? Colors.grey.shade900 : Colors.grey.shade100,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(color: Colors.transparent),
@@ -187,14 +191,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   child: Text(
                     AppLocalizations.of(context)!.emailCannotBeChanged,
                     style: TextStyle(
-                      color: isDark ? Colors.grey.shade400 : AppColors.textMutedLight,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : AppColors.textMutedLight,
                       fontSize: 12,
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 40),
-                
                 SizedBox(
                   width: double.infinity,
                   height: 50,

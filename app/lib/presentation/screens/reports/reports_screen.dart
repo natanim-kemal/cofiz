@@ -2,13 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/providers/transaction_provider.dart';
+import '../../../core/providers/income_provider.dart';
+import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/transaction_model.dart';
+import '../../../core/models/income_record_model.dart';
+import '../../../core/models/expense_record_model.dart';
 import '../../../core/utils/number_formatter.dart';
-import '../../widgets/stats_card.dart';
-import '../../../core/services/report_service.dart';
 import '../../widgets/custom_header.dart';
+import '../../../core/services/report_service.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
+
+enum _ReportKind { distribution, returnMoney, purchase, investment, sale, expense }
+
+class _ReportEntry {
+  final _ReportKind kind;
+  final DateTime createdAt;
+  final Object payload;
+  const _ReportEntry(this.kind, this.createdAt, this.payload);
+}
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -23,7 +36,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _itemsToShow = 20; // Pagination - items per page
   static const int _itemsPerLoad = 20;
   DateTime? _selectedDate; // For "Choose Date" option
-  
+
   late List<String> _dateOptions;
   late List<String> _typeOptions;
 
@@ -31,27 +44,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final l10n = AppLocalizations.of(context)!;
-    
+
     _dateOptions = [
-      l10n.today, 
-      l10n.last7Days, 
-      l10n.thisMonth, 
-      l10n.allTime, 
+      l10n.today,
+      l10n.last7Days,
+      l10n.thisMonth,
+      l10n.allTime,
       l10n.chooseDate
     ];
-    
+
     _typeOptions = [
       l10n.all,
       l10n.distribute,
       l10n.returnMoney,
       l10n.coffeePurchase,
+      l10n.investment,
+      l10n.sale,
+      l10n.expenses,
     ];
 
     // Ensure initial or valid selection
     if (_dateFilter == null || !_dateOptions.contains(_dateFilter)) {
       _dateFilter = l10n.last7Days;
     }
-    
+
     if (_typeFilter == null || !_typeOptions.contains(_typeFilter)) {
       _typeFilter = l10n.all;
     }
@@ -61,25 +77,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<TransactionProvider>(context, listen: false).loadAllTransactions();
+      Provider.of<TransactionProvider>(context, listen: false)
+          .loadAllTransactions();
     });
   }
-  
+
   void _loadMore() {
     setState(() {
       _itemsToShow += _itemsPerLoad;
     });
   }
-  
-  void _resetPagination() {
-    setState(() {
-      _itemsToShow = _itemsPerLoad;
-    });
-  }
 
   Future<void> _pickDate() async {
     final l10n = AppLocalizations.of(context)!;
-    
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? DateTime.now(),
@@ -92,14 +103,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
               primary: AppColors.primary,
               onPrimary: Colors.white,
               surface: Theme.of(context).cardColor,
-              onSurface: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
+              onSurface:
+                  Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
             ),
           ),
           child: child!,
         );
       },
     );
-    
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -109,11 +121,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  List<MoneyTransaction> _getFilteredTransactions(List<MoneyTransaction> allTransactions, AppLocalizations l10n) {
+  List<_ReportEntry> _getFilteredEntries(
+    List<MoneyTransaction> allTransactions,
+    List<IncomeRecord> incomeRecords,
+    List<ExpenseRecord> expenseRecords,
+    AppLocalizations l10n,
+  ) {
     DateTime now = DateTime.now();
     DateTime? startDate;
     DateTime? endDate;
-    
+
     // Use localized strings for comparison
     if (_dateFilter == l10n.today) {
       startDate = DateTime(now.year, now.month, now.day);
@@ -125,118 +142,149 @@ class _ReportsScreenState extends State<ReportsScreen> {
       startDate = null;
     } else if (_dateFilter == l10n.chooseDate) {
       if (_selectedDate != null) {
-        startDate = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
-        endDate = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day, 23, 59, 59);
+        startDate = DateTime(
+            _selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
+        endDate = DateTime(_selectedDate!.year, _selectedDate!.month,
+            _selectedDate!.day, 23, 59, 59);
       }
     }
 
-    return allTransactions.where((t) {
-      bool dateMatch;
-      if (_dateFilter == l10n.chooseDate && startDate != null && endDate != null) {
+    bool dateMatch(DateTime createdAt) {
+      if (_dateFilter == l10n.chooseDate &&
+          startDate != null &&
+          endDate != null) {
         // For specific date, check if transaction is within that day
-        dateMatch = t.createdAt.isAfter(startDate.subtract(const Duration(seconds: 1))) && 
-                    t.createdAt.isBefore(endDate.add(const Duration(seconds: 1)));
-      } else {
-        dateMatch = startDate == null || t.createdAt.isAfter(startDate);
+        return createdAt
+                .isAfter(startDate.subtract(const Duration(seconds: 1))) &&
+            createdAt.isBefore(endDate.add(const Duration(seconds: 1)));
       }
-      
-      // Determine type match based on localized string mapping or internal type
-      // Internal types: 'Distribution', 'Return', 'Purchase'
-      bool typeMatch = false;
-      String typeLower = t.type.toLowerCase();
-      
-      if (_typeFilter == l10n.all) {
-        typeMatch = true;
-      } else if (_typeFilter == l10n.distribute && typeLower == 'distribution') {
-        typeMatch = true;
-      } else if (_typeFilter == l10n.returnMoney && typeLower == 'return') {
-        typeMatch = true;
-      } else if (_typeFilter == l10n.coffeePurchase && typeLower == 'purchase') {
-        typeMatch = true;
+      return startDate == null || createdAt.isAfter(startDate);
+    }
+
+    bool typeMatch(_ReportKind kind) {
+      if (_typeFilter == l10n.all) return true;
+      switch (_typeFilter) {
+        case _ when _typeFilter == l10n.distribute:
+          return kind == _ReportKind.distribution;
+        case _ when _typeFilter == l10n.returnMoney:
+          return kind == _ReportKind.returnMoney;
+        case _ when _typeFilter == l10n.coffeePurchase:
+          return kind == _ReportKind.purchase;
+        case _ when _typeFilter == l10n.investment:
+          return kind == _ReportKind.investment;
+        case _ when _typeFilter == l10n.sale:
+          return kind == _ReportKind.sale;
+        case _ when _typeFilter == l10n.expenses:
+          return kind == _ReportKind.expense;
+        default:
+          return false;
       }
-      
-      return dateMatch && typeMatch;
-    }).toList();
+    }
+
+    final entries = <_ReportEntry>[
+      for (final t in allTransactions)
+        _ReportEntry(
+          t.type.toLowerCase() == 'return'
+              ? _ReportKind.returnMoney
+              : t.type.toLowerCase() == 'purchase'
+                  ? _ReportKind.purchase
+                  : _ReportKind.distribution,
+          t.createdAt,
+          t,
+        ),
+      for (final r in incomeRecords)
+        _ReportEntry(
+          r.kind == IncomeKind.sale ? _ReportKind.sale : _ReportKind.investment,
+          r.createdAt,
+          r,
+        ),
+      for (final e in expenseRecords)
+        _ReportEntry(_ReportKind.expense, e.createdAt, e),
+    ];
+
+    return entries
+        .where((e) => dateMatch(e.createdAt) && typeMatch(e.kind))
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   @override
   Widget build(BuildContext context) {
     final transactionProvider = Provider.of<TransactionProvider>(context);
+    final incomeProvider = Provider.of<IncomeProvider>(context);
+    final expenseProvider = Provider.of<ExpenseProvider>(context);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final filteredTransactions = _getFilteredTransactions(transactionProvider.allTransactions, l10n);
-    
-    // Calculate summary
-    double totalAmount = filteredTransactions.fold(0, (sum, t) => sum + t.amount);
-    int count = filteredTransactions.length;
-
+    final entries = _getFilteredEntries(
+      transactionProvider.allTransactions,
+      incomeProvider.records,
+      expenseProvider.records,
+      l10n,
+    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Column(
-          children: [
-              // Header
-              CustomHeader(
-                height: 200, // Match WorkerListScreen header height
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          CustomHeader(
+            height: 200, // Match WorkerListScreen header height
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context)?.reports ?? 'Reports',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      IconButton(
-                        onPressed: () async {
-                           if (filteredTransactions.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(AppLocalizations.of(context)!.noDataToExport)),
-                            );
-                            return;
-                          }
-                          
-                          try {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(AppLocalizations.of(context)!.preparingPdfReport)),
-                            );
-
-                            await ReportService().generateTransactionReport(
-                              filteredTransactions,
-                              _dateFilter!,
-                              _typeFilter!,
-                            );
-                          } catch (e, stackTrace) {
-                            print('Error generating PDF report: $e');
-                            print(stackTrace);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${AppLocalizations.of(context)!.errorGeneratingReport}: $e'),
-                                  backgroundColor: Colors.red,
-                                  duration: const Duration(seconds: 5),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+                    Text(
+                      AppLocalizations.of(context)?.reports ?? 'Reports',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Filters matching Search Box style
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _selectedDate != null 
+                    ),
+                    IconButton(
+                      onPressed: () async {
+                        if (entries.isEmpty) {
+                          AppToast.show(
+                              AppLocalizations.of(context)!.noDataToExport);
+                          return;
+                        }
+
+                        try {
+                          AppToast.show(
+                              AppLocalizations.of(context)!.preparingPdfReport);
+
+                          await ReportService().generateTransactionReport(
+                            _transactionsFrom(entries),
+                            _incomeFrom(entries),
+                            _expensesFrom(entries),
+                            _dateFilter!,
+                            _typeFilter!,
+                          );
+                        } catch (e, stackTrace) {
+                          print('Error generating PDF report: $e');
+                          print(stackTrace);
+                          if (mounted) {
+                            AppToast.show(
+                                '${AppLocalizations.of(context)!
+                                    .errorGeneratingReport}: $e');
+                          }
+                        }
+                      },
+                      icon:
+                          const Icon(Icons.picture_as_pdf, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Filters matching Search Box style
+                Row(
+                  children: [
+                    Expanded(
+                      child: _selectedDate != null
                           ? _buildDateChip()
                           : _buildFilterDropdown(
                               value: _dateFilter!,
@@ -254,43 +302,45 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               },
                               icon: Icons.calendar_today,
                             ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildFilterDropdown(
+                        value: _typeFilter!,
+                        items: _typeOptions,
+                        onChanged: (val) => setState(() => _typeFilter = val!),
+                        icon: Icons.filter_list,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildFilterDropdown(
-                          value: _typeFilter!,
-                          items: _typeOptions,
-                          onChanged: (val) => setState(() => _typeFilter = val!),
-                          icon: Icons.filter_list,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
 
-            // Summary Cards
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () async {
-                  Provider.of<TransactionProvider>(context, listen: false).loadAllTransactions();
-                  await Future.delayed(const Duration(milliseconds: 500));
-                },
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
+          // Summary Cards
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                Provider.of<TransactionProvider>(context, listen: false)
+                    .loadAllTransactions();
+                await Future.delayed(const Duration(milliseconds: 500));
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
                     // Quick Stats Row
-                    _buildQuickStats(filteredTransactions),
+                    _buildQuickStats(_transactionsFrom(entries)),
 
                     const SizedBox(height: 24),
 
                     // Coffee Purchase Summary by Type
-                    if (_typeFilter == l10n.all || _typeFilter == l10n.coffeePurchase)
-                      _buildCoffeeSummary(filteredTransactions),
+                    if (_typeFilter == l10n.all ||
+                        _typeFilter == l10n.coffeePurchase)
+                      _buildCoffeeSummary(_transactionsFrom(entries)),
 
                     const SizedBox(height: 24),
 
@@ -307,25 +357,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ),
                         ),
                         Text(
-                          '${filteredTransactions.length} ${AppLocalizations.of(context)!.records}',
+                          '${entries.length} ${AppLocalizations.of(context)!.records}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                            color: isDark
+                                ? AppColors.textMutedDark
+                                : AppColors.textMutedLight,
                           ),
                         ),
                       ],
                     ),
-                    
-                    if (filteredTransactions.isEmpty)
+
+                    if (entries.isEmpty)
                       Padding(
                         padding: const EdgeInsets.all(40),
                         child: Center(
                           child: Column(
                             children: [
-                              Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+                              Icon(Icons.search_off,
+                                  size: 48, color: Colors.grey.shade300),
                               const SizedBox(height: 16),
                               Text(
-                                AppLocalizations.of(context)!.noTransactionsFound,
+                                AppLocalizations.of(context)!
+                                    .noTransactionsFound,
                                 style: TextStyle(color: Colors.grey.shade500),
                               ),
                             ],
@@ -338,63 +392,70 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filteredTransactions.length > _itemsToShow 
-                                ? _itemsToShow 
-                                : filteredTransactions.length,
+                            itemCount:
+                                entries.length > _itemsToShow
+                                    ? _itemsToShow
+                                    : entries.length,
                             itemBuilder: (context, index) {
-                              final transaction = filteredTransactions[index];
-                              return _buildTransactionItem(transaction);
+                              return _buildReportItem(entries[index]);
                             },
                           ),
                           // Load More button
-                          if (filteredTransactions.length > _itemsToShow)
+                          if (entries.length > _itemsToShow)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: OutlinedButton.icon(
                                 onPressed: _loadMore,
                                 icon: const Icon(Icons.expand_more),
                                 label: Text(
-                                  '${AppLocalizations.of(context)!.loadMore} (${filteredTransactions.length - _itemsToShow} ${AppLocalizations.of(context)!.remaining})',
+                                  AppLocalizations.of(context)!.loadMore(
+                                      entries.length - _itemsToShow),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primary,
-                                  side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  side: BorderSide(
+                                      color:
+                                          AppColors.primary.withOpacity(0.5)),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                 ),
                               ),
                             )
-                          else if (filteredTransactions.length > _itemsPerLoad)
+                          else if (entries.length > _itemsPerLoad)
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Text(
-                                AppLocalizations.of(context)!.showingAllTransactions(filteredTransactions.length),
+                                AppLocalizations.of(context)!
+                                    .showingAllTransactions(entries.length),
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                                  color: isDark
+                                      ? AppColors.textMutedDark
+                                      : AppColors.textMutedLight,
                                 ),
                               ),
                             ),
                         ],
                       ),
-                      
-                    const SizedBox(height: 80), 
+
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
-             ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildDateChip() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return GestureDetector(
       onTap: _pickDate,
       child: Container(
@@ -429,11 +490,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
               onTap: () {
                 setState(() {
                   _selectedDate = null;
-                  _dateFilter = 'Last 7 Days'; // Keep default key for now to avoid breaking too much logic one shot
+                  _dateFilter =
+                      'Last 7 Days'; // Keep default key for now to avoid breaking too much logic one shot
                   _itemsToShow = _itemsPerLoad;
                 });
               },
-              child: Icon(Icons.close, size: 18, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+              child: Icon(Icons.close,
+                  size: 18,
+                  color: isDark
+                      ? AppColors.textMutedDark
+                      : AppColors.textMutedLight),
             ),
           ],
         ),
@@ -466,7 +532,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+          Icon(icon,
+              size: 18,
+              color:
+                  isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
           const SizedBox(width: 8),
           Expanded(
             child: DropdownButtonHideUnderline(
@@ -474,7 +543,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 value: value,
                 isDense: true,
                 isExpanded: true,
-                icon: Icon(Icons.arrow_drop_down, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                icon: Icon(Icons.arrow_drop_down,
+                    color: isDark
+                        ? AppColors.textMutedDark
+                        : AppColors.textMutedLight),
                 dropdownColor: theme.cardColor,
                 borderRadius: BorderRadius.circular(12),
                 style: TextStyle(
@@ -486,7 +558,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   return DropdownMenuItem<String>(
                     value: item,
                     child: Text(
-                      item, 
+                      item,
                       overflow: TextOverflow.ellipsis,
                     ),
                   );
@@ -500,27 +572,108 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildTransactionItem(MoneyTransaction transaction) {
-    Color getAmountColor() {
-      switch (transaction.type.toLowerCase()) {
-        case 'distribution': return Colors.green;
-        case 'return': return Colors.red;
-        case 'purchase': return Colors.orange;
-        default: return Colors.black;
-      }
-    }
+  List<MoneyTransaction> _transactionsFrom(List<_ReportEntry> entries) =>
+      entries
+          .where((e) =>
+              e.kind == _ReportKind.distribution ||
+              e.kind == _ReportKind.returnMoney ||
+              e.kind == _ReportKind.purchase)
+          .map((e) => e.payload as MoneyTransaction)
+          .toList();
 
-    IconData getIcon() {
-      switch (transaction.type.toLowerCase()) {
-        case 'distribution': return Icons.arrow_upward;
-        case 'return': return Icons.arrow_downward;
-        case 'purchase': return Icons.local_cafe;
-        default: return Icons.article;
-      }
-    }
+  List<IncomeRecord> _incomeFrom(List<_ReportEntry> entries) => entries
+      .where((e) =>
+          e.kind == _ReportKind.investment || e.kind == _ReportKind.sale)
+      .map((e) => e.payload as IncomeRecord)
+      .toList();
 
+  List<ExpenseRecord> _expensesFrom(List<_ReportEntry> entries) => entries
+      .where((e) => e.kind == _ReportKind.expense)
+      .map((e) => e.payload as ExpenseRecord)
+      .toList();
+
+  double _entryAmount(_ReportEntry e) {
+    switch (e.kind) {
+      case _ReportKind.distribution:
+      case _ReportKind.returnMoney:
+      case _ReportKind.purchase:
+        return (e.payload as MoneyTransaction).amount;
+      case _ReportKind.investment:
+      case _ReportKind.sale:
+        return (e.payload as IncomeRecord).amount;
+      case _ReportKind.expense:
+        return (e.payload as ExpenseRecord).amount;
+    }
+  }
+
+  String _entryPrefix(_ReportEntry e) {
+    switch (e.kind) {
+      case _ReportKind.distribution:
+      case _ReportKind.expense:
+        return '-';
+      case _ReportKind.returnMoney:
+      case _ReportKind.purchase:
+      case _ReportKind.investment:
+      case _ReportKind.sale:
+        return '+';
+    }
+  }
+
+  Widget _buildReportItem(_ReportEntry entry) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    Color amountColor;
+    IconData icon;
+    String title;
+    String typeLabel;
+
+    switch (entry.kind) {
+      case _ReportKind.distribution:
+        final t = entry.payload as MoneyTransaction;
+        amountColor = Colors.red;
+        icon = Icons.arrow_upward;
+        title = t.workerName;
+        typeLabel = t.typeDisplay;
+        break;
+      case _ReportKind.returnMoney:
+        final t = entry.payload as MoneyTransaction;
+        amountColor = Colors.green;
+        icon = Icons.arrow_downward;
+        title = t.workerName;
+        typeLabel = t.typeDisplay;
+        break;
+      case _ReportKind.purchase:
+        final t = entry.payload as MoneyTransaction;
+        amountColor = Colors.orange;
+        icon = Icons.local_cafe;
+        title = t.workerName;
+        typeLabel = t.typeDisplay;
+        break;
+      case _ReportKind.investment:
+        final r = entry.payload as IncomeRecord;
+        amountColor = Colors.green;
+        icon = Icons.account_balance;
+        title = r.viewerName ?? (AppLocalizations.of(context)?.investment ??
+            'Investment');
+        typeLabel = AppLocalizations.of(context)?.investment ?? 'Investment';
+        break;
+      case _ReportKind.sale:
+        final r = entry.payload as IncomeRecord;
+        amountColor = Colors.green;
+        icon = Icons.point_of_sale;
+        title = r.saleCategory ?? (AppLocalizations.of(context)?.sale ?? 'Sale');
+        typeLabel = AppLocalizations.of(context)?.sale ?? 'Sale';
+        break;
+      case _ReportKind.expense:
+        final e = entry.payload as ExpenseRecord;
+        amountColor = Colors.red;
+        icon = Icons.receipt_long;
+        title = e.expenseCategory;
+        typeLabel =
+            AppLocalizations.of(context)?.expenses ?? 'Expenses';
+        break;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -538,17 +691,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              getIcon(),
-              color: getAmountColor(),
-              size: 20,
-            ),
+          Icon(
+            icon,
+            color: amountColor,
+            size: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -556,7 +702,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  transaction.workerName,
+                  title,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
@@ -564,10 +710,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                 ),
                 Text(
-                  DateFormat('MMM d, h:mm a').format(transaction.createdAt),
+                  DateFormat('MMM d, h:mm a').format(entry.createdAt),
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                    color: isDark
+                        ? AppColors.textMutedDark
+                        : AppColors.textMutedLight,
                   ),
                 ),
               ],
@@ -577,18 +725,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${transaction.amount.formatted}',
+                '${_entryPrefix(entry)}${AppLocalizations.of(context)?.currency ?? 'ETB'} ${_entryAmount(entry).formatted}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
-                  color: getAmountColor(),
+                  color: amountColor,
                 ),
               ),
               Text(
-                transaction.typeDisplay,
+                typeLabel,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                  color: isDark
+                      ? AppColors.textMutedDark
+                      : AppColors.textMutedLight,
                 ),
               ),
             ],
@@ -602,25 +752,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildQuickStats(List<MoneyTransaction> transactions) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     // Get purchase transactions only
-    final purchases = transactions.where((t) => t.type.toLowerCase() == 'purchase').toList();
-    
+    final purchases =
+        transactions.where((t) => t.type.toLowerCase() == 'purchase').toList();
+
     // Calculate stats
     String topBuyer = '-';
     double avgPrice = 0;
     double totalCommission = 0;
-    
+
     if (purchases.isNotEmpty) {
       // Find top buyer (by total amount)
       Map<String, double> buyerTotals = {};
       for (var t in purchases) {
         buyerTotals[t.workerName] = (buyerTotals[t.workerName] ?? 0) + t.amount;
       }
-      topBuyer = buyerTotals.entries
-          .reduce((a, b) => a.value > b.value ? a : b)
-          .key;
-      
+      topBuyer =
+          buyerTotals.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+
       // Calculate average price per kg
       double totalWeight = 0;
       double totalValue = 0;
@@ -633,20 +783,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (totalWeight > 0) {
         avgPrice = totalValue / totalWeight;
       }
-      
+
       // Calculate total commission
       for (var t in purchases) {
         totalCommission += t.commissionAmount ?? 0;
       }
     }
-    
+
     return Row(
       children: [
         Expanded(
           child: _buildQuickStatCard(
             icon: Icons.emoji_events,
             label: 'Top Buyer',
-            value: topBuyer.length > 10 ? '${topBuyer.substring(0, 10)}...' : topBuyer,
+            value: topBuyer.length > 10
+                ? '${topBuyer.substring(0, 10)}...'
+                : topBuyer,
             color: Colors.amber,
             isDark: isDark,
           ),
@@ -687,20 +839,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 18),
+          Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
-              color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+              color:
+                  isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
             ),
           ),
           const SizedBox(height: 2),
@@ -722,33 +872,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildCoffeeSummary(List<MoneyTransaction> transactions) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     // Get purchase transactions only
-    final purchases = transactions.where((t) => t.type.toLowerCase() == 'purchase').toList();
-    
+    final purchases =
+        transactions.where((t) => t.type.toLowerCase() == 'purchase').toList();
+
     if (purchases.isEmpty) return const SizedBox.shrink();
-    
+
     // Group by coffee type
     Map<String, Map<String, double>> coffeeData = {};
-    
+
     for (var t in purchases) {
       String type = t.coffeeType ?? 'Unknown';
-      type = type.isNotEmpty ? type[0].toUpperCase() + type.substring(1) : 'Unknown';
-      
+      type = type.isNotEmpty
+          ? type[0].toUpperCase() + type.substring(1)
+          : 'Unknown';
+
       coffeeData.putIfAbsent(type, () => {'qty': 0, 'total': 0, 'count': 0});
-      coffeeData[type]!['qty'] = (coffeeData[type]!['qty'] ?? 0) + (t.coffeeWeight ?? 0);
+      coffeeData[type]!['qty'] =
+          (coffeeData[type]!['qty'] ?? 0) + (t.coffeeWeight ?? 0);
       coffeeData[type]!['total'] = (coffeeData[type]!['total'] ?? 0) + t.amount;
       coffeeData[type]!['count'] = (coffeeData[type]!['count'] ?? 0) + 1;
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.2),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,20 +919,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Header
           Row(
             children: [
-              Expanded(flex: 2, child: Text('Type', style: _headerStyle(isDark))),
-              Expanded(flex: 1, child: Text('Qty', style: _headerStyle(isDark), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Avg Price', style: _headerStyle(isDark), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Total', style: _headerStyle(isDark), textAlign: TextAlign.right)),
+              Expanded(
+                  flex: 2, child: Text('Type', style: _headerStyle(isDark))),
+              Expanded(
+                  flex: 1,
+                  child: Text('Qty',
+                      style: _headerStyle(isDark), textAlign: TextAlign.right)),
+              Expanded(
+                  flex: 2,
+                  child: Text('Avg Price',
+                      style: _headerStyle(isDark), textAlign: TextAlign.right)),
+              Expanded(
+                  flex: 2,
+                  child: Text('Total',
+                      style: _headerStyle(isDark), textAlign: TextAlign.right)),
             ],
           ),
           const SizedBox(height: 8),
           Divider(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
           const SizedBox(height: 8),
-          
+
           // Data rows
           ...coffeeData.entries.map((entry) {
             final type = entry.key;
@@ -789,13 +950,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
             final qty = data['qty'] ?? 0;
             final total = data['total'] ?? 0;
             final avgPrice = qty > 0 ? total / qty : 0;
-            
+
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: [
                   Expanded(
-                    flex: 2, 
+                    flex: 2,
                     child: Row(
                       children: [
                         Container(
@@ -812,7 +973,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                   ),
                   Expanded(
-                    flex: 1, 
+                    flex: 1,
                     child: Text(
                       '${qty.formatted} Kg',
                       style: _valueStyle(isDark),
@@ -820,7 +981,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                   ),
                   Expanded(
-                    flex: 2, 
+                    flex: 2,
                     child: Text(
                       'ETB ${avgPrice.formatted}',
                       style: _valueStyle(isDark),
@@ -828,10 +989,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                   ),
                   Expanded(
-                    flex: 2, 
+                    flex: 2,
                     child: Text(
                       'ETB ${total.formatted}',
-                      style: _valueStyle(isDark).copyWith(fontWeight: FontWeight.bold),
+                      style: _valueStyle(isDark)
+                          .copyWith(fontWeight: FontWeight.bold),
                       textAlign: TextAlign.right,
                     ),
                   ),
