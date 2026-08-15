@@ -15,6 +15,6 @@ enum CoffeeType {
   }
 
   String get id {
-     return name;
+    return name;
   }
 }

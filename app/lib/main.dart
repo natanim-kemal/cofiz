@@ -16,8 +16,13 @@ import 'core/services/notification_service.dart';
 import 'core/providers/notification_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'core/providers/transaction_provider.dart';
+import 'core/providers/income_provider.dart';
+import 'core/providers/expense_provider.dart';
+import 'core/services/income_service.dart';
+import 'core/services/expense_service.dart';
 import 'presentation/widgets/custom_bottom_nav.dart';
 import 'presentation/widgets/offline_indicator.dart';
+import 'presentation/widgets/app_toast.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/widgets/background_pattern.dart';
 import 'presentation/screens/reports/reports_screen.dart';
@@ -29,7 +34,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -52,10 +57,14 @@ void main() async {
   // Initialize default areas if none exist
   await AreaService().initializeDefaultAreas();
 
+  // Initialize default sale & expense categories if none exist
+  await IncomeService().initializeDefaultSaleCategories();
+  await ExpenseService().initializeDefaultExpenseCategories();
+
   // Initialize offline services
   final offlineSyncService = OfflineSyncService();
   await offlineSyncService.initialize();
-  
+
   runApp(StitchWorkerApp(
     notificationService: notificationService,
     offlineSyncService: offlineSyncService,
@@ -65,7 +74,7 @@ void main() async {
 class StitchWorkerApp extends StatelessWidget {
   final NotificationService notificationService;
   final OfflineSyncService offlineSyncService;
-  
+
   const StitchWorkerApp({
     super.key,
     required this.notificationService,
@@ -80,6 +89,8 @@ class StitchWorkerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => WorkerProvider()),
         ChangeNotifierProvider(create: (_) => TransactionProvider()),
+        ChangeNotifierProvider(create: (_) => IncomeProvider()..initialize()),
+        ChangeNotifierProvider(create: (_) => ExpenseProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AuditProvider()),
@@ -91,7 +102,7 @@ class StitchWorkerApp extends StatelessWidget {
             title: 'Cofiz',
             // Locale
             locale: settingsProvider.locale,
-            
+
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
@@ -103,9 +114,10 @@ class StitchWorkerApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
-              Locale('en'), 
+              Locale('en'),
               Locale('am'),
             ],
+            builder: (context, child) => AppToastHost(child: child!),
             home: const AuthGate(),
           );
         },
@@ -129,8 +141,8 @@ class AuthGate extends StatelessWidget {
           });
         } else {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-             Provider.of<NotificationProvider>(context, listen: false)
-                 .disposeListener();
+            Provider.of<NotificationProvider>(context, listen: false)
+                .disposeListener();
           });
         }
         // Show loading while checking auth state
@@ -196,7 +208,7 @@ class AuthGate extends StatelessWidget {
               // Admin and Viewer use MainLayout
               // Viewer will have read-only restrictions in UI
               return MainLayout(key: MainLayout.mainLayoutKey);
-              
+
             case UserRole.worker:
 
               // Workers go to their own dashboard
@@ -207,7 +219,8 @@ class AuthGate extends StatelessWidget {
               } else {
                 return const Scaffold(
                   body: Center(
-                    child: Text('Error: Worker account not properly configured'),
+                    child: Text(
+                        'Error: Collector account not properly configured'),
                   ),
                 );
               }
@@ -223,9 +236,10 @@ class AuthGate extends StatelessWidget {
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
-  
-  static final GlobalKey<_MainLayoutState> mainLayoutKey = GlobalKey<_MainLayoutState>();
-  
+
+  static final GlobalKey<_MainLayoutState> mainLayoutKey =
+      GlobalKey<_MainLayoutState>();
+
   static void navigateTo(int index) {
     mainLayoutKey.currentState?._onNavTap(index);
   }
@@ -268,7 +282,7 @@ class _MainLayoutState extends State<MainLayout> {
       index,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      );
+    );
   }
 
   @override
@@ -282,7 +296,7 @@ class _MainLayoutState extends State<MainLayout> {
             onPageChanged: _onPageChanged,
             children: _screens,
           ),
-          
+
           // Offline Indicator
           const Positioned(
             top: 0,
@@ -290,7 +304,7 @@ class _MainLayoutState extends State<MainLayout> {
             right: 0,
             child: OfflineIndicator(),
           ),
-          
+
           // Fixed Bottom Nav
           Positioned(
             left: 0,

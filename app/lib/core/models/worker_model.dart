@@ -3,12 +3,12 @@ class Worker {
   final String name;
   final String phone;
   final String? email;
-  final String role; 
+  final String role;
   final int yearsOfExperience;
   final String status; // 'active', 'busy', 'offline'
   final double performanceRating; // 0-100
   final String? photoUrl;
-  final double currentBalance; 
+  final double currentBalance;
   final double totalDistributed;
   final double totalReturned; // lifetime total
   final double totalCoffeePurchased; // lifetime total
@@ -173,7 +173,8 @@ class Worker {
       totalDistributed: totalDistributed ?? this.totalDistributed,
       totalReturned: totalReturned ?? this.totalReturned,
       totalCoffeePurchased: totalCoffeePurchased ?? this.totalCoffeePurchased,
-      totalCommissionEarned: totalCommissionEarned ?? this.totalCommissionEarned,
+      totalCommissionEarned:
+          totalCommissionEarned ?? this.totalCommissionEarned,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       isActive: isActive ?? this.isActive,
@@ -196,6 +197,9 @@ class Worker {
         return status;
     }
   }
+
+  /// Get display role text
+  String get roleDisplay => role.toLowerCase() == 'worker' ? 'Collector' : role;
 
   /// Get rating as percentage (0-100)
   int get ratingPercentage => performanceRating.round();

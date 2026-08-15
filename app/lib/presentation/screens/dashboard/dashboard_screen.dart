@@ -4,19 +4,24 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/worker_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
+import '../../../core/providers/income_provider.dart';
+import '../../../core/providers/expense_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/notification_provider.dart';
+import '../../../core/models/worker_model.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../../../main.dart';
 import '../../dialogs/ping_dialog.dart';
-import '../../widgets/stats_card.dart';
-import '../../widgets/activity_chart.dart';
-import '../../widgets/worker_item.dart';
+import '../../widgets/activity_feed_list.dart';
 import '../../widgets/notification_badge.dart';
 import '../notifications/notifications_screen.dart';
-import '../worker_detail/worker_detail_screen.dart';
+import '../income/company_income_screen.dart';
+import '../income/my_investments_screen.dart';
+import '../expense/expenses_screen.dart';
+import '../transaction/transaction_dialog.dart';
 import '../../widgets/custom_header.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,11 +31,14 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  bool _showTotalActivity = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+      final transactionProvider =
+          Provider.of<TransactionProvider>(context, listen: false);
       transactionProvider.loadTodayTotals();
       transactionProvider.loadAllTransactions();
     });
@@ -38,19 +46,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     final authProvider = Provider.of<AuthProvider>(context);
     final workerProvider = Provider.of<WorkerProvider>(context);
     final transactionProvider = Provider.of<TransactionProvider>(context);
+    final incomeProvider = Provider.of<IncomeProvider>(context);
+    final expenseProvider = Provider.of<ExpenseProvider>(context);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     // Robust Localization: Allow null, use fallbacks
     final AppLocalizations? localizations = AppLocalizations.of(context);
-
-    final distributedData = _getLast7DaysData('distribution');
-    final returnedData = _getLast7DaysData('return');
-    final labels = _getLast7DaysLabels();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -62,7 +67,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
         child: Column(
           children: [
-             CustomHeader(
+            CustomHeader(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -82,7 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                             authProvider.user?.displayName ?? 'User',
+                            authProvider.user?.displayName ?? 'User',
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -95,41 +100,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           // Admin Ping All Button
                           if (authProvider.isAdmin)
-                            Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                shape: BoxShape.circle,
-                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
                               child: IconButton(
-                                icon: const Icon(Icons.campaign, color: Colors.white),
-                                tooltip: localizations?.pingAllWorkers ?? 'Ping All Workers',
-                                onPressed: () => _showPingAllDialog(context, authProvider),
+                                icon: const Icon(Icons.campaign,
+                                    color: Colors.white),
+                                tooltip: localizations?.pingAllWorkers ??
+                                    'Ping All Collectors',
+                                onPressed: () =>
+                                    _showPingAllDialog(context, authProvider),
                               ),
                             ),
                           NotificationBadge(
-                            child: InkWell(
-                              onTap: () {
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.notifications_outlined,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              tooltip: localizations?.notifications ??
+                                  'Notifications',
+                              onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const NotificationsScreen(),
+                                    builder: (context) =>
+                                        const NotificationsScreen(),
                                   ),
                                 );
                               },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
                             ),
                           ),
                         ],
@@ -156,14 +155,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     // Compact Stats (Moved Up)
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 12),
                       decoration: BoxDecoration(
                         color: theme.cardColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.5)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                            color:
+                                Colors.black.withOpacity(isDark ? 0.2 : 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 2),
                           ),
@@ -172,17 +172,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildCompactStat(context, Icons.people, '${workerProvider.totalWorkers}', localizations?.total ?? 'Total', AppColors.primary),
+                          _buildCompactStat(
+                            context,
+                            Icons.trending_up,
+                            '${localizations?.currency ?? 'ETB'} ${incomeProvider.totalIncome.formattedCompact}',
+                            localizations?.investment ?? 'Investment',
+                            AppColors.primary,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => authProvider.isViewer
+                                      ? const MyInvestmentsScreen()
+                                      : const CompanyIncomeScreen(),
+                                ),
+                              );
+                            },
+                          ),
                           _buildContainerDivider(isDark),
-                          _buildCompactStat(context, Icons.check_circle, '${workerProvider.activeToday}', localizations?.active ?? 'Active', AppColors.primary),
-                          _buildContainerDivider(isDark),
-                          _buildCompactStat(context, Icons.star, '${workerProvider.avgPerformance.toStringAsFixed(0)}%', localizations?.perf ?? 'Perf', AppColors.primary),
-                          _buildContainerDivider(isDark),
-                          _buildCompactStat(context, Icons.local_cafe, '${transactionProvider.todayPurchased.formatted}', localizations?.sales ?? 'Sales', AppColors.primary),
+                          _buildCompactStat(
+                            context,
+                            Icons.people,
+                            '${workerProvider.activeToday}',
+                            localizations?.collectors ?? 'Collectors',
+                            AppColors.primary,
+                            onTap: () => MainLayout.navigateTo(1),
+                          ),
+_buildContainerDivider(isDark),
+                          _buildCompactStat(
+                            context,
+                            Icons.receipt_long,
+                            '${localizations?.currency ?? 'ETB'} ${expenseProvider.totalExpenses.formattedCompact}',
+                            localizations?.expenses ?? 'Expenses',
+                            AppColors.primary,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ExpensesScreen(),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 24),
 
                     // Today's Overview Card (Moved Down)
@@ -211,26 +246,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(10),
+                              const Icon(
+                                Icons.account_balance_wallet,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _showTotalActivity
+                                      ? (localizations?.totalActivity ??
+                                          'Total Activity')
+                                      : (localizations?.todaysActivity ??
+                                          "Today's Activity"),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.account_balance_wallet,
+                              ),
+                              IconButton(
+                                onPressed: () => setState(
+                                    () => _showTotalActivity =
+                                        !_showTotalActivity),
+                                icon: const Icon(
+                                  Icons.swap_horiz,
                                   color: Colors.white,
                                   size: 20,
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                localizations?.todaysActivity ?? "Today's Activity",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                tooltip: 'Toggle Today / Total',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                               ),
                             ],
                           ),
@@ -239,8 +286,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               Expanded(
                                 child: _buildTodayStatItem(
-                                  localizations?.distributed ?? 'Distributed',
-                                  '${localizations?.currency ?? "ETB"} ${transactionProvider.todayDistributed.formatted}',
+                                  localizations?.moneyIn ?? 'Money In',
+                                  _showTotalActivity
+                                      ? '${localizations?.currency ?? "ETB"} ${_totalMoneyIn(transactionProvider, incomeProvider, expenseProvider).formatted}'
+                                      : '${localizations?.currency ?? "ETB"} ${_todayMoneyIn(transactionProvider, incomeProvider, expenseProvider).formatted}',
                                   Icons.arrow_downward,
                                   Colors.white,
                                 ),
@@ -252,8 +301,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               Expanded(
                                 child: _buildTodayStatItem(
-                                  localizations?.returned ?? 'Returned',
-                                  '${localizations?.currency ?? "ETB"} ${transactionProvider.todayReturned.formatted}',
+                                  localizations?.moneyOut ?? 'Money Out',
+                                  _showTotalActivity
+                                      ? '${localizations?.currency ?? "ETB"} ${_totalMoneyOut(transactionProvider, expenseProvider).formatted}'
+                                      : '${localizations?.currency ?? "ETB"} ${_todayMoneyOut(transactionProvider, expenseProvider).formatted}',
                                   Icons.arrow_upward,
                                   Colors.white,
                                 ),
@@ -274,7 +325,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                               Text(
-                                '${localizations?.currency ?? "ETB"} ${transactionProvider.todayNet.formatted}',
+                                _showTotalActivity
+                                    ? '${localizations?.currency ?? "ETB"} ${_totalNet(transactionProvider, incomeProvider, expenseProvider).formatted}'
+                                    : '${localizations?.currency ?? "ETB"} ${_todayNet(transactionProvider, incomeProvider, expenseProvider).formatted}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 20,
@@ -289,183 +342,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Activity Chart
-                    ActivityChart(
-                      distributedData: distributedData,
-                      returnedData: returnedData,
-                      labels: labels,
-                    ),
+                    _buildEntrySection(),
 
                     const SizedBox(height: 24),
 
-                    // Active Workers Section
-                    if (workerProvider.workers.isNotEmpty) ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            localizations?.activeWorkers ?? 'Active Workers',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: theme.textTheme.bodyLarge?.color,
-                            ),
+                    // Latest Transactions Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          localizations?.latestTransactions ??
+                              'Latest Transactions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: theme.textTheme.bodyLarge?.color,
                           ),
-                          TextButton(
-                            onPressed: () {
-                              MainLayout.navigateTo(1); 
-                            },
-                            child: Text(
-                              localizations?.viewAll ?? 'View All',
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                                ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...workerProvider.workers
-                          .where((w) => w.status == 'active')
-                          .take(3)
-                          .map((worker) {
-                            final isLowBalance = worker.currentBalance < 500;
-                            final balanceColor = isLowBalance ? Colors.red : Colors.green;
-                            
-                            return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: theme.cardColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.primary.withOpacity(0.5)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: InkWell(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            WorkerDetailScreen(workerId: worker.id),
-                                      ),
-                                    );
-                                  },
-                                  child: Row(
-                                    children: [
-                                      // Avatar
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: AppColors.primary.withOpacity(0.1),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            worker.name.substring(0, 2).toUpperCase(),
-                                            style: TextStyle(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      // Info
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              worker.name,
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: isDark ? Colors.white : Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              worker.role,
-                                              style: TextStyle(
-                                                color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // Balance Badge
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 10, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: balanceColor.withOpacity(isDark ? 0.2 : 0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'ETB ${worker.currentBalance.formatted}',
-                                              style: TextStyle(
-                                                color: balanceColor,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (isLowBalance)
-                                              Text(
-                                                'Low',
-                                                style: TextStyle(
-                                                  color: balanceColor,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                          }),
-                    ] else ...[
-                      Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.people_outline,
-                                size: 48, color: Colors.grey.shade400),
-                            const SizedBox(height: 12),
-                            Text(
-                              localizations?.noWorkersYet ?? 'No workers yet',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              localizations?.addWorkersToGetStarted ?? 'Add workers to get started',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade400,
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
-                    ],
+                        TextButton(
+                          onPressed: () => MainLayout.navigateTo(2),
+                          child: Text(
+                            localizations?.viewAll ?? 'View All',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ActivityFeedList(
+                      transactions: transactionProvider.allTransactions,
+                      incomeRecords: incomeProvider.records,
+                      expenseRecords: expenseProvider.records,
+                    ),
                   ],
                 ),
               ),
@@ -476,38 +387,173 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  List<double> _getLast7DaysData(String type) {
-    final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
-    final transactions = transactionProvider.allTransactions;
-    final now = DateTime.now();
-    List<double> data = [];
-    
-    for (int i = 6; i >= 0; i--) {
-      final day = now.subtract(Duration(days: i));
-      final startOfDay = DateTime(day.year, day.month, day.day);
-      final endOfDay = DateTime(day.year, day.month, day.day, 23, 59, 59);
-      
-      double dailySum = transactions
-          .where((t) =>
-              t.type == type &&
-              t.createdAt.isAfter(startOfDay) &&
-              t.createdAt.isBefore(endOfDay))
-          .fold(0.0, (sum, t) => sum + t.amount);
-      
-      data.add(dailySum);
-    }
-    return data;
+  Widget _buildEntrySection() {
+    final localizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            localizations?.recordTransactions ?? 'Record Transactions',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildEntryButton(
+                  Icons.add_circle,
+                  localizations?.distribute ?? 'Distribute',
+                  () => _pickWorkerForEntry('distribution'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildEntryButton(
+                  Icons.remove_circle,
+                  localizations?.returnMoney ?? 'Return',
+                  () => _pickWorkerForEntry('return'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildEntryButton(
+                  Icons.shopping_cart,
+                  localizations?.recordPurchase ?? 'Purchase',
+                  () => _pickWorkerForEntry('purchase'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  List<String> _getLast7DaysLabels() {
-    final now = DateTime.now();
-    List<String> labels = [];
-    
-    for (int i = 6; i >= 0; i--) {
-      final day = now.subtract(Duration(days: i));
-      labels.add(DateFormat('E').format(day));
+  Widget _buildEntryButton(
+      IconData icon, String label, VoidCallback onTap) {
+    const warmOrange = Color(0xFFF0A04B);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: warmOrange.withOpacity(
+              Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: warmOrange, size: 24),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: warmOrange,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _pickWorkerForEntry(String type) {
+    final workerProvider = Provider.of<WorkerProvider>(context, listen: false);
+    final workers = workerProvider.workers.where((w) => w.isActive).toList();
+
+    if (workers.isEmpty) {
+      AppToast.show('No collectors available');
+      return;
     }
-    return labels;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _WorkerPickerSheet(
+        workers: workers,
+        type: type,
+      ),
+    );
+  }
+
+  double _todayMoneyIn(
+      TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
+    return tp.todayReturned +
+        tp.todayPurchased +
+        ip.todayInvestmentIncome +
+        ip.todayManualSales;
+  }
+
+  double _todayMoneyOut(TransactionProvider tp, ExpenseProvider ep) {
+    return tp.todayDistributed + ep.todayExpenses;
+  }
+
+  double _todayNet(
+      TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
+    return _todayMoneyIn(tp, ip, ep) - _todayMoneyOut(tp, ep);
+  }
+
+  double _totalMoneyIn(
+      TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
+    final transactions = tp.allTransactions;
+    double returned = 0;
+    double purchased = 0;
+    for (final t in transactions) {
+      switch (t.type.toLowerCase()) {
+        case 'return':
+          returned += t.amount;
+          break;
+        case 'purchase':
+          purchased += t.amount;
+          break;
+      }
+    }
+    return returned + purchased + ip.totalInvestments + ip.totalSales;
+  }
+
+  double _totalMoneyOut(TransactionProvider tp, ExpenseProvider ep) {
+    final transactions = tp.allTransactions;
+    double distributed = 0;
+    for (final t in transactions) {
+      if (t.type.toLowerCase() == 'distribution') {
+        distributed += t.amount;
+      }
+    }
+    return distributed + ep.totalExpenses;
+  }
+
+  double _totalNet(
+      TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
+    final net = _totalMoneyIn(tp, ip, ep) - _totalMoneyOut(tp, ep);
+    return net < 0 ? 0 : net;
   }
 
   Widget _buildTodayStatItem(
@@ -518,7 +564,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     return Column(
       children: [
-        Icon(icon, color: color.withOpacity(0.8), size: 20),
+        Icon(icon, color: color.withOpacity(0.8), size: 24),
         const SizedBox(height: 8),
         Text(
           value,
@@ -540,18 +586,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildCompactStat(BuildContext context, IconData icon, String value, String label, Color color) {
-    return Column(
+  Widget _buildCompactStat(BuildContext context, IconData icon, String value,
+      String label, Color color,
+      {VoidCallback? onTap}) {
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
+        Icon(icon, color: color, size: 24),
         const SizedBox(height: 8),
         Text(
           value,
@@ -563,37 +604,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+          style: const TextStyle(
+            fontSize: 13.2,
+            color: Color(0xFFF0A04B),
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
     );
+    if (onTap == null) return content;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: content,
+    );
   }
 
-  Future<void> _showPingAllDialog(BuildContext context, AuthProvider authProvider) async {
+  Future<void> _showPingAllDialog(
+      BuildContext context, AuthProvider authProvider) async {
     final localizations = AppLocalizations.of(context);
     await showDialog(
       context: context,
       builder: (context) => PingDialog(
-        title: localizations?.pingAllWorkers ?? 'Ping All Workers',
-        messageLabel: localizations?.messageToAllWorkers ?? 'Message to all workers',
+        title: localizations?.pingAllWorkers ?? 'Ping All Collectors',
+        messageLabel:
+            localizations?.messageToAllWorkers ?? 'Message to all collectors',
         onSend: (message) async {
           final notificationProvider =
               Provider.of<NotificationProvider>(context, listen: false);
-          
+
           await notificationProvider.sendGlobalPing(
             title: localizations?.announcement ?? 'Announcement',
             body: message,
-            senderName: authProvider.user?.displayName ?? localizations?.admin ?? 'Admin',
+            senderName: authProvider.user?.displayName ??
+                localizations?.admin ??
+                'Admin',
             senderId: authProvider.user?.uid ?? '',
           );
-          
+
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(localizations?.notificationSentToAll ?? 'Notification sent to all workers')),
-            );
+            AppToast.show(localizations?.notificationSentToAll ??
+                'Notification sent to all collectors');
           }
         },
       ),
@@ -605,6 +656,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
       width: 1,
       height: 40,
       color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+    );
+  }
+}
+
+class _WorkerPickerSheet extends StatefulWidget {
+  final List<Worker> workers;
+  final String type;
+
+  const _WorkerPickerSheet({
+    required this.workers,
+    required this.type,
+  });
+
+  @override
+  State<_WorkerPickerSheet> createState() => _WorkerPickerSheetState();
+}
+
+class _WorkerPickerSheetState extends State<_WorkerPickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final filtered = widget.workers
+        .where((w) =>
+            _query.isEmpty ||
+            w.name.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              localizations?.selectCollector ?? 'Select Collector',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              onChanged: (value) => setState(() => _query = value),
+              decoration: InputDecoration(
+                hintText: localizations?.searchCollector ?? 'Search collectors',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      localizations?.noCollectorsFound ?? 'No collectors found',
+                      style: TextStyle(
+                          color: isDark ? Colors.grey.shade400 : Colors.grey),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final worker = filtered[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          child: Text(worker.name.isNotEmpty
+                              ? worker.name[0].toUpperCase()
+                              : '?'),
+                        ),
+                        title: Text(worker.name),
+                        subtitle: Text(
+                          '${localizations?.currentBalance ?? 'Balance'}: '
+                          '${worker.currentBalance.asCurrency}',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.pop(context);
+                          showDialog(
+                            context: context,
+                            builder: (context) => TransactionDialog(
+                              worker: worker,
+                              type: widget.type,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
