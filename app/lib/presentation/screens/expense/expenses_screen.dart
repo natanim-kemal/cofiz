@@ -1,0 +1,431 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/models/expense_record_model.dart';
+import '../../../core/providers/expense_provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/utils/number_formatter.dart';
+import '../../widgets/custom_header.dart';
+import '../../widgets/app_toast.dart';
+import 'dialogs/add_expense_dialog.dart';
+import '../settings/expense_categories_screen.dart';
+import '../../../l10n/app_localizations.dart';
+
+class ExpensesScreen extends StatefulWidget {
+  const ExpensesScreen({super.key});
+
+  @override
+  State<ExpensesScreen> createState() => _ExpensesScreenState();
+}
+
+class _ExpensesScreenState extends State<ExpensesScreen> {
+  int _itemsToShow = 20;
+  static const int _itemsPerLoad = 20;
+
+  void _loadMore() {
+    setState(() => _itemsToShow += _itemsPerLoad);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Column(
+        children: [
+          CustomHeader(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    if (Navigator.canPop(context))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: IconButton(
+                          icon:
+                              const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                    Text(
+                      l10n.expenses,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.totalExpenses,
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Consumer<ExpenseProvider>(
+              builder: (context, provider, _) {
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: theme.cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.totalExpenses,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark
+                                  ? AppColors.textMutedDark
+                                  : AppColors.textMutedLight,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${l10n.currency ?? 'ETB'} ${provider.totalExpenses.formattedCompact}',
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ExpenseCategoriesScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.category, size: 18),
+                        label: Text(l10n.manageExpenseCategories),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.expenseRecords,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (provider.records.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Text(
+                            l10n.noTransactionsYet,
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      )
+                    else ...[
+                      ...provider.records
+                          .take(_itemsToShow)
+                          .map((r) => _buildRecordTile(context, r)),
+                      if (provider.records.length > _itemsToShow)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: OutlinedButton.icon(
+                            onPressed: _loadMore,
+                            icon: const Icon(Icons.expand_more),
+                            label: Text(
+                              l10n.loadMore(provider.records.length -
+                                  _itemsToShow),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: BorderSide(
+                                  color: AppColors.primary.withOpacity(0.5)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (provider.records.length > _itemsPerLoad)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            l10n.showingAllTransactions(
+                                provider.records.length),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textMutedDark
+                                  : AppColors.textMutedLight,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: Consumer<AuthProvider>(
+        builder: (context, auth, _) {
+          if (auth.userRole?.canCreateTransactions != true) {
+            return const SizedBox.shrink();
+          }
+          return FloatingActionButton.extended(
+            onPressed: () => _showAddExpenseDialog(context),
+            backgroundColor: AppColors.primary,
+            icon: const Icon(Icons.add),
+            label: Text(l10n.addExpense),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRecordTile(BuildContext context, ExpenseRecord record) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+    final subtitle = DateFormat('MMM d, yyyy h:mm a').format(record.createdAt);
+
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) => GestureDetector(
+        onLongPress:
+            auth.isAdmin ? () => _showRecordActions(context, record) : null,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withOpacity(0.1),
+                ),
+                child: const Icon(Icons.receipt_long,
+                    color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      record.expenseCategory,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.textMutedDark
+                            : AppColors.textMutedLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '-${l10n.currency ?? 'ETB'} ${record.amount.formatted}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddExpenseDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      builder: (context) => const AddExpenseDialog(),
+    );
+  }
+
+  Future<void> _editRecord(BuildContext context, ExpenseRecord record) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AddExpenseDialog(existing: record),
+    );
+  }
+
+  Future<void> _deleteRecord(
+      BuildContext context, ExpenseRecord record) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteExpenseTitle),
+        content: Text(l10n.deleteExpenseConfirmation(
+            '${l10n.currency} ${record.amount.formatted}')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child:
+                Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final provider = Provider.of<ExpenseProvider>(context, listen: false);
+    final success = await provider.deleteExpense(record.id);
+
+    if (context.mounted) {
+      if (success) {
+        AppToast.show(l10n.expenseDeleted, success: true);
+      } else {
+        AppToast.show(provider.errorMessage ?? l10n.failedToDeleteExpense);
+      }
+    }
+  }
+
+  Future<void> _showRecordActions(
+      BuildContext context, ExpenseRecord record) async {
+    final l10n = AppLocalizations.of(context)!;
+    final action = await showDialog<String>(
+      context: context,
+      builder: (context) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildActionChip(
+                  icon: Icons.edit_outlined,
+                  label: l10n.edit,
+                  color: const Color(0xFFF0A04B),
+                  value: 'edit',
+                ),
+                const SizedBox(width: 12),
+                _buildActionChip(
+                  icon: Icons.delete_outline,
+                  label: l10n.delete,
+                  color: const Color(0xFFF0A04B),
+                  value: 'delete',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (!context.mounted || action == null) return;
+    if (action == 'edit') {
+      await _editRecord(context, record);
+    } else if (action == 'delete') {
+      await _deleteRecord(context, record);
+    }
+  }
+
+  Widget _buildActionChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required String value,
+  }) {
+    return Material(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.pop(context, value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
