@@ -8,10 +8,11 @@ class MoneyTransaction {
   final String? receiptUrl;
   final DateTime createdAt;
   final String createdBy;
-  
+  final bool approved;
+
   // Specific to Coffee Purchase
-  final String? coffeeType;     // 'jenfel', 'yetatebe', 'special'
-  final double? coffeeWeight;   // in Kg
+  final String? coffeeType; // 'jenfel', 'yetatebe', 'special'
+  final double? coffeeWeight; // in Kg
   final double? pricePerKg;
   final double? commissionAmount;
 
@@ -25,6 +26,7 @@ class MoneyTransaction {
     this.receiptUrl,
     required this.createdAt,
     required this.createdBy,
+    this.approved = true,
     this.coffeeType,
     this.coffeeWeight,
     this.pricePerKg,
@@ -44,10 +46,17 @@ class MoneyTransaction {
           ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
           : DateTime.now(),
       createdBy: data['createdBy'] ?? '',
+      approved: data['approved'] ?? true,
       coffeeType: data['coffeeType'],
-      coffeeWeight: (data['coffeeWeight'] ?? 0.0).toDouble() == 0.0 ? null : (data['coffeeWeight'] ?? 0.0).toDouble(),
-      pricePerKg: (data['pricePerKg'] ?? 0.0).toDouble() == 0.0 ? null : (data['pricePerKg'] ?? 0.0).toDouble(),
-      commissionAmount: (data['commissionAmount'] ?? 0.0).toDouble() == 0.0 ? null : (data['commissionAmount'] ?? 0.0).toDouble(),
+      coffeeWeight: (data['coffeeWeight'] ?? 0.0).toDouble() == 0.0
+          ? null
+          : (data['coffeeWeight'] ?? 0.0).toDouble(),
+      pricePerKg: (data['pricePerKg'] ?? 0.0).toDouble() == 0.0
+          ? null
+          : (data['pricePerKg'] ?? 0.0).toDouble(),
+      commissionAmount: (data['commissionAmount'] ?? 0.0).toDouble() == 0.0
+          ? null
+          : (data['commissionAmount'] ?? 0.0).toDouble(),
     );
   }
 
@@ -61,6 +70,7 @@ class MoneyTransaction {
       'receiptUrl': receiptUrl,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'createdBy': createdBy,
+      'approved': approved,
       'coffeeType': coffeeType,
       'coffeeWeight': coffeeWeight,
       'pricePerKg': pricePerKg,
@@ -89,10 +99,17 @@ class MoneyTransaction {
           ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'])
           : DateTime.now(),
       createdBy: json['createdBy'] ?? '',
+      approved: json['approved'] ?? true,
       coffeeType: json['coffeeType'],
-      coffeeWeight: (json['coffeeWeight'] ?? 0.0).toDouble() == 0.0 ? null : (json['coffeeWeight'] ?? 0.0).toDouble(),
-      pricePerKg: (json['pricePerKg'] ?? 0.0).toDouble() == 0.0 ? null : (json['pricePerKg'] ?? 0.0).toDouble(),
-      commissionAmount: (json['commissionAmount'] ?? 0.0).toDouble() == 0.0 ? null : (json['commissionAmount'] ?? 0.0).toDouble(),
+      coffeeWeight: (json['coffeeWeight'] ?? 0.0).toDouble() == 0.0
+          ? null
+          : (json['coffeeWeight'] ?? 0.0).toDouble(),
+      pricePerKg: (json['pricePerKg'] ?? 0.0).toDouble() == 0.0
+          ? null
+          : (json['pricePerKg'] ?? 0.0).toDouble(),
+      commissionAmount: (json['commissionAmount'] ?? 0.0).toDouble() == 0.0
+          ? null
+          : (json['commissionAmount'] ?? 0.0).toDouble(),
     );
   }
 
