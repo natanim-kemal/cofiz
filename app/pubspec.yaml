@@ -37,7 +37,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.3.0
+  google_fonts: ^6.3.3
   percent_indicator: ^4.2.5
   flutter_animate: ^4.5.2
   
@@ -64,6 +64,8 @@ dependencies:
   
   # Image Picker
   image_picker: ^1.2.1
+  image: ^4.5.4
+  http: ^1.2.0
   
   # Firebase Storage
   firebase_storage: ^12.4.10
@@ -102,6 +104,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   generate: true
+
+  fonts:
+    - family: DMSans
+      fonts:
+        - asset: assets/DM-Sans-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   assets:
