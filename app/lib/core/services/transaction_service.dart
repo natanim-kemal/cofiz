@@ -306,16 +306,16 @@ class TransactionService {
 
   /// Delete both records of a transfer by shared transferId, reversing balances.
   Future<void> deleteTransfer(String transferId) async {
+    final snapshot = await _firestore
+        .collection(_transactionsCollection)
+        .where('transferId', isEqualTo: transferId)
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      throw 'Transfer not found';
+    }
+
     try {
-      final snapshot = await _firestore
-          .collection(_transactionsCollection)
-          .where('transferId', isEqualTo: transferId)
-          .get();
-
-      if (snapshot.docs.isEmpty) {
-        throw 'Transfer not found';
-      }
-
       final batch = _firestore.batch();
       for (final doc in snapshot.docs) {
         final tx = MoneyTransaction.fromFirestore(doc.data(), doc.id);
