@@ -53,6 +53,24 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
     }
   }
 
+  Future<void> _approveTransfer(
+      TransactionProvider provider, String transferId) async {
+    setState(() => _approving = true);
+    final success = await provider.approveTransfer(transferId);
+    if (mounted) {
+      setState(() => _approving = false);
+      if (success) {
+        AppToast.show(
+          AppLocalizations.of(context)!.entryConfirmed,
+          success: true,
+        );
+      } else {
+        AppToast.show(provider.errorMessage ??
+            AppLocalizations.of(context)!.failedToComplete);
+      }
+    }
+  }
+
   Future<void> _approveAll(TransactionProvider provider) async {
     setState(() => _approving = true);
     final success = await provider.approveAllForWorker(widget.worker.id);
@@ -193,9 +211,15 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                       ...dayTransactions.map((tx) => WorkerTransactionTile(
                             transaction: tx,
                             isDark: widget.isDark,
-                            onApprove: tx.approved
-                                ? null
-                                : () => _approveTransaction(provider, tx.id),
+                            onApprove: !tx.approved
+                                ? (tx.isTransfer
+                                    ? (tx.isTransferReceiver
+                                        ? () => _approveTransfer(
+                                            provider, tx.transferId!)
+                                        : null)
+                                    : () => _approveTransaction(
+                                        provider, tx.id))
+                                : null,
                           )),
                     ],
                   );
