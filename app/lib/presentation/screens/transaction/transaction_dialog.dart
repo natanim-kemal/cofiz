@@ -100,11 +100,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Color get color {
+    const warmOrange = Color(0xFFF0A04B);
     switch (widget.type) {
       case 'distribution':
-        return Colors.green;
+        return warmOrange;
       case 'return':
-        return Colors.red;
+        return warmOrange;
       case 'purchase':
         return Colors.orange;
       default:
