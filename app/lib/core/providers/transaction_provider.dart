@@ -206,6 +206,48 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
+  /// Record a collector-to-collector transfer
+  Future<bool> transferFromCollectorToCollector({
+    required String fromWorkerId,
+    required String fromWorkerName,
+    required String toWorkerId,
+    required String toWorkerName,
+    required double amount,
+    required String createdBy,
+    String? notes,
+  }) async {
+    if (amount <= 0) {
+      _errorMessage = 'Amount must be greater than 0';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      await _transactionService.addTransfer(
+        fromWorkerId: fromWorkerId,
+        fromWorkerName: fromWorkerName,
+        toWorkerId: toWorkerId,
+        toWorkerName: toWorkerName,
+        amount: amount,
+        createdBy: createdBy,
+        notes: notes,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Load today's totals
   Future<void> loadTodayTotals() async {
     try {
@@ -243,6 +285,18 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
+  /// Approve both sides of a transfer
+  Future<bool> approveTransfer(String transferId) async {
+    try {
+      await _transactionService.approveTransfer(transferId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Edit an existing transaction (reverses old balance effect, applies new)
   Future<bool> updateTransaction(MoneyTransaction transaction) async {
     try {
@@ -259,6 +313,18 @@ class TransactionProvider with ChangeNotifier {
   Future<bool> deleteTransaction(String transactionId) async {
     try {
       await _transactionService.deleteTransaction(transactionId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Delete both records of a transfer
+  Future<bool> deleteTransfer(String transferId) async {
+    try {
+      await _transactionService.deleteTransfer(transferId);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
