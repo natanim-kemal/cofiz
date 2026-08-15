@@ -33,6 +33,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _showTotalActivity = false;
+  FeedFilter _feedFilter = FeedFilter.none;
 
   @override
   void initState() {
@@ -286,13 +287,18 @@ _buildContainerDivider(isDark),
                           Row(
                             children: [
                               Expanded(
-                                child: _buildTodayStatItem(
-                                  localizations?.moneyIn ?? 'Money In',
-                                  _showTotalActivity
+                                child: _buildTappableStat(
+                                  label: localizations?.moneyIn ?? 'Money In',
+                                  value: _showTotalActivity
                                       ? '${localizations?.currency ?? "ETB"} ${_totalMoneyIn(transactionProvider, incomeProvider, expenseProvider).formatted}'
                                       : '${localizations?.currency ?? "ETB"} ${_todayMoneyIn(transactionProvider, incomeProvider, expenseProvider).formatted}',
-                                  Icons.arrow_downward,
-                                  Colors.white,
+                                  icon: Icons.arrow_downward,
+                                  selected: _feedFilter == FeedFilter.in_,
+                                  onTap: () => setState(() {
+                                    _feedFilter = _feedFilter == FeedFilter.in_
+                                        ? FeedFilter.none
+                                        : FeedFilter.in_;
+                                  }),
                                 ),
                               ),
                               Container(
@@ -301,13 +307,18 @@ _buildContainerDivider(isDark),
                                 color: Colors.white24,
                               ),
                               Expanded(
-                                child: _buildTodayStatItem(
-                                  localizations?.moneyOut ?? 'Money Out',
-                                  _showTotalActivity
+                                child: _buildTappableStat(
+                                  label: localizations?.moneyOut ?? 'Money Out',
+                                  value: _showTotalActivity
                                       ? '${localizations?.currency ?? "ETB"} ${_totalMoneyOut(transactionProvider, expenseProvider).formatted}'
                                       : '${localizations?.currency ?? "ETB"} ${_todayMoneyOut(transactionProvider, expenseProvider).formatted}',
-                                  Icons.arrow_upward,
-                                  Colors.white,
+                                  icon: Icons.arrow_upward,
+                                  selected: _feedFilter == FeedFilter.out_,
+                                  onTap: () => setState(() {
+                                    _feedFilter = _feedFilter == FeedFilter.out_
+                                        ? FeedFilter.none
+                                        : FeedFilter.out_;
+                                  }),
                                 ),
                               ),
                             ],
@@ -377,6 +388,7 @@ _buildContainerDivider(isDark),
                       transactions: transactionProvider.allTransactions,
                       incomeRecords: incomeProvider.records,
                       expenseRecords: expenseProvider.records,
+                      filter: _feedFilter,
                     ),
                   ],
                 ),
@@ -593,33 +605,50 @@ _buildContainerDivider(isDark),
     return net < 0 ? 0 : net;
   }
 
-  Widget _buildTodayStatItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, color: color.withOpacity(0.8), size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+  Widget _buildTappableStat({
+    required String label,
+    required String value,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFF0A04B).withOpacity(isDark ? 0.25 : 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFF0A04B)
+                : Colors.transparent,
+            width: 1.5,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: color.withOpacity(0.8),
-            fontSize: 12,
-          ),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
