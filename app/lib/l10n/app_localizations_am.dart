@@ -15,7 +15,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get dashboard => 'ዳሽቦርድ';
 
   @override
-  String get workers => 'ሰራተኞች';
+  String get workers => 'ሰብሳቢዎች';
 
   @override
   String get reports => 'ሪፖርቶች';
@@ -39,6 +39,9 @@ class AppLocalizationsAm extends AppLocalizations {
   String get todaysActivity => 'የዛሬ እንቅስቃሴ';
 
   @override
+  String get totalActivity => 'ጠቅላላ እንቅስቃሴ';
+
+  @override
   String get distributed => 'የተከፋፈለ';
 
   @override
@@ -48,7 +51,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get netBalance => 'የተጣራ ሂሳብ';
 
   @override
-  String get activeWorkers => 'ንቁ ሰራተኞች';
+  String get activeWorkers => 'ሰብሳቢዎች';
 
   @override
   String get viewAll => 'ሁሉንም ይመልከቱ';
@@ -66,19 +69,19 @@ class AppLocalizationsAm extends AppLocalizations {
   String get sales => 'ሽያጭ';
 
   @override
-  String get noWorkersYet => 'እስካሁን ምንም ሰራተኞች የሉም';
+  String get noWorkersYet => 'እስካሁን ምንም ሰብሳቢዎች የሉም';
 
   @override
-  String get addWorkersToGetStarted => 'ለመጀመር ሰራተኞችን ይጨምሩ';
+  String get addWorkersToGetStarted => 'ለመጀመር ሰብሳቢዎችን ይጨምሩ';
 
   @override
   String get currency => 'ብር';
 
   @override
-  String get searchWorkers => 'ሰራተኞችን ይፈልጉ...';
+  String get searchWorkers => 'ሰብሳቢዎችን ይፈልጉ...';
 
   @override
-  String get noWorkersFound => 'ምንም ሰራተኞች አልተገኙም';
+  String get noWorkersFound => 'ምንም ሰብሳቢዎች አልተገኙም';
 
   @override
   String get profile => 'መገለጫ';
@@ -224,7 +227,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get avgPrice => 'አማካይ ዋጋ';
 
   @override
-  String get workerCommission => 'የሰራተኛ ኮሚሽን:';
+  String get workerCommission => 'የሰብሳቢ ኮሚሽን:';
 
   @override
   String get commissionEarned => 'የተገኘ ኮሚሽን';
@@ -302,10 +305,10 @@ class AppLocalizationsAm extends AppLocalizations {
   String get profileUpdatedSuccessfully => 'መገለጫ በተሳካ ሁኔታ ተዘምኗል';
 
   @override
-  String get workerDeletedSuccessfully => 'ሰራተኛው በተሳካ ሁኔታ ተሰርዟል';
+  String get workerDeletedSuccessfully => 'ሰብሳቢው በተሳካ ሁኔታ ተሰርዟል';
 
   @override
-  String get workerSavedSuccessfully => 'ሰራተኛ በተሳካ ሁኔታ ተቀምጧል';
+  String get workerSavedSuccessfully => 'ሰብሳቢ በተሳካ ሁኔታ ተቀምጧል';
 
   @override
   String get backupSuccessful => 'ምትኬ በተሳካ ሁኔታ ተጠናቅቋል';
@@ -314,7 +317,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get insufficientBalance => 'በቂ ያልሆነ ቀሪ ሂሳብ';
 
   @override
-  String get workerNotFound => 'ሰራተኛ አልተገኘም';
+  String get workerNotFound => 'ሰብሳቢ አልተገኘም';
 
   @override
   String get notificationSent => 'ማሳወቂያ ተልኳል';
@@ -397,13 +400,13 @@ class AppLocalizationsAm extends AppLocalizations {
   String get rememberMe => 'አስታውሰኝ';
 
   @override
-  String get addWorker => 'ሰራተኛ አክል';
+  String get addWorker => 'ሰብሳቢ አክል';
 
   @override
-  String get editWorker => 'ሰራተኛ አርትዕ';
+  String get editWorker => 'ሰብሳቢ አርትዕ';
 
   @override
-  String get workerName => 'የሰራተኛ ስም';
+  String get workerName => 'የሰብሳቢ ስም';
 
   @override
   String get workerPhone => 'ስልክ ቁጥር';
@@ -468,7 +471,7 @@ class AppLocalizationsAm extends AppLocalizations {
   }
 
   @override
-  String get workerAccountCreated => 'የሰራተኛ መለያ ተፈጥሯል!';
+  String get workerAccountCreated => 'የሰብሳቢ መለያ ተፈጥሯል!';
 
   @override
   String loginCredentialsFor(Object name) {
@@ -476,7 +479,7 @@ class AppLocalizationsAm extends AppLocalizations {
   }
 
   @override
-  String get sendCredentialsToWorker => 'ይህንን መረጃ ለሰራተኛው ይላኩ:';
+  String get sendCredentialsToWorker => 'ይህንን መረጃ ለሰብሳቢው ይላኩ:';
 
   @override
   String get welcomeToCofiz => 'እንኳን ወደ Cofiz በደህና መጡ!';
@@ -547,10 +550,10 @@ class AppLocalizationsAm extends AppLocalizations {
       'የይለፍ ቃልዎን እንደገና ለማስጀመር ኢሜይልዎን ያስገቡ እና አገናኝ ይላክልዎታል።';
 
   @override
-  String get pingAllWorkers => 'ለሁሉም ሰራተኞች መልእክት ላክ';
+  String get pingAllWorkers => 'ለሁሉም ሰብሳቢዎች መልእክት ላክ';
 
   @override
-  String get messageToAllWorkers => 'ለሁሉም ሰራተኞች መልእክት';
+  String get messageToAllWorkers => 'ለሁሉም ሰብሳቢዎች መልእክት';
 
   @override
   String get announcement => 'ማስታወቂያ';
@@ -559,7 +562,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get admin => 'አስተዳዳሪ';
 
   @override
-  String get notificationSentToAll => 'ማሳወቂያ ለሁሉም ሰራተኞች ተልኳል';
+  String get notificationSentToAll => 'ማሳወቂያ ለሁሉም ሰብሳቢዎች ተልኳል';
 
   @override
   String get markAllAsRead => 'ሁሉንም እንደተነበበ ምልክት አድርግ';
@@ -794,7 +797,7 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get clearCacheConfirmation =>
-      'ይህ የአካባቢ ምርጫዎችን (ገጽታ፣ ቅንብሮች፣ የመጨረሻ መግቢያ) ያጸዳል። ሰራተኞችን ወይም ግብይቶችን አይሰርዝም።\n\nእርግጠኛ ነዎት?';
+      'ይህ የአካባቢ ምርጫዎችን (ገጽታ፣ ቅንብሮች፣ የመጨረሻ መግቢያ) ያጸዳል። ሰብሳቢዎችን ወይም ግብይቶችን አይሰርዝም።\n\nእርግጠኛ ነዎት?';
 
   @override
   String get cacheCleared => 'ካሽ ተጸድቷል። ለሙሉ ውጤት እባክዎ መተግበሪያውን እንደገና ያስጀምሩ።';
@@ -806,7 +809,8 @@ class AppLocalizationsAm extends AppLocalizations {
   String get exportDataJson => 'መረጃ ላክ (JSON)';
 
   @override
-  String get exportDataSubtitle => 'የሁሉም ሰራተኞች እና ግብይቶች ሙሉ ምትኬ ወደ መሳሪያዎ ያስቀምጡ።';
+  String get exportDataSubtitle =>
+      'የሁሉም ሰብሳቢዎች እና ግብይቶች ሙሉ ምትኬ ወደ መሳሪያዎ ያስቀምጡ።';
 
   @override
   String get storage => 'ማከማቻ';
@@ -818,7 +822,21 @@ class AppLocalizationsAm extends AppLocalizations {
   String get clearAppCacheSubtitle => 'የአካባቢ ምርጫዎችን እና ጊዜያዊ ፋይሎችን ዳግም ያስጀምሩ።';
 
   @override
-  String get failedToDeleteWorker => 'ሰራተኛውን መሰረዝ አልተቻለም';
+  String get failedToDeleteWorker => 'ሰብሳቢውን መሰረዝ አልተቻለም';
+
+  @override
+  String get deleteTransactionTitle => 'ግብይት ሰርዝ';
+
+  @override
+  String deleteTransactionConfirmation(Object amount) {
+    return 'የ$amount ግብይት ሰርዘሃል እርግጠኛ ነህ? የሰብሳቢው ሂሳብ ይሻሻላል.';
+  }
+
+  @override
+  String get transactionDeleted => 'ግብይት በተሳካ ሁኔታ ተሰርዟል';
+
+  @override
+  String get failedToDeleteTransaction => 'ግብይትን መሰረዝ አልተቻለም';
 
   @override
   String get distribute => 'አከፋፍል';
@@ -858,17 +876,17 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String workerSavedAccountFailed(Object error) {
-    return 'ሰራተኛ ተቀምጧል፣ ግን የመግቢያ መለያ አልተሳካም: $error';
+    return 'ሰብሳቢ ተቀምጧል፣ ግን የመግቢያ መለያ አልተሳካም: $error';
   }
 
   @override
-  String get workerUpdatedSuccessfully => 'ሰራተኛው በተሳካ ሁኔታ ተዘምኗል';
+  String get workerUpdatedSuccessfully => 'ሰብሳቢው በተሳካ ሁኔታ ተዘምኗል';
 
   @override
-  String get workerAddedSuccessfully => 'ሰራተኛው በተሳካ ሁኔታ ታክሏል';
+  String get workerAddedSuccessfully => 'ሰብሳቢው በተሳካ ሁኔታ ታክሏል';
 
   @override
-  String get failedToSaveWorker => 'ሰራተኛውን ማስቀመጥ አልተቻለም';
+  String get failedToSaveWorker => 'ሰብሳቢውን ማስቀመጥ አልተቻለም';
 
   @override
   String get nameIsRequired => 'ስም ያስፈልጋል';
@@ -895,7 +913,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get enterValidEmail => 'እባክዎ ትክክለኛ ኢሜይል ያስገቡ';
 
   @override
-  String get allowWorkerLogin => 'ይህ ሰራተኛ ወደ መተግበሪያው እንዲገባ ይፍቀዱ';
+  String get allowWorkerLogin => 'ይህ ሰብሳቢ ወደ መተግበሪያው እንዲገባ ይፍቀዱ';
 
   @override
   String years(Object count) {
@@ -909,13 +927,13 @@ class AppLocalizationsAm extends AppLocalizations {
   String get performanceRating => 'የአፈጻጸም ደረጃ';
 
   @override
-  String get filterWorkers => 'ሰራተኞችን አጣራ';
+  String get filterWorkers => 'ሰብሳቢዎችን አጣራ';
 
   @override
   String get tryAdjustingSearch => 'ፍለጋዎን ለማስተካከል ይሞክሩ';
 
   @override
-  String get tapToAddWorker => 'የመጀመሪያውን ሰራተኛ ለማከል + ይንኩ';
+  String get tapToAddWorker => 'የመጀመሪያውን ሰብሳቢ ለማከል + ይንኩ';
 
   @override
   String get returnMoneyTitle => 'ገንዘብ መልስ';
@@ -970,7 +988,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get addReceiptPhoto => 'የደረሰኝ ፎቶ ያክሉ';
 
   @override
-  String get workerDataNotFound => 'የሰራተኛ መረጃ አልተገኘም';
+  String get workerDataNotFound => 'የሰብሳቢ መረጃ አልተገኘም';
 
   @override
   String get refresh => 'አድስ';
@@ -1102,6 +1120,46 @@ class AppLocalizationsAm extends AppLocalizations {
   String get failedToRecordReturn => 'ምላሽ መመዝገብ አልተቻለም';
 
   @override
+  String get expenseRecorded => 'ወጪ በተሳካ ሁኔታ ተመዝግቧል';
+
+  @override
+  String get incomeRecorded => 'ገቢ በተሳካ ሁኔታ ተመዝግቧል';
+
+  @override
+  String get editIncome => 'ገቢ አርትዕ';
+
+  @override
+  String get editExpense => 'ወጪ አርትዕ';
+
+  @override
+  String get incomeDeleted => 'ገቢ ተሰርዟል';
+
+  @override
+  String get expenseDeleted => 'ወጪ ተሰርዟል';
+
+  @override
+  String get failedToDeleteIncome => 'ገቢን መሰረዝ አልተቻለም';
+
+  @override
+  String get failedToDeleteExpense => 'ወጪን መሰረዝ አልተቻለም';
+
+  @override
+  String get deleteIncomeTitle => 'ገቢ ሰርዝ';
+
+  @override
+  String deleteIncomeConfirmation(Object amount) {
+    return 'የ$amount ገቢ ሰርዘሃል እርግጠኛ ነህ?';
+  }
+
+  @override
+  String get deleteExpenseTitle => 'ወጪ ሰርዝ';
+
+  @override
+  String deleteExpenseConfirmation(Object amount) {
+    return 'የ$amount ወጪ ሰርዘሃል እርግጠኛ ነህ?';
+  }
+
+  @override
   String get moneyReturnedTitle => 'የተመለሰ ገንዘብ';
 
   @override
@@ -1146,4 +1204,157 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get welcome => 'እንኳን ደህና መጡ';
+
+  @override
+  String get addCategory => 'ምድብ ጨምር';
+
+  @override
+  String get addExpense => 'ወጪ ጨምር';
+
+  @override
+  String get addIncome => 'ገቢ ጨምር';
+
+  @override
+  String get categoryName => 'የምድብ ስም';
+
+  @override
+  String get collector => 'ሰብሳቢ';
+
+  @override
+  String get collectors => 'ሰብሳቢዎች';
+
+  @override
+  String get companyIncome => 'ገቢ';
+
+  @override
+  String get defaultCategoriesCannotBeDeleted => 'ነባሪ ምድቦችን መሰረዝ አይቻልም';
+
+  @override
+  String get expenseDescription => 'መግለጫ';
+
+  @override
+  String get expenseRecords => 'የወጪ መዝገቦች';
+
+  @override
+  String get expenses => 'ወጪዎች';
+
+  @override
+  String get incomeBreakdown => 'የገቢ ብልሽት';
+
+  @override
+  String get incomeDescription => 'መግለጫ';
+
+  @override
+  String get incomeRecords => 'የገቢ መዝገቦች';
+
+  @override
+  String get investment => 'ኢንቨስትመንት';
+
+  @override
+  String get investmentIncome => 'የኢንቨስትመንት ገቢ';
+
+  @override
+  String get latestTransactions => 'የቅርብ ጊዜ ግብይቶች';
+
+  @override
+  String get manageExpenseCategories => 'የወጪ ምድቦችን ያስተዳድሩ';
+
+  @override
+  String get manageSaleCategories => 'የሽያጭ ምድቦችን ያስተዳድሩ';
+
+  @override
+  String get manualSales => 'የእጅ ሽያጭ';
+
+  @override
+  String get moneyIn => 'ገቢ';
+
+  @override
+  String get moneyOut => 'ወጪ';
+
+  @override
+  String get myInvestments => 'የእኔ ኢንቨስትመንቶች';
+
+  @override
+  String get noViewersFound => 'ምንም ተመልካቾች አልተገኙም';
+
+  @override
+  String get recordExpense => 'ወጪ መዝግብ';
+
+  @override
+  String get recordInvestment => 'ኢንቨስትመንት መዝግብ';
+
+  @override
+  String get recordSale => 'ሽያጭ መዝግብ';
+
+  @override
+  String get recordedBy => 'የተመዘገበው በ';
+
+  @override
+  String get sale => 'ሽያጭ';
+
+  @override
+  String get salesIncome => 'የሽያጭ ገቢ';
+
+  @override
+  String get selectExpenseCategory => 'የወጪ ምድብ ይምረጡ';
+
+  @override
+  String get selectSaleCategory => 'ምድብ ይምረጡ';
+
+  @override
+  String get selectViewer => 'ተመልካች ይምረጡ';
+
+  @override
+  String get selectSource => 'ምንጭ ይምረጡ';
+
+  @override
+  String get totalExpenses => 'ጠቅላላ ወጪ';
+
+  @override
+  String get totalIncome => 'ጠቅላላ ገቢ';
+
+  @override
+  String get viewer => 'ተመልካች';
+
+  @override
+  String get viewerInvestment => 'ኢንቨስትመንት';
+
+  @override
+  String get pending => 'በመጠባበቅ ላይ';
+
+  @override
+  String get pendingApprovals => 'በመጠባበቅ ላይ ያሉ ማረጋገጫዎች';
+
+  @override
+  String get approveAll => 'ሁሉንም አረጋግጥ';
+
+  @override
+  String get noPendingApprovals => 'ለማረጋገጥ የሚጠብቁ ግቤቶች የሉም';
+
+  @override
+  String get allConfirmed => 'ሁሉም ግቤቶች ተረጋግጠዋል';
+
+  @override
+  String get entryConfirmed => 'ግቤት ተረጋግጧል';
+
+  @override
+  String get editTransaction => 'ግብይት አርትዕ';
+
+  @override
+  String get recordTransactions => 'ግብይቶች መዝግብ';
+
+  @override
+  String get selectCollector => 'ሰብሳቢ ይምረጡ';
+
+  @override
+  String get searchCollector => 'ሰብሳቢዎችን ይፈልጉ';
+
+  @override
+  String get noCollectorsFound => 'ሰብሳቢዎች አልተገኙም';
+
+  @override
+  String get enterSourceName => 'የምንጭን ስም ይጻፉ';
+
+  @override
+  String get filterByDate => 'በቀን አጣራ';
 }

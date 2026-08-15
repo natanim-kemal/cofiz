@@ -15,7 +15,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboard => 'Dashboard';
 
   @override
-  String get workers => 'Workers';
+  String get workers => 'Collectors';
 
   @override
   String get reports => 'Reports';
@@ -39,6 +39,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get todaysActivity => 'Today\'s Activity';
 
   @override
+  String get totalActivity => 'Total Activity';
+
+  @override
   String get distributed => 'Distributed';
 
   @override
@@ -48,7 +51,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get netBalance => 'Net Balance';
 
   @override
-  String get activeWorkers => 'Active Workers';
+  String get activeWorkers => 'Collectors';
 
   @override
   String get viewAll => 'View All';
@@ -66,19 +69,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sales => 'Sales';
 
   @override
-  String get noWorkersYet => 'No workers yet';
+  String get noWorkersYet => 'No collectors yet';
 
   @override
-  String get addWorkersToGetStarted => 'Add workers to get started';
+  String get addWorkersToGetStarted => 'Add collectors to get started';
 
   @override
   String get currency => 'ETB';
 
   @override
-  String get searchWorkers => 'Search workers...';
+  String get searchWorkers => 'Search collectors...';
 
   @override
-  String get noWorkersFound => 'No workers found';
+  String get noWorkersFound => 'No collectors found';
 
   @override
   String get profile => 'Profile';
@@ -224,7 +227,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get avgPrice => 'Avg Price';
 
   @override
-  String get workerCommission => 'Worker Commission:';
+  String get workerCommission => 'Collector Commission:';
 
   @override
   String get commissionEarned => 'Commission Earned';
@@ -303,10 +306,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileUpdatedSuccessfully => 'Profile updated successfully';
 
   @override
-  String get workerDeletedSuccessfully => 'Worker deleted successfully';
+  String get workerDeletedSuccessfully => 'Collector deleted successfully';
 
   @override
-  String get workerSavedSuccessfully => 'Worker saved successfully';
+  String get workerSavedSuccessfully => 'Collector saved successfully';
 
   @override
   String get backupSuccessful => 'Backup Successful';
@@ -315,7 +318,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get insufficientBalance => 'Insufficient balance';
 
   @override
-  String get workerNotFound => 'Worker not found';
+  String get workerNotFound => 'Collector not found';
 
   @override
   String get notificationSent => 'Notification sent';
@@ -398,13 +401,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rememberMe => 'Remember me';
 
   @override
-  String get addWorker => 'Add Worker';
+  String get addWorker => 'Add Collector';
 
   @override
-  String get editWorker => 'Edit Worker';
+  String get editWorker => 'Edit Collector';
 
   @override
-  String get workerName => 'Worker Name';
+  String get workerName => 'Collector Name';
 
   @override
   String get workerPhone => 'Phone Number';
@@ -470,7 +473,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get workerAccountCreated => 'Worker Account Created!';
+  String get workerAccountCreated => 'Collector Account Created!';
 
   @override
   String loginCredentialsFor(Object name) {
@@ -478,7 +481,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sendCredentialsToWorker => 'Send these credentials to the worker:';
+  String get sendCredentialsToWorker =>
+      'Send these credentials to the collector:';
 
   @override
   String get welcomeToCofiz => 'Welcome to Cofiz!';
@@ -550,10 +554,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter your email address and we\'ll send you a link to reset your password.';
 
   @override
-  String get pingAllWorkers => 'Ping All Workers';
+  String get pingAllWorkers => 'Ping All Collectors';
 
   @override
-  String get messageToAllWorkers => 'Message to all workers';
+  String get messageToAllWorkers => 'Message to all collectors';
 
   @override
   String get announcement => 'Announcement';
@@ -562,7 +566,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get admin => 'Admin';
 
   @override
-  String get notificationSentToAll => 'Notification sent to all workers';
+  String get notificationSentToAll => 'Notification sent to all collectors';
 
   @override
   String get markAllAsRead => 'Mark all as read';
@@ -797,7 +801,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get clearCacheConfirmation =>
-      'This will clear local preferences (theme, settings, last login). It will NOT delete workers or transactions.\n\nAre you sure?';
+      'This will clear local preferences (theme, settings, last login). It will NOT delete collectors or transactions.\n\nAre you sure?';
 
   @override
   String get cacheCleared =>
@@ -811,7 +815,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportDataSubtitle =>
-      'Save a full backup of all workers and transactions to your device.';
+      'Save a full backup of all collectors and transactions to your device.';
 
   @override
   String get storage => 'Storage';
@@ -824,7 +828,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reset local preferences and temporary files.';
 
   @override
-  String get failedToDeleteWorker => 'Failed to delete worker';
+  String get failedToDeleteWorker => 'Failed to delete collector';
+
+  @override
+  String get deleteTransactionTitle => 'Delete Transaction';
+
+  @override
+  String deleteTransactionConfirmation(Object amount) {
+    return 'Are you sure you want to delete this transaction of $amount? The collector\'s balance will be updated.';
+  }
+
+  @override
+  String get transactionDeleted => 'Transaction deleted';
+
+  @override
+  String get failedToDeleteTransaction => 'Failed to delete transaction';
 
   @override
   String get distribute => 'Distribute';
@@ -865,17 +883,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String workerSavedAccountFailed(Object error) {
-    return 'Worker saved, but login account failed: $error';
+    return 'Collector saved, but login account failed: $error';
   }
 
   @override
-  String get workerUpdatedSuccessfully => 'Worker updated successfully';
+  String get workerUpdatedSuccessfully => 'Collector updated successfully';
 
   @override
-  String get workerAddedSuccessfully => 'Worker added successfully';
+  String get workerAddedSuccessfully => 'Collector added successfully';
 
   @override
-  String get failedToSaveWorker => 'Failed to save worker';
+  String get failedToSaveWorker => 'Failed to save collector';
 
   @override
   String get nameIsRequired => 'Name is required';
@@ -902,7 +920,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get enterValidEmail => 'Please enter a valid email address';
 
   @override
-  String get allowWorkerLogin => 'Allow this worker to login to the app';
+  String get allowWorkerLogin => 'Allow this collector to login to the app';
 
   @override
   String years(Object count) {
@@ -916,13 +934,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get performanceRating => 'Performance Rating';
 
   @override
-  String get filterWorkers => 'Filter Workers';
+  String get filterWorkers => 'Filter Collectors';
 
   @override
   String get tryAdjustingSearch => 'Try adjusting your search';
 
   @override
-  String get tapToAddWorker => 'Tap + to add your first worker';
+  String get tapToAddWorker => 'Tap + to add your first collector';
 
   @override
   String get returnMoneyTitle => 'Return Money';
@@ -977,7 +995,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addReceiptPhoto => 'Add Receipt Photo';
 
   @override
-  String get workerDataNotFound => 'Worker data not found';
+  String get workerDataNotFound => 'Collector data not found';
 
   @override
   String get refresh => 'Refresh';
@@ -1112,6 +1130,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get failedToRecordReturn => 'Failed to record return';
 
   @override
+  String get expenseRecorded => 'Expense recorded successfully';
+
+  @override
+  String get incomeRecorded => 'Income recorded successfully';
+
+  @override
+  String get editIncome => 'Edit Income';
+
+  @override
+  String get editExpense => 'Edit Expense';
+
+  @override
+  String get incomeDeleted => 'Income deleted';
+
+  @override
+  String get expenseDeleted => 'Expense deleted';
+
+  @override
+  String get failedToDeleteIncome => 'Failed to delete income';
+
+  @override
+  String get failedToDeleteExpense => 'Failed to delete expense';
+
+  @override
+  String get deleteIncomeTitle => 'Delete Income';
+
+  @override
+  String deleteIncomeConfirmation(Object amount) {
+    return 'Are you sure you want to delete this income of $amount?';
+  }
+
+  @override
+  String get deleteExpenseTitle => 'Delete Expense';
+
+  @override
+  String deleteExpenseConfirmation(Object amount) {
+    return 'Are you sure you want to delete this expense of $amount?';
+  }
+
+  @override
   String get moneyReturnedTitle => 'Money Returned';
 
   @override
@@ -1156,4 +1214,158 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcome => 'Welcome';
+
+  @override
+  String get addCategory => 'Add Category';
+
+  @override
+  String get addExpense => 'Add Expense';
+
+  @override
+  String get addIncome => 'Add Income';
+
+  @override
+  String get categoryName => 'Category Name';
+
+  @override
+  String get collector => 'Collector';
+
+  @override
+  String get collectors => 'Collectors';
+
+  @override
+  String get companyIncome => 'Income';
+
+  @override
+  String get defaultCategoriesCannotBeDeleted =>
+      'Default categories cannot be deleted';
+
+  @override
+  String get expenseDescription => 'Description';
+
+  @override
+  String get expenseRecords => 'Expense Records';
+
+  @override
+  String get expenses => 'Expenses';
+
+  @override
+  String get incomeBreakdown => 'Income Breakdown';
+
+  @override
+  String get incomeDescription => 'Description';
+
+  @override
+  String get incomeRecords => 'Income Records';
+
+  @override
+  String get investment => 'Investment';
+
+  @override
+  String get investmentIncome => 'Investment Income';
+
+  @override
+  String get latestTransactions => 'Latest Transactions';
+
+  @override
+  String get manageExpenseCategories => 'Manage Expense Categories';
+
+  @override
+  String get manageSaleCategories => 'Manage Sale Categories';
+
+  @override
+  String get manualSales => 'Manual Sales';
+
+  @override
+  String get moneyIn => 'Money In';
+
+  @override
+  String get moneyOut => 'Money Out';
+
+  @override
+  String get myInvestments => 'My Investments';
+
+  @override
+  String get noViewersFound => 'No viewers found';
+
+  @override
+  String get recordExpense => 'Record Expense';
+
+  @override
+  String get recordInvestment => 'Record Investment';
+
+  @override
+  String get recordSale => 'Record Sale';
+
+  @override
+  String get recordedBy => 'Recorded by';
+
+  @override
+  String get sale => 'Sale';
+
+  @override
+  String get salesIncome => 'Sales Income';
+
+  @override
+  String get selectExpenseCategory => 'Select Expense Category';
+
+  @override
+  String get selectSaleCategory => 'Select Category';
+
+  @override
+  String get selectViewer => 'Select Viewer';
+
+  @override
+  String get selectSource => 'Select Source';
+
+  @override
+  String get totalExpenses => 'Total Expenses';
+
+  @override
+  String get totalIncome => 'Total Income';
+
+  @override
+  String get viewer => 'Viewer';
+
+  @override
+  String get viewerInvestment => 'Investment';
+
+  @override
+  String get pending => 'Pending';
+
+  @override
+  String get pendingApprovals => 'Pending Approvals';
+
+  @override
+  String get approveAll => 'Confirm All';
+
+  @override
+  String get noPendingApprovals => 'No entries waiting for confirmation';
+
+  @override
+  String get allConfirmed => 'All entries confirmed';
+
+  @override
+  String get entryConfirmed => 'Entry confirmed';
+
+  @override
+  String get editTransaction => 'Edit Transaction';
+
+  @override
+  String get recordTransactions => 'Record Transactions';
+
+  @override
+  String get selectCollector => 'Select Collector';
+
+  @override
+  String get searchCollector => 'Search collectors';
+
+  @override
+  String get noCollectorsFound => 'No collectors found';
+
+  @override
+  String get enterSourceName => 'Type the source name';
+
+  @override
+  String get filterByDate => 'Filter by date';
 }

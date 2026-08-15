@@ -113,7 +113,7 @@ abstract class AppLocalizations {
   /// No description provided for @workers.
   ///
   /// In en, this message translates to:
-  /// **'Workers'**
+  /// **'Collectors'**
   String get workers;
 
   /// No description provided for @reports.
@@ -158,6 +158,12 @@ abstract class AppLocalizations {
   /// **'Today\'s Activity'**
   String get todaysActivity;
 
+  /// No description provided for @totalActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Activity'**
+  String get totalActivity;
+
   /// No description provided for @distributed.
   ///
   /// In en, this message translates to:
@@ -179,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @activeWorkers.
   ///
   /// In en, this message translates to:
-  /// **'Active Workers'**
+  /// **'Collectors'**
   String get activeWorkers;
 
   /// No description provided for @viewAll.
@@ -215,13 +221,13 @@ abstract class AppLocalizations {
   /// No description provided for @noWorkersYet.
   ///
   /// In en, this message translates to:
-  /// **'No workers yet'**
+  /// **'No collectors yet'**
   String get noWorkersYet;
 
   /// No description provided for @addWorkersToGetStarted.
   ///
   /// In en, this message translates to:
-  /// **'Add workers to get started'**
+  /// **'Add collectors to get started'**
   String get addWorkersToGetStarted;
 
   /// No description provided for @currency.
@@ -233,13 +239,13 @@ abstract class AppLocalizations {
   /// No description provided for @searchWorkers.
   ///
   /// In en, this message translates to:
-  /// **'Search workers...'**
+  /// **'Search collectors...'**
   String get searchWorkers;
 
   /// No description provided for @noWorkersFound.
   ///
   /// In en, this message translates to:
-  /// **'No workers found'**
+  /// **'No collectors found'**
   String get noWorkersFound;
 
   /// No description provided for @profile.
@@ -527,7 +533,7 @@ abstract class AppLocalizations {
   /// No description provided for @workerCommission.
   ///
   /// In en, this message translates to:
-  /// **'Worker Commission:'**
+  /// **'Collector Commission:'**
   String get workerCommission;
 
   /// No description provided for @commissionEarned.
@@ -683,13 +689,13 @@ abstract class AppLocalizations {
   /// No description provided for @workerDeletedSuccessfully.
   ///
   /// In en, this message translates to:
-  /// **'Worker deleted successfully'**
+  /// **'Collector deleted successfully'**
   String get workerDeletedSuccessfully;
 
   /// No description provided for @workerSavedSuccessfully.
   ///
   /// In en, this message translates to:
-  /// **'Worker saved successfully'**
+  /// **'Collector saved successfully'**
   String get workerSavedSuccessfully;
 
   /// No description provided for @backupSuccessful.
@@ -707,7 +713,7 @@ abstract class AppLocalizations {
   /// No description provided for @workerNotFound.
   ///
   /// In en, this message translates to:
-  /// **'Worker not found'**
+  /// **'Collector not found'**
   String get workerNotFound;
 
   /// No description provided for @notificationSent.
@@ -869,19 +875,19 @@ abstract class AppLocalizations {
   /// No description provided for @addWorker.
   ///
   /// In en, this message translates to:
-  /// **'Add Worker'**
+  /// **'Add Collector'**
   String get addWorker;
 
   /// No description provided for @editWorker.
   ///
   /// In en, this message translates to:
-  /// **'Edit Worker'**
+  /// **'Edit Collector'**
   String get editWorker;
 
   /// No description provided for @workerName.
   ///
   /// In en, this message translates to:
-  /// **'Worker Name'**
+  /// **'Collector Name'**
   String get workerName;
 
   /// No description provided for @workerPhone.
@@ -995,7 +1001,7 @@ abstract class AppLocalizations {
   /// No description provided for @workerAccountCreated.
   ///
   /// In en, this message translates to:
-  /// **'Worker Account Created!'**
+  /// **'Collector Account Created!'**
   String get workerAccountCreated;
 
   /// No description provided for @loginCredentialsFor.
@@ -1007,7 +1013,7 @@ abstract class AppLocalizations {
   /// No description provided for @sendCredentialsToWorker.
   ///
   /// In en, this message translates to:
-  /// **'Send these credentials to the worker:'**
+  /// **'Send these credentials to the collector:'**
   String get sendCredentialsToWorker;
 
   /// No description provided for @welcomeToCofiz.
@@ -1139,13 +1145,13 @@ abstract class AppLocalizations {
   /// No description provided for @pingAllWorkers.
   ///
   /// In en, this message translates to:
-  /// **'Ping All Workers'**
+  /// **'Ping All Collectors'**
   String get pingAllWorkers;
 
   /// No description provided for @messageToAllWorkers.
   ///
   /// In en, this message translates to:
-  /// **'Message to all workers'**
+  /// **'Message to all collectors'**
   String get messageToAllWorkers;
 
   /// No description provided for @announcement.
@@ -1163,7 +1169,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationSentToAll.
   ///
   /// In en, this message translates to:
-  /// **'Notification sent to all workers'**
+  /// **'Notification sent to all collectors'**
   String get notificationSentToAll;
 
   /// No description provided for @markAllAsRead.
@@ -1577,7 +1583,7 @@ abstract class AppLocalizations {
   /// No description provided for @clearCacheConfirmation.
   ///
   /// In en, this message translates to:
-  /// **'This will clear local preferences (theme, settings, last login). It will NOT delete workers or transactions.\n\nAre you sure?'**
+  /// **'This will clear local preferences (theme, settings, last login). It will NOT delete collectors or transactions.\n\nAre you sure?'**
   String get clearCacheConfirmation;
 
   /// No description provided for @cacheCleared.
@@ -1601,7 +1607,7 @@ abstract class AppLocalizations {
   /// No description provided for @exportDataSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Save a full backup of all workers and transactions to your device.'**
+  /// **'Save a full backup of all collectors and transactions to your device.'**
   String get exportDataSubtitle;
 
   /// No description provided for @storage.
@@ -1625,8 +1631,32 @@ abstract class AppLocalizations {
   /// No description provided for @failedToDeleteWorker.
   ///
   /// In en, this message translates to:
-  /// **'Failed to delete worker'**
+  /// **'Failed to delete collector'**
   String get failedToDeleteWorker;
+
+  /// No description provided for @deleteTransactionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Transaction'**
+  String get deleteTransactionTitle;
+
+  /// No description provided for @deleteTransactionConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this transaction of {amount}? The collector\'s balance will be updated.'**
+  String deleteTransactionConfirmation(Object amount);
+
+  /// No description provided for @transactionDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction deleted'**
+  String get transactionDeleted;
+
+  /// No description provided for @failedToDeleteTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete transaction'**
+  String get failedToDeleteTransaction;
 
   /// No description provided for @distribute.
   ///
@@ -1691,25 +1721,25 @@ abstract class AppLocalizations {
   /// No description provided for @workerSavedAccountFailed.
   ///
   /// In en, this message translates to:
-  /// **'Worker saved, but login account failed: {error}'**
+  /// **'Collector saved, but login account failed: {error}'**
   String workerSavedAccountFailed(Object error);
 
   /// No description provided for @workerUpdatedSuccessfully.
   ///
   /// In en, this message translates to:
-  /// **'Worker updated successfully'**
+  /// **'Collector updated successfully'**
   String get workerUpdatedSuccessfully;
 
   /// No description provided for @workerAddedSuccessfully.
   ///
   /// In en, this message translates to:
-  /// **'Worker added successfully'**
+  /// **'Collector added successfully'**
   String get workerAddedSuccessfully;
 
   /// No description provided for @failedToSaveWorker.
   ///
   /// In en, this message translates to:
-  /// **'Failed to save worker'**
+  /// **'Failed to save collector'**
   String get failedToSaveWorker;
 
   /// No description provided for @nameIsRequired.
@@ -1763,7 +1793,7 @@ abstract class AppLocalizations {
   /// No description provided for @allowWorkerLogin.
   ///
   /// In en, this message translates to:
-  /// **'Allow this worker to login to the app'**
+  /// **'Allow this collector to login to the app'**
   String get allowWorkerLogin;
 
   /// No description provided for @years.
@@ -1787,7 +1817,7 @@ abstract class AppLocalizations {
   /// No description provided for @filterWorkers.
   ///
   /// In en, this message translates to:
-  /// **'Filter Workers'**
+  /// **'Filter Collectors'**
   String get filterWorkers;
 
   /// No description provided for @tryAdjustingSearch.
@@ -1799,7 +1829,7 @@ abstract class AppLocalizations {
   /// No description provided for @tapToAddWorker.
   ///
   /// In en, this message translates to:
-  /// **'Tap + to add your first worker'**
+  /// **'Tap + to add your first collector'**
   String get tapToAddWorker;
 
   /// No description provided for @returnMoneyTitle.
@@ -1901,7 +1931,7 @@ abstract class AppLocalizations {
   /// No description provided for @workerDataNotFound.
   ///
   /// In en, this message translates to:
-  /// **'Worker data not found'**
+  /// **'Collector data not found'**
   String get workerDataNotFound;
 
   /// No description provided for @refresh.
@@ -2126,6 +2156,78 @@ abstract class AppLocalizations {
   /// **'Failed to record return'**
   String get failedToRecordReturn;
 
+  /// No description provided for @expenseRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense recorded successfully'**
+  String get expenseRecorded;
+
+  /// No description provided for @incomeRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Income recorded successfully'**
+  String get incomeRecorded;
+
+  /// No description provided for @editIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Income'**
+  String get editIncome;
+
+  /// No description provided for @editExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Expense'**
+  String get editExpense;
+
+  /// No description provided for @incomeDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Income deleted'**
+  String get incomeDeleted;
+
+  /// No description provided for @expenseDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense deleted'**
+  String get expenseDeleted;
+
+  /// No description provided for @failedToDeleteIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete income'**
+  String get failedToDeleteIncome;
+
+  /// No description provided for @failedToDeleteExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete expense'**
+  String get failedToDeleteExpense;
+
+  /// No description provided for @deleteIncomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Income'**
+  String get deleteIncomeTitle;
+
+  /// No description provided for @deleteIncomeConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this income of {amount}?'**
+  String deleteIncomeConfirmation(Object amount);
+
+  /// No description provided for @deleteExpenseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Expense'**
+  String get deleteExpenseTitle;
+
+  /// No description provided for @deleteExpenseConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this expense of {amount}?'**
+  String deleteExpenseConfirmation(Object amount);
+
   /// No description provided for @moneyReturnedTitle.
   ///
   /// In en, this message translates to:
@@ -2209,6 +2311,312 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Welcome'**
   String get welcome;
+
+  /// No description provided for @addCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Category'**
+  String get addCategory;
+
+  /// No description provided for @addExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Expense'**
+  String get addExpense;
+
+  /// No description provided for @addIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Income'**
+  String get addIncome;
+
+  /// No description provided for @categoryName.
+  ///
+  /// In en, this message translates to:
+  /// **'Category Name'**
+  String get categoryName;
+
+  /// No description provided for @collector.
+  ///
+  /// In en, this message translates to:
+  /// **'Collector'**
+  String get collector;
+
+  /// No description provided for @collectors.
+  ///
+  /// In en, this message translates to:
+  /// **'Collectors'**
+  String get collectors;
+
+  /// No description provided for @companyIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Income'**
+  String get companyIncome;
+
+  /// No description provided for @defaultCategoriesCannotBeDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Default categories cannot be deleted'**
+  String get defaultCategoriesCannotBeDeleted;
+
+  /// No description provided for @expenseDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get expenseDescription;
+
+  /// No description provided for @expenseRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense Records'**
+  String get expenseRecords;
+
+  /// No description provided for @expenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Expenses'**
+  String get expenses;
+
+  /// No description provided for @incomeBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Income Breakdown'**
+  String get incomeBreakdown;
+
+  /// No description provided for @incomeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get incomeDescription;
+
+  /// No description provided for @incomeRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Income Records'**
+  String get incomeRecords;
+
+  /// No description provided for @investment.
+  ///
+  /// In en, this message translates to:
+  /// **'Investment'**
+  String get investment;
+
+  /// No description provided for @investmentIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Investment Income'**
+  String get investmentIncome;
+
+  /// No description provided for @latestTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest Transactions'**
+  String get latestTransactions;
+
+  /// No description provided for @manageExpenseCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Expense Categories'**
+  String get manageExpenseCategories;
+
+  /// No description provided for @manageSaleCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Sale Categories'**
+  String get manageSaleCategories;
+
+  /// No description provided for @manualSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Sales'**
+  String get manualSales;
+
+  /// No description provided for @moneyIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Money In'**
+  String get moneyIn;
+
+  /// No description provided for @moneyOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Money Out'**
+  String get moneyOut;
+
+  /// No description provided for @myInvestments.
+  ///
+  /// In en, this message translates to:
+  /// **'My Investments'**
+  String get myInvestments;
+
+  /// No description provided for @noViewersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No viewers found'**
+  String get noViewersFound;
+
+  /// No description provided for @recordExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Expense'**
+  String get recordExpense;
+
+  /// No description provided for @recordInvestment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Investment'**
+  String get recordInvestment;
+
+  /// No description provided for @recordSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Sale'**
+  String get recordSale;
+
+  /// No description provided for @recordedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded by'**
+  String get recordedBy;
+
+  /// No description provided for @sale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale'**
+  String get sale;
+
+  /// No description provided for @salesIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales Income'**
+  String get salesIncome;
+
+  /// No description provided for @selectExpenseCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Expense Category'**
+  String get selectExpenseCategory;
+
+  /// No description provided for @selectSaleCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Category'**
+  String get selectSaleCategory;
+
+  /// No description provided for @selectViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Viewer'**
+  String get selectViewer;
+
+  /// No description provided for @selectSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Source'**
+  String get selectSource;
+
+  /// No description provided for @totalExpenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Expenses'**
+  String get totalExpenses;
+
+  /// No description provided for @totalIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Income'**
+  String get totalIncome;
+
+  /// No description provided for @viewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get viewer;
+
+  /// No description provided for @viewerInvestment.
+  ///
+  /// In en, this message translates to:
+  /// **'Investment'**
+  String get viewerInvestment;
+
+  /// No description provided for @pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get pending;
+
+  /// No description provided for @pendingApprovals.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Approvals'**
+  String get pendingApprovals;
+
+  /// No description provided for @approveAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm All'**
+  String get approveAll;
+
+  /// No description provided for @noPendingApprovals.
+  ///
+  /// In en, this message translates to:
+  /// **'No entries waiting for confirmation'**
+  String get noPendingApprovals;
+
+  /// No description provided for @allConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'All entries confirmed'**
+  String get allConfirmed;
+
+  /// No description provided for @entryConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry confirmed'**
+  String get entryConfirmed;
+
+  /// No description provided for @editTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Transaction'**
+  String get editTransaction;
+
+  /// No description provided for @recordTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Transactions'**
+  String get recordTransactions;
+
+  /// No description provided for @selectCollector.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Collector'**
+  String get selectCollector;
+
+  /// No description provided for @searchCollector.
+  ///
+  /// In en, this message translates to:
+  /// **'Search collectors'**
+  String get searchCollector;
+
+  /// No description provided for @noCollectorsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No collectors found'**
+  String get noCollectorsFound;
+
+  /// No description provided for @enterSourceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the source name'**
+  String get enterSourceName;
+
+  /// No description provided for @filterByDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by date'**
+  String get filterByDate;
 }
 
 class _AppLocalizationsDelegate
