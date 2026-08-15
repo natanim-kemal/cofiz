@@ -293,6 +293,27 @@ class AppLocalizationsAm extends AppLocalizations {
   String get returnMoney => 'መልስ';
 
   @override
+  String get transfer => 'ማስተላለፍ';
+
+  @override
+  String get chooseSender => 'ላኪ ይምረጡ';
+
+  @override
+  String get chooseReceiver => 'ተቀባይ ይምረጡ';
+
+  @override
+  String get transferTitle => 'ገንዘብ ማስተላለፍ';
+
+  @override
+  String get transferredOut => 'ተላልፏል';
+
+  @override
+  String get receivedFrom => 'የተቀበለው ከ';
+
+  @override
+  String get transferFailed => 'ገንዘብ ማስተላለፍ አልተሳካም';
+
+  @override
   String get recordPurchase => 'ግዢ መዝግብ';
 
   @override

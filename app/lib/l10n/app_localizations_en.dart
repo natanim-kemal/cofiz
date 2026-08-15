@@ -293,6 +293,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get returnMoney => 'Return';
 
   @override
+  String get transfer => 'Transfer';
+
+  @override
+  String get chooseSender => 'Choose Sender';
+
+  @override
+  String get chooseReceiver => 'Choose Receiver';
+
+  @override
+  String get transferTitle => 'Transfer Money';
+
+  @override
+  String get transferredOut => 'Transferred Out';
+
+  @override
+  String get receivedFrom => 'Received From';
+
+  @override
+  String get transferFailed => 'Failed to record transfer';
+
+  @override
   String get recordPurchase => 'Record Purchase';
 
   @override

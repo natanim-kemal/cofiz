@@ -98,6 +98,13 @@
 
   "distributeMoney": "ገንዘብ አከፋፍል",
   "returnMoney": "ገንዘብ መልስ",
+  "transfer": "ማስተላለፍ",
+  "chooseSender": "ላኪ ይምረጡ",
+  "chooseReceiver": "ተቀባይ ይምረጡ",
+  "transferTitle": "ገንዘብ ማስተላለፍ",
+  "transferredOut": "ተላልፏል",
+  "receivedFrom": "የተቀበለው ከ",
+  "transferFailed": "ገንዘብ ማስተላለፍ አልተሳካም",
   "recordPurchase": "ግዢ መዝግብ",
   "coffeePurchase": "የቡና ግዢ",
 

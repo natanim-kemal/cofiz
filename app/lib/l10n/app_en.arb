@@ -98,6 +98,13 @@
 
   "distributeMoney": "Distribute Money",
   "returnMoney": "Return Money",
+  "transfer": "Transfer",
+  "chooseSender": "Choose Sender",
+  "chooseReceiver": "Choose Receiver",
+  "transferTitle": "Transfer Money",
+  "transferredOut": "Transferred Out",
+  "receivedFrom": "Received From",
+  "transferFailed": "Failed to record transfer",
   "recordPurchase": "Record Purchase",
   "coffeePurchase": "Coffee Purchase",
 

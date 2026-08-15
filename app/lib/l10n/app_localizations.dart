@@ -662,6 +662,48 @@ abstract class AppLocalizations {
   /// **'Return'**
   String get returnMoney;
 
+  /// No description provided for @transfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get transfer;
+
+  /// No description provided for @chooseSender.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Sender'**
+  String get chooseSender;
+
+  /// No description provided for @chooseReceiver.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Receiver'**
+  String get chooseReceiver;
+
+  /// No description provided for @transferTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer Money'**
+  String get transferTitle;
+
+  /// No description provided for @transferredOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Transferred Out'**
+  String get transferredOut;
+
+  /// No description provided for @receivedFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Received From'**
+  String get receivedFrom;
+
+  /// No description provided for @transferFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to record transfer'**
+  String get transferFailed;
+
   /// No description provided for @recordPurchase.
   ///
   /// In en, this message translates to:
