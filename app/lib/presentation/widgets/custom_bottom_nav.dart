@@ -21,8 +21,9 @@ class CustomBottomNav extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         border: Border(
-           top: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
+          top: BorderSide(
+            color:
+                isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
           ),
         ),
       ),
@@ -43,7 +44,7 @@ class CustomBottomNav extends StatelessWidget {
           ),
           _NavItem(
             icon: Icons.people_outline_rounded,
-            label: AppLocalizations.of(context)?.workers ?? 'Workers',
+            label: AppLocalizations.of(context)?.workers ?? 'Collectors',
             isSelected: currentIndex == 1,
             onTap: () => onTap(1),
           ),

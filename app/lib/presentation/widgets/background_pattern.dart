@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
 
 class BackgroundPattern extends StatelessWidget {
   final Widget? child;
@@ -8,29 +7,12 @@ class BackgroundPattern extends StatelessWidget {
   const BackgroundPattern({
     super.key,
     this.child,
-    this.opacity = 0.1, // 
+    this.opacity = 0.1, //
   });
 
   @override
   Widget build(BuildContext context) {
-    final pattern = CustomPaint(
-      painter: DotPatternPainter(
-        color: AppColors.primary.withOpacity(opacity),
-      ),
-      size: Size.infinite,
-    );
-
-    if (child != null) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          pattern,
-          child!,
-        ],
-      );
-    }
-
-    return pattern;
+    return child ?? const SizedBox.expand();
   }
 }
 
@@ -54,7 +36,7 @@ class DotPatternPainter extends CustomPainter {
     for (double x = 0; x < size.width; x += spacing) {
       for (double y = 0; y < size.height; y += spacing) {
         final xOffset = (y / spacing).round() % 2 == 0 ? 0.0 : spacing / 2;
-        
+
         canvas.drawCircle(
           Offset(x + xOffset, y),
           radius,
@@ -67,7 +49,7 @@ class DotPatternPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant DotPatternPainter oldDelegate) {
     return oldDelegate.color != color ||
-           oldDelegate.spacing != spacing ||
-           oldDelegate.radius != radius;
+        oldDelegate.spacing != spacing ||
+        oldDelegate.radius != radius;
   }
 }

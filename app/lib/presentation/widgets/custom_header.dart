@@ -18,7 +18,8 @@ class CustomHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: height,
-      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 10, 20, 20),
+      padding: EdgeInsets.fromLTRB(
+          20, MediaQuery.of(context).padding.top + 10, 20, 20),
       decoration: BoxDecoration(
         color: backgroundColor ?? AppColors.primary,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),

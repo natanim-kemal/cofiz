@@ -8,7 +8,6 @@ class WorkerItem extends StatelessWidget {
   final String role;
   final int yearsOfExperience;
   final String status;
-  final double rating; // 0-5 stars
   final String? photoUrl;
   final double? currentBalance; // Optional balance to display
   final VoidCallback? onTap;
@@ -19,7 +18,6 @@ class WorkerItem extends StatelessWidget {
     required this.role,
     this.yearsOfExperience = 0,
     this.status = 'active',
-    this.rating = 0.0,
     this.photoUrl,
     this.currentBalance,
     this.onTap,
@@ -37,7 +35,6 @@ class WorkerItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.primary.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
@@ -74,19 +71,27 @@ class WorkerItem extends StatelessWidget {
                         role,
                         style: TextStyle(
                           fontSize: 13,
-                          color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                          color: isDark
+                              ? AppColors.textMutedDark
+                              : AppColors.textMutedLight,
                         ),
                       ),
                       if (yearsOfExperience > 0) ...[
                         Text(
                           ' • ',
-                          style: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                          style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textMutedDark
+                                  : AppColors.textMutedLight),
                         ),
                         Text(
-                          AppLocalizations.of(context)!.yrs('$yearsOfExperience'),
+                          AppLocalizations.of(context)!
+                              .yrs('$yearsOfExperience'),
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                            color: isDark
+                                ? AppColors.textMutedDark
+                                : AppColors.textMutedLight,
                           ),
                         ),
                       ],
@@ -96,8 +101,6 @@ class WorkerItem extends StatelessWidget {
                   Row(
                     children: [
                       _buildStatusBadge(context),
-                      const SizedBox(width: 12),
-                      if (rating > 0) _buildRating(context),
                     ],
                   ),
                 ],
@@ -123,44 +126,33 @@ class WorkerItem extends StatelessWidget {
   }
 
   Widget _buildBalanceDisplay(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isLowBalance = currentBalance! < 500;
-    final balanceColor = isLowBalance ? Colors.red : Colors.green;
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: balanceColor.withOpacity(isDark ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${currentBalance!.formatted}',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: balanceColor,
-            ),
+    final balanceColor = isLowBalance ? Colors.red : AppColors.success;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${currentBalance!.formatted}',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: balanceColor,
           ),
-          if (isLowBalance)
-            Text(
-              AppLocalizations.of(context)!.low,
-              style: TextStyle(
-                fontSize: 10,
-                color: balanceColor,
-              ),
-            ),
-        ],
-      ),
+        ),
+        if (isLowBalance)
+          Text(
+            AppLocalizations.of(context)!.low,
+            style: TextStyle(fontSize: 10, color: balanceColor),
+          ),
+      ],
     );
   }
 
   Widget _buildAvatar(ThemeData theme) {
     final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
-    
+
     return Stack(
       children: [
         Container(
@@ -211,7 +203,6 @@ class WorkerItem extends StatelessWidget {
   }
 
   Widget _buildStatusBadge(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color badgeColor;
     switch (status.toLowerCase()) {
       case 'active':
@@ -227,44 +218,16 @@ class WorkerItem extends StatelessWidget {
         badgeColor = Colors.grey;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: badgeColor.withOpacity(isDark ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        _getStatusText(context, status),
-        style: TextStyle(
-          fontSize: 11,
-          color: badgeColor,
-          fontWeight: FontWeight.w600,
-        ),
+    return Text(
+      _getStatusText(context, status),
+      style: TextStyle(
+        fontSize: 12,
+        color: badgeColor,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
 
-  Widget _buildRating(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.star,
-          size: 14,
-          color: Colors.amber.shade600,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          rating.toStringAsFixed(1),
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).textTheme.bodyLarge?.color,
-          ),
-        ),
-      ],
-    );
-  }
   String _getStatusText(BuildContext context, String status) {
     switch (status.toLowerCase()) {
       case 'active':

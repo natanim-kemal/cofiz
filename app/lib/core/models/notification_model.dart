@@ -4,10 +4,10 @@ enum NotificationType {
   alert,
   dailyReportRequest,
   // New types for automatic notifications
-  lowBalance,          // Worker balance below threshold
-  moneyDistributed,    // Worker received money from admin
-  purchaseRecorded,    // Admin notified of worker purchase
-  commissionEarned;    // Worker earned commission
+  lowBalance, // Worker balance below threshold
+  moneyDistributed, // Worker received money from admin
+  purchaseRecorded, // Admin notified of worker purchase
+  commissionEarned; // Worker earned commission
 
   String get displayName {
     switch (this) {

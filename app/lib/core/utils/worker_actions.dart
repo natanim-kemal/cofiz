@@ -36,7 +36,7 @@ class WorkerActions {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Worker'),
+        title: const Text('Delete Collector'),
         content: Text(
           'Are you sure you want to delete $workerName? This action cannot be undone.',
         ),

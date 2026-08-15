@@ -51,9 +51,11 @@ class ActivityChart extends StatelessWidget {
               ),
               Row(
                 children: [
-                  _buildLegend(Colors.green, localizations?.distributed ?? 'Distributed'),
+                  _buildLegend(Colors.red,
+                      localizations?.distributed ?? 'Distributed'),
                   const SizedBox(width: 12),
-                  _buildLegend(Colors.red, localizations?.returned ?? 'Returned'),
+                  _buildLegend(
+                      Colors.green, localizations?.returned ?? 'Returned'),
                 ],
               ),
             ],
@@ -67,7 +69,8 @@ class ActivityChart extends StatelessWidget {
                 barTouchData: BarTouchData(
                   enabled: true,
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: isDark ? Colors.grey.shade800 : Colors.black87,
+                    tooltipBgColor:
+                        isDark ? Colors.grey.shade800 : Colors.black87,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
                         '${localizations?.currency ?? 'ETB'} ${rod.toY.toStringAsFixed(0)}',
@@ -87,7 +90,8 @@ class ActivityChart extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 30,
                       getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 && value.toInt() < labels.length) {
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < labels.length) {
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
@@ -178,7 +182,7 @@ class ActivityChart extends StatelessWidget {
 
   List<BarChartGroupData> _buildBarGroups() {
     List<BarChartGroupData> groups = [];
-    
+
     for (int i = 0; i < distributedData.length; i++) {
       groups.add(
         BarChartGroupData(
@@ -186,21 +190,23 @@ class ActivityChart extends StatelessWidget {
           barRods: [
             BarChartRodData(
               toY: distributedData[i],
-              color: Colors.green,
+              color: Colors.red,
               width: 12,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(4)),
             ),
             BarChartRodData(
               toY: returnedData[i],
-              color: Colors.red,
+              color: Colors.green,
               width: 12,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(4)),
             ),
           ],
         ),
       );
     }
-    
+
     return groups;
   }
 }

@@ -8,7 +8,7 @@ enum UserRole {
       case UserRole.admin:
         return 'Admin';
       case UserRole.worker:
-        return 'Worker';
+        return 'Collector';
       case UserRole.viewer:
         return 'Viewer';
     }
@@ -17,7 +17,7 @@ enum UserRole {
   String get description {
     switch (this) {
       case UserRole.admin:
-        return 'Full access - Can manage users, workers, settings, and all data';
+        return 'Full access - Can manage users, collectors, settings, and all data';
       case UserRole.worker:
         return 'Can view own dashboard, record transactions, and view history';
       case UserRole.viewer:
@@ -29,7 +29,8 @@ enum UserRole {
   bool get canManageUsers => this == UserRole.admin;
   bool get canManageSettings => this == UserRole.admin;
   bool get canManageWorkers => this == UserRole.admin;
-  bool get canCreateTransactions => this == UserRole.admin || this == UserRole.worker;
+  bool get canCreateTransactions =>
+      this == UserRole.admin || this == UserRole.worker;
   bool get canDeleteWorkers => this == UserRole.admin;
   bool get canEditWorkers => this == UserRole.admin;
   bool get canViewReports => true; // All roles can view
@@ -69,7 +70,7 @@ class AppUser {
       (r) => r.name.toLowerCase() == roleString,
       orElse: () => UserRole.viewer,
     );
-    
+
     return AppUser(
       uid: uid,
       email: data['email'] ?? '',

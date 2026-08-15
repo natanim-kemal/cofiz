@@ -19,7 +19,7 @@ class _OfflineIndicatorState extends State<OfflineIndicator> {
   void initState() {
     super.initState();
     _isOnline = _connectivity.isOnline;
-    
+
     _connectivity.connectionStatus.listen((isOnline) {
       if (mounted) {
         setState(() {
@@ -48,7 +48,8 @@ class _OfflineIndicatorState extends State<OfflineIndicator> {
           const SizedBox(width: 8),
           Text(
             pendingCount > 0
-                ? AppLocalizations.of(context)!.offlineSyncPending('$pendingCount')
+                ? AppLocalizations.of(context)!
+                    .offlineSyncPending('$pendingCount')
                 : AppLocalizations.of(context)!.youAreOffline,
             style: const TextStyle(
               color: Colors.white,
