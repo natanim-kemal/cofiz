@@ -81,8 +81,9 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
 
     final transactionProvider =
         Provider.of<TransactionProvider>(context, listen: false);
-    final success =
-        await transactionProvider.deleteTransaction(transaction.id);
+    final success = transaction.isTransfer
+        ? await transactionProvider.deleteTransfer(transaction.transferId!)
+        : await transactionProvider.deleteTransaction(transaction.id);
 
     if (!mounted) return;
     if (success) {
@@ -163,6 +164,9 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
     Color typeColor;
     IconData typeIcon;
     bool isPositive = transaction.increasesBalance;
+    if (transaction.isTransfer) {
+      isPositive = transaction.isTransferReceiver;
+    }
 
     switch (transaction.type.toLowerCase()) {
       case 'distribution':
@@ -176,6 +180,10 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
       case 'purchase':
         typeColor = Colors.orange;
         typeIcon = Icons.shopping_cart;
+        break;
+      case 'transfer':
+        typeColor = const Color(0xFFF0A04B);
+        typeIcon = Icons.swap_horiz;
         break;
       default:
         typeColor = Colors.grey;
@@ -213,7 +221,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _getTypeDisplay(context, transaction.type),
+                        _getTypeDisplay(context, transaction),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -312,13 +320,14 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildActionChip(
-                  icon: Icons.edit_outlined,
-                  label: l10n.edit,
-                  color: const Color(0xFFF0A04B),
-                  value: 'edit',
-                ),
-                const SizedBox(width: 12),
+                if (!transaction.isTransfer)
+                  _buildActionChip(
+                    icon: Icons.edit_outlined,
+                    label: l10n.edit,
+                    color: const Color(0xFFF0A04B),
+                    value: 'edit',
+                  ),
+                if (!transaction.isTransfer) const SizedBox(width: 12),
                 _buildActionChip(
                   icon: Icons.delete_outline,
                   label: l10n.delete,
@@ -373,16 +382,22 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
     );
   }
 
-  String _getTypeDisplay(BuildContext context, String type) {
-    switch (type.toLowerCase()) {
+  String _getTypeDisplay(BuildContext context, MoneyTransaction transaction) {
+    switch (transaction.type.toLowerCase()) {
       case 'distribution':
         return AppLocalizations.of(context)?.distributed ?? 'Distributed';
       case 'return':
         return AppLocalizations.of(context)?.returned ?? 'Returned';
       case 'purchase':
         return AppLocalizations.of(context)?.purchased ?? 'Purchased';
+      case 'transfer':
+        return transaction.isTransferSender
+            ? (AppLocalizations.of(context)?.transferredOut ??
+                'Transferred Out')
+            : (AppLocalizations.of(context)?.receivedFrom ??
+                'Received From');
       default:
-        return type;
+        return transaction.type;
     }
   }
 }
