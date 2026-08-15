@@ -10,7 +10,9 @@ import '../screens/income/company_income_screen.dart';
 import '../screens/worker_detail/worker_detail_screen.dart';
 import '../../l10n/app_localizations.dart';
 
+enum FeedFilter { none, in_, out_ }
 enum _FeedKind { transaction, income, expense }
+enum _FeedDirection { in_, out_, neutral }
 
 class _FeedItem {
   final DateTime createdAt;
@@ -26,6 +28,7 @@ class ActivityFeedList extends StatelessWidget {
   final int limit;
   final VoidCallback? onViewAll;
   final String? emptyText;
+  final FeedFilter filter;
 
   const ActivityFeedList({
     super.key,
@@ -35,6 +38,7 @@ class ActivityFeedList extends StatelessWidget {
     this.limit = 8,
     this.onViewAll,
     this.emptyText,
+    this.filter = FeedFilter.none,
   });
 
   @override
@@ -43,14 +47,24 @@ class ActivityFeedList extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
-    final entries = <_FeedItem>[
+    final allEntries = <_FeedItem>[
       for (final t in transactions)
         _FeedItem(t.createdAt, _FeedKind.transaction, t),
       for (final r in incomeRecords)
         _FeedItem(r.createdAt, _FeedKind.income, r),
       for (final e in expenseRecords)
         _FeedItem(e.createdAt, _FeedKind.expense, e),
-    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    ];
+
+    final entries = switch (filter) {
+      FeedFilter.in_ => allEntries
+          .where((e) => _directionOf(e) == _FeedDirection.in_)
+          .toList(),
+      FeedFilter.out_ => allEntries
+          .where((e) => _directionOf(e) == _FeedDirection.out_)
+          .toList(),
+      FeedFilter.none => allEntries,
+    }..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     final shown = entries.take(limit).toList();
 
@@ -87,6 +101,21 @@ class ActivityFeedList extends StatelessWidget {
     );
   }
 
+  _FeedDirection _directionOf(_FeedItem item) {
+    switch (item.kind) {
+      case _FeedKind.income:
+        return _FeedDirection.in_;
+      case _FeedKind.expense:
+        return _FeedDirection.out_;
+      case _FeedKind.transaction:
+        final t = item.payload as MoneyTransaction;
+        if (t.isTransfer) return _FeedDirection.neutral;
+        return t.increasesBalance
+            ? _FeedDirection.out_
+            : _FeedDirection.in_;
+    }
+  }
+
   Widget _buildRow(BuildContext context, _FeedItem item) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -119,6 +148,14 @@ class ActivityFeedList extends StatelessWidget {
             amountColor = AppColors.success;
             amount = '+${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
             break;
+          case 'transfer':
+            icon = Icons.swap_horiz;
+            title = t.isTransferSender
+                ? '${l10n?.transferredOut ?? 'Transferred Out'} · ${t.workerName}'
+                : '${l10n?.receivedFrom ?? 'Received From'} · ${t.workerName}';
+            amountColor = const Color(0xFFF0A04B);
+            amount = '${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
+            break;
           default:
             icon = Icons.local_cafe;
             title = l10n?.purchased ?? 'Purchased';
@@ -131,7 +168,9 @@ class ActivityFeedList extends StatelessWidget {
                   '${l10n?.currency ?? 'ETB'} ${(t.pricePerKg ?? 0).formatted}';
             }
         }
-        title = '$title · ${t.workerName}';
+        if (!t.isTransfer) {
+          title = '$title · ${t.workerName}';
+        }
         subtitle = DateFormat('MMM d, h:mm a').format(t.createdAt);
         onTap = () {
           Navigator.push(
