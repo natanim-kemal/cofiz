@@ -5,16 +5,14 @@ import '../../../../core/providers/transaction_provider.dart';
 import '../../../../../core/utils/number_formatter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/worker_model.dart';
-import '../widgets/worker_action_button.dart';
 import '../widgets/worker_stat_card.dart';
 import '../widgets/worker_transaction_tile.dart';
+import '../../../widgets/app_toast.dart';
 
 class WorkerHomeTab extends StatefulWidget {
   final Worker worker;
   final bool isDark;
   final VoidCallback onRefresh;
-  final Function(Worker) onRecordReturn;
-  final Function(Worker) onRecordPurchase;
   final VoidCallback onViewHistory;
 
   const WorkerHomeTab({
@@ -22,8 +20,6 @@ class WorkerHomeTab extends StatefulWidget {
     required this.worker,
     required this.isDark,
     required this.onRefresh,
-    required this.onRecordReturn,
-    required this.onRecordPurchase,
     required this.onViewHistory,
   });
 
@@ -32,6 +28,41 @@ class WorkerHomeTab extends StatefulWidget {
 }
 
 class _WorkerHomeTabState extends State<WorkerHomeTab> {
+  bool _approving = false;
+
+  Future<void> _approveTransaction(
+      TransactionProvider provider, String id) async {
+    setState(() => _approving = true);
+    final success = await provider.approveTransaction(id);
+    if (mounted) {
+      setState(() => _approving = false);
+      if (success) {
+        AppToast.show(
+          AppLocalizations.of(context)!.entryConfirmed,
+          success: true,
+        );
+      } else {
+        AppToast.show(provider.errorMessage ??
+            AppLocalizations.of(context)!.failedToComplete);
+      }
+    }
+  }
+
+  Future<void> _approveAll(TransactionProvider provider) async {
+    setState(() => _approving = true);
+    final success = await provider.approveAllForWorker(widget.worker.id);
+    if (mounted) {
+      setState(() => _approving = false);
+      AppToast.show(
+        success
+            ? AppLocalizations.of(context)!.allConfirmed
+            : provider.errorMessage ??
+                AppLocalizations.of(context)!.failedToComplete,
+        success: success,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -90,7 +121,7 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
 
           // Balance Card
@@ -134,22 +165,22 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                 Row(
                   children: [
                     Icon(
-                      widget.worker.currentBalance < 500 
+                      widget.worker.currentBalance < 500
                           ? Icons.warning_amber_rounded
                           : Icons.check_circle,
-                      color: widget.worker.currentBalance < 500 
-                          ? Colors.orange 
+                      color: widget.worker.currentBalance < 500
+                          ? Colors.orange
                           : Colors.white,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      widget.worker.currentBalance < 500 
+                      widget.worker.currentBalance < 500
                           ? AppLocalizations.of(context)!.lowBalanceWarning
                           : AppLocalizations.of(context)!.balanceGood,
                       style: TextStyle(
-                        color: widget.worker.currentBalance < 500 
-                            ? Colors.orange 
+                        color: widget.worker.currentBalance < 500
+                            ? Colors.orange
                             : Colors.white70,
                         fontSize: 12,
                       ),
@@ -162,28 +193,7 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
 
           const SizedBox(height: 24),
 
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: WorkerActionButton(
-                  icon: Icons.arrow_upward,
-                  label: AppLocalizations.of(context)!.recordReturn,
-                  color: Colors.green,
-                  onTap: () => widget.onRecordReturn(widget.worker),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: WorkerActionButton(
-                  icon: Icons.shopping_cart,
-                  label: AppLocalizations.of(context)!.recordPurchase,
-                  color: Colors.blue,
-                  onTap: () => widget.onRecordPurchase(widget.worker),
-                ),
-              ),
-            ],
-          ),
+          _buildPendingApprovals(),
 
           const SizedBox(height: 24),
 
@@ -194,11 +204,105 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
     );
   }
 
+  Widget _buildPendingApprovals() {
+    return Consumer<TransactionProvider>(
+      builder: (context, provider, _) {
+        final pending = provider.workerTransactions
+            .where((t) => !t.approved)
+            .toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.verified_user,
+                        color: Colors.amber, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppLocalizations.of(context)!.pendingApprovals,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                if (pending.isNotEmpty)
+                  TextButton.icon(
+                    onPressed:
+                        _approving ? null : () => _approveAll(provider),
+                    icon: _approving
+                        ? const SizedBox(
+                            height: 14,
+                            width: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.primary),
+                          )
+                        : const Icon(Icons.done_all, size: 16),
+                    label: Text(
+                      AppLocalizations.of(context)!.approveAll,
+                      style: const TextStyle(color: AppColors.primary),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (pending.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color:
+                          widget.isDark ? Colors.white10 : Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(widget.isDark ? 0.2 : 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified, color: Colors.green, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        AppLocalizations.of(context)!.noPendingApprovals,
+                        style: TextStyle(
+                          color: widget.isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...pending.map((tx) => WorkerTransactionTile(
+                    transaction: tx,
+                    isDark: widget.isDark,
+                    onApprove: () => _approveTransaction(provider, tx.id),
+                  )),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildRecentTransactionsPreview(bool isDark) {
     return Consumer<TransactionProvider>(
       builder: (context, provider, _) {
         final transactions = provider.workerTransactions.take(3).toList();
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -229,7 +333,8 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade200),
+                  border: Border.all(
+                      color: isDark ? Colors.white10 : Colors.grey.shade200),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
@@ -242,13 +347,15 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                   child: Text(
                     AppLocalizations.of(context)!.noTransactionsYet,
                     style: TextStyle(
-                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color:
+                          isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
                 ),
               )
             else
-              ...transactions.map((tx) => WorkerTransactionTile(transaction: tx, isDark: isDark)),
+              ...transactions.map((tx) =>
+                  WorkerTransactionTile(transaction: tx, isDark: isDark)),
           ],
         );
       },

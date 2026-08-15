@@ -3,16 +3,17 @@ import '../../../../l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/models/transaction_model.dart';
-import '../../../../core/theme/app_theme.dart';
 
 class WorkerTransactionTile extends StatelessWidget {
   final MoneyTransaction transaction;
   final bool isDark;
+  final VoidCallback? onApprove;
 
   const WorkerTransactionTile({
     super.key,
     required this.transaction,
     required this.isDark,
+    this.onApprove,
   });
 
   @override
@@ -50,7 +51,6 @@ class WorkerTransactionTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
@@ -61,14 +61,7 @@ class WorkerTransactionTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
+          Icon(icon, color: color, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -83,18 +76,41 @@ class WorkerTransactionTile extends StatelessWidget {
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                     ),
-                    // Show coffee type badge for purchases
-                    if (transaction.type == 'purchase' && transaction.coffeeType != null) ...[
+                    if (!transaction.approved) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          AppLocalizations.of(context)!.pending,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.amber,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                    // Show coffee type badge for purchases
+                    if (transaction.type == 'purchase' &&
+                        transaction.coffeeType != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.brown.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          transaction.coffeeType!.substring(0, 1).toUpperCase() + 
-                            transaction.coffeeType!.substring(1),
+                          transaction.coffeeType!
+                                  .substring(0, 1)
+                                  .toUpperCase() +
+                              transaction.coffeeType!.substring(1),
                           style: const TextStyle(
                             fontSize: 10,
                             color: Colors.brown,
@@ -112,16 +128,22 @@ class WorkerTransactionTile extends StatelessWidget {
                       DateFormat('h:mm a').format(transaction.createdAt),
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                     ),
                     // Show commission for purchases
-                    if (transaction.type == 'purchase' && transaction.commissionAmount != null && transaction.commissionAmount! > 0) ...[
+                    if (transaction.type == 'purchase' &&
+                        transaction.commissionAmount != null &&
+                        transaction.commissionAmount! > 0) ...[
                       Text(
                         ' • ',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                         ),
                       ),
                       Icon(Icons.paid, size: 12, color: Colors.teal),
@@ -144,7 +166,9 @@ class WorkerTransactionTile extends StatelessWidget {
                       transaction.notes!,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                        color: isDark
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade500,
                         fontStyle: FontStyle.italic,
                       ),
                       maxLines: 1,
@@ -165,15 +189,41 @@ class WorkerTransactionTile extends StatelessWidget {
                   color: color,
                 ),
               ),
-              // Show weight for purchases
-              if (transaction.type == 'purchase' && transaction.coffeeWeight != null)
+              // Show weight and per-kilo price for purchases
+              if (transaction.type == 'purchase' &&
+                  transaction.coffeeWeight != null)
                 Text(
-                  '${transaction.coffeeWeight!.formatted} ${AppLocalizations.of(context)!.kg}',
+                  '${transaction.coffeeWeight!.formatted} ${AppLocalizations.of(context)!.kg}'
+                  ' • '
+                  '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${(transaction.pricePerKg ?? 0).formatted}',
                   style: TextStyle(
                     fontSize: 11,
                     color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
                 ),
+              if (!transaction.approved && onApprove != null) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: onApprove,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      AppLocalizations.of(context)!.confirm,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -186,9 +236,11 @@ class WorkerTransactionTile extends StatelessWidget {
       case 'distribution':
         return AppLocalizations.of(context)?.moneyReceived ?? 'Money Received';
       case 'return':
-        return AppLocalizations.of(context)?.moneyReturnedTitle ?? 'Money Returned';
+        return AppLocalizations.of(context)?.moneyReturnedTitle ??
+            'Money Returned';
       case 'purchase':
-        return AppLocalizations.of(context)?.coffeePurchaseTitle ?? 'Coffee Purchase';
+        return AppLocalizations.of(context)?.coffeePurchaseTitle ??
+            'Coffee Purchase';
       default:
         return AppLocalizations.of(context)?.transaction ?? 'Transaction';
     }

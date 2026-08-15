@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../dialogs/worker_credentials_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/background_pattern.dart';
+import '../../widgets/app_toast.dart';
 
 class WorkerFormScreen extends StatefulWidget {
   final Worker? worker; // null for add, Worker for edit
@@ -25,12 +26,11 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _commissionRateController = TextEditingController();
-  
+
   int _yearsOfExperience = 0;
   String _status = 'active';
-  double _performanceRating = 70.0;
   bool _isLoading = false;
-  
+
   // Login account creation
   bool _createLoginAccount = false;
   String? _generatedPassword;
@@ -48,12 +48,10 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
       _commissionRateController.text = widget.worker!.commissionRate.toString();
       _yearsOfExperience = widget.worker!.yearsOfExperience;
       _status = widget.worker!.status;
-      _performanceRating = widget.worker!.performanceRating;
     } else {
       _commissionRateController.text = '2.0'; // Default
     }
   }
-
 
   @override
   void dispose() {
@@ -71,13 +69,9 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
 
     // Validate email is provided if creating login account
     if (_createLoginAccount && _emailController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.emailRequiredForLogin),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.show(
+          AppLocalizations.of(context)!.emailRequiredForLogin,
+          success: true);
       return;
     }
 
@@ -87,11 +81,13 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
       id: widget.worker?.id ?? '',
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
-      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+      email: _emailController.text.trim().isEmpty
+          ? null
+          : _emailController.text.trim(),
       role: widget.worker?.role ?? 'Worker', // Default role for workers
       yearsOfExperience: _yearsOfExperience,
       status: _status,
-      performanceRating: _performanceRating,
+      performanceRating: 70.0,
       createdAt: widget.worker?.createdAt ?? DateTime.now(),
       lastActiveAt: DateTime.now(),
       isActive: true,
@@ -100,9 +96,12 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
       totalReturned: widget.worker?.totalReturned ?? 0.0,
       totalCoffeePurchased: widget.worker?.totalCoffeePurchased ?? 0.0,
       totalCommissionEarned: widget.worker?.totalCommissionEarned ?? 0.0,
-      commissionRate: double.tryParse(_commissionRateController.text.trim()) ?? 0.0,
+      commissionRate:
+          double.tryParse(_commissionRateController.text.trim()) ?? 0.0,
       userId: widget.worker?.userId,
-      hasLoginAccess: isEditMode ? (widget.worker?.hasLoginAccess ?? false) : _createLoginAccount,
+      hasLoginAccess: isEditMode
+          ? (widget.worker?.hasLoginAccess ?? false)
+          : _createLoginAccount,
     );
 
     final workerProvider = Provider.of<WorkerProvider>(context, listen: false);
@@ -120,8 +119,9 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
       if (success) {
         // Determine if account creation is needed
         final targetId = isEditMode ? widget.worker!.id : newWorkerId;
-        final shouldCreateAccount = _createLoginAccount && 
-            (!isEditMode || (isEditMode && !(widget.worker?.hasLoginAccess ?? false)));
+        final shouldCreateAccount = _createLoginAccount &&
+            (!isEditMode ||
+                (isEditMode && !(widget.worker?.hasLoginAccess ?? false)));
 
         if (shouldCreateAccount && targetId != null) {
           final accountService = WorkerAccountService();
@@ -133,19 +133,16 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
 
           // Force update local cache if possible, or wait for stream
           // Note: WorkerProvider stream will eventually update the worker with userId
-          
+
           setState(() => _isLoading = false);
 
           if (result['success'] == true) {
             // Check if it was a restoration (existing account)
             if (result['message'] != null) {
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(result['message']),
-                    backgroundColor: Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                AppToast.show(
+                  '${result['message']}',
+                  success: true,
                 );
               }
             } else {
@@ -158,42 +155,33 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
                     workerName: _nameController.text.trim(),
                     email: _emailController.text.trim(),
                     password: result['password'] as String,
-                    phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+                    phone: _phoneController.text.trim().isEmpty
+                        ? null
+                        : _phoneController.text.trim(),
                   ),
                 );
               }
             }
           } else {
             // Account creation failed, show error but worker was still created
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppLocalizations.of(context)!.workerSavedAccountFailed(result['error'])),
-                backgroundColor: Colors.orange,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-              ),
-            );
+            AppToast.show(
+                AppLocalizations.of(context)!.workerSavedAccountFailed(
+                    result['error']));
           }
         } else {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isEditMode ? AppLocalizations.of(context)!.workerUpdatedSuccessfully : AppLocalizations.of(context)!.workerAddedSuccessfully),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppToast.show(
+            isEditMode
+                ? AppLocalizations.of(context)!.workerUpdatedSuccessfully
+                : AppLocalizations.of(context)!.workerAddedSuccessfully,
+            success: true,
           );
         }
         Navigator.pop(context);
       } else {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(workerProvider.errorMessage ?? AppLocalizations.of(context)!.failedToSaveWorker),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppToast.show(workerProvider.errorMessage ??
+            AppLocalizations.of(context)!.failedToSaveWorker);
       }
     }
   }
@@ -204,7 +192,8 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final cardColor = isDark ? theme.cardColor : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final shadowColor = isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.03);
+    final shadowColor =
+        isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.03);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -216,7 +205,9 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          isEditMode ? AppLocalizations.of(context)!.editWorker : AppLocalizations.of(context)!.addWorker,
+          isEditMode
+              ? AppLocalizations.of(context)!.editWorker
+              : AppLocalizations.of(context)!.addWorker,
           style: TextStyle(
             color: textColor,
             fontWeight: FontWeight.w600,
@@ -252,327 +243,283 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
         children: [
           const BackgroundPattern(),
           Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // Name Field
-            _buildTextField(
-              controller: _nameController,
-              label: AppLocalizations.of(context)!.fullName,
-              icon: Icons.person,
-              isDark: isDark,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return AppLocalizations.of(context)!.nameIsRequired;
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Phone Field
-            _buildTextField(
-              controller: _phoneController,
-              label: AppLocalizations.of(context)!.phoneNumber,
-              icon: Icons.phone,
-              keyboardType: TextInputType.phone,
-              isDark: isDark,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return AppLocalizations.of(context)!.phoneNumberIsRequired;
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-            
-            // Commission Rate Field
-            _buildTextField(
-              controller: _commissionRateController,
-              label: AppLocalizations.of(context)!.commissionRate,
-              icon: Icons.monetization_on,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              isDark: isDark,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return AppLocalizations.of(context)!.commissionRateIsRequired;
-                }
-                if (double.tryParse(value) == null) {
-                  return AppLocalizations.of(context)!.enterValidNumber;
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Email Field (Required for login account)
-            _buildTextField(
-              controller: _emailController,
-              label: _createLoginAccount ? AppLocalizations.of(context)!.emailRequiredLogin : AppLocalizations.of(context)!.emailOptional,
-              icon: Icons.email,
-              keyboardType: TextInputType.emailAddress,
-              isDark: isDark,
-              validator: (value) {
-                if (_createLoginAccount) {
-                  if (value == null || value.trim().isEmpty) {
-                    return AppLocalizations.of(context)!.emailRequiredForLogin;
-                  }
-                  // Email format validation
-                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                  if (!emailRegex.hasMatch(value.trim())) {
-                    return AppLocalizations.of(context)!.enterValidEmail;
-                  }
-                } else if (value != null && value.trim().isNotEmpty) {
-                  // If email is optional but provided, still validate format
-                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                  if (!emailRegex.hasMatch(value.trim())) {
-                    return AppLocalizations.of(context)!.enterValidEmail;
-                  }
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Create Login Account Toggle (new workers or existing without login)
-            if (!isEditMode || (isEditMode && !(widget.worker?.hasLoginAccess ?? false)))
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _createLoginAccount 
-                        ? AppColors.primary.withOpacity(0.5)
-                        : Colors.grey.shade300,
-                    width: 2,
-                  ),
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                // Name Field
+                _buildTextField(
+                  controller: _nameController,
+                  label: AppLocalizations.of(context)!.fullName,
+                  icon: Icons.person,
+                  isDark: isDark,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return AppLocalizations.of(context)!.nameIsRequired;
+                    }
+                    return null;
+                  },
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.login,
-                      color: _createLoginAccount 
-                          ? AppColors.primary 
-                          : Colors.grey,
+
+                const SizedBox(height: 16),
+
+                // Phone Field
+                _buildTextField(
+                  controller: _phoneController,
+                  label: AppLocalizations.of(context)!.phoneNumber,
+                  icon: Icons.phone,
+                  keyboardType: TextInputType.phone,
+                  isDark: isDark,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return AppLocalizations.of(context)!
+                          .phoneNumberIsRequired;
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Commission Rate Field
+                _buildTextField(
+                  controller: _commissionRateController,
+                  label: AppLocalizations.of(context)!.commissionRate,
+                  icon: Icons.monetization_on,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  isDark: isDark,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return AppLocalizations.of(context)!
+                          .commissionRateIsRequired;
+                    }
+                    if (double.tryParse(value) == null) {
+                      return AppLocalizations.of(context)!.enterValidNumber;
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Email Field (Required for login account)
+                _buildTextField(
+                  controller: _emailController,
+                  label: _createLoginAccount
+                      ? AppLocalizations.of(context)!.emailRequiredLogin
+                      : AppLocalizations.of(context)!.emailOptional,
+                  icon: Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                  isDark: isDark,
+                  validator: (value) {
+                    if (_createLoginAccount) {
+                      if (value == null || value.trim().isEmpty) {
+                        return AppLocalizations.of(context)!
+                            .emailRequiredForLogin;
+                      }
+                      // Email format validation
+                      final emailRegex =
+                          RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      if (!emailRegex.hasMatch(value.trim())) {
+                        return AppLocalizations.of(context)!.enterValidEmail;
+                      }
+                    } else if (value != null && value.trim().isNotEmpty) {
+                      // If email is optional but provided, still validate format
+                      final emailRegex =
+                          RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      if (!emailRegex.hasMatch(value.trim())) {
+                        return AppLocalizations.of(context)!.enterValidEmail;
+                      }
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Create Login Account Toggle (new workers or existing without login)
+                if (!isEditMode ||
+                    (isEditMode && !(widget.worker?.hasLoginAccess ?? false)))
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _createLoginAccount
+                            ? AppColors.primary.withOpacity(0.5)
+                            : Colors.grey.shade300,
+                        width: 2,
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.login,
+                          color: _createLoginAccount
+                              ? AppColors.primary
+                              : Colors.grey,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                AppLocalizations.of(context)!
+                                    .createLoginAccount,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                AppLocalizations.of(context)!.allowWorkerLogin,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _createLoginAccount,
+                          onChanged: (value) {
+                            setState(() => _createLoginAccount = value);
+                          },
+                          activeColor: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                if (!isEditMode) const SizedBox(height: 16),
+
+                const SizedBox(height: 24),
+
+                // Years of Experience
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: shadowColor,
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppLocalizations.of(context)!.yearsOfExperience,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
                         children: [
-                          Text(
-                            AppLocalizations.of(context)!.createLoginAccount,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: textColor,
+                          Expanded(
+                            child: Slider(
+                              value: _yearsOfExperience.toDouble(),
+                              min: 0,
+                              max: 30,
+                              divisions: 30,
+                              activeColor: AppColors.primary,
+                              label: AppLocalizations.of(context)!
+                                  .years('$_yearsOfExperience'),
+                              onChanged: (value) {
+                                setState(
+                                    () => _yearsOfExperience = value.toInt());
+                              },
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            AppLocalizations.of(context)!.allowWorkerLogin,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '$_yearsOfExperience',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    Switch(
-                      value: _createLoginAccount,
-                      onChanged: (value) {
-                        setState(() => _createLoginAccount = value);
-                      },
-                      activeColor: AppColors.primary,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-            if (!isEditMode) const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
-
-            // Years of Experience
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: shadowColor,
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLocalizations.of(context)!.yearsOfExperience,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: _yearsOfExperience.toDouble(),
-                          min: 0,
-                          max: 30,
-                          divisions: 30,
-                          activeColor: AppColors.primary,
-                          label: AppLocalizations.of(context)!.years('$_yearsOfExperience'),
-                          onChanged: (value) {
-                            setState(() => _yearsOfExperience = value.toInt());
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '$_yearsOfExperience',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                // Status
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: shadowColor,
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Status
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: shadowColor,
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLocalizations.of(context)!.status,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatusChip(AppLocalizations.of(context)!.active, 'active', Colors.green, isDark),
-                      const SizedBox(width: 8),
-                      _buildStatusChip(AppLocalizations.of(context)!.busy, 'busy', Colors.orange, isDark),
-                      const SizedBox(width: 8),
-                      _buildStatusChip(AppLocalizations.of(context)!.offline, 'offline', Colors.grey, isDark),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Performance Rating
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: shadowColor,
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppLocalizations.of(context)!.performanceRating,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: _performanceRating,
-                          min: 0,
-                          max: 100,
-                          divisions: 20,
-                          activeColor: AppColors.primary,
-                          label: '${_performanceRating.toInt()}%',
-                          onChanged: (value) {
-                            setState(() => _performanceRating = value);
-                          },
+                      Text(
+                        AppLocalizations.of(context)!.status,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${_performanceRating.toInt()}%',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _buildStatusChip(AppLocalizations.of(context)!.active,
+                              'active', Colors.green, isDark),
+                          const SizedBox(width: 8),
+                          _buildStatusChip(AppLocalizations.of(context)!.busy,
+                              'busy', Colors.orange, isDark),
+                          const SizedBox(width: 8),
+                          _buildStatusChip(
+                              AppLocalizations.of(context)!.offline,
+                              'offline',
+                              Colors.grey,
+                              isDark),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -587,9 +534,10 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
     String? Function(String?)? validator,
   }) {
     final cardColor = isDark ? Theme.of(context).cardColor : Colors.white;
-    final shadowColor = isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.03);
+    final shadowColor =
+        isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.03);
     final textColor = isDark ? Colors.white : Colors.black87;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -609,8 +557,13 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
         style: TextStyle(fontSize: 15, color: textColor),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-          prefixIcon: Icon(icon, size: 20, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+          labelStyle: TextStyle(
+              color:
+                  isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+          prefixIcon: Icon(icon,
+              size: 20,
+              color:
+                  isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -624,9 +577,11 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
     );
   }
 
-  Widget _buildStatusChip(String label, String value, Color color, bool isDark) {
+  Widget _buildStatusChip(
+      String label, String value, Color color, bool isDark) {
     final isSelected = _status == value;
-    final unselectedBg = isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100;
+    final unselectedBg =
+        isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100;
     final unselectedText = isDark ? Colors.white70 : Colors.black87;
 
     return Expanded(

@@ -7,6 +7,7 @@ import '../../../../core/models/worker_model.dart';
 import '../../../../core/models/transaction_model.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/worker_transaction_tile.dart';
+import '../../../widgets/app_toast.dart';
 
 class WorkerHistoryTab extends StatefulWidget {
   final Worker worker;
@@ -27,11 +28,44 @@ class WorkerHistoryTab extends StatefulWidget {
 class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
   int _itemsToShow = 20;
   static const int _itemsPerLoad = 20;
+  bool _approving = false;
 
   void _loadMore() {
     setState(() {
       _itemsToShow += _itemsPerLoad;
     });
+  }
+
+  Future<void> _approveTransaction(TransactionProvider provider, String id) async {
+    setState(() => _approving = true);
+    final success = await provider.approveTransaction(id);
+    if (mounted) {
+      setState(() => _approving = false);
+      if (success) {
+        AppToast.show(
+          AppLocalizations.of(context)!.entryConfirmed,
+          success: true,
+        );
+      } else {
+        AppToast.show(provider.errorMessage ??
+            AppLocalizations.of(context)!.failedToComplete);
+      }
+    }
+  }
+
+  Future<void> _approveAll(TransactionProvider provider) async {
+    setState(() => _approving = true);
+    final success = await provider.approveAllForWorker(widget.worker.id);
+    if (mounted) {
+      setState(() => _approving = false);
+      AppToast.show(
+        success
+            ? AppLocalizations.of(context)!.allConfirmed
+            : provider.errorMessage ??
+                AppLocalizations.of(context)!.failedToComplete,
+        success: success,
+      );
+    }
   }
 
   @override
@@ -50,7 +84,9 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                   Icon(
                     Icons.receipt_long,
                     size: 64,
-                    color: widget.isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                    color: widget.isDark
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade400,
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -65,7 +101,9 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                   Text(
                     AppLocalizations.of(context)!.transactionsWillAppearHere,
                     style: TextStyle(
-                      color: widget.isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: widget.isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ],
@@ -75,8 +113,8 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
         }
 
         // Paginate transactions
-        final transactions = allTransactions.length > _itemsToShow 
-            ? allTransactions.sublist(0, _itemsToShow) 
+        final transactions = allTransactions.length > _itemsToShow
+            ? allTransactions.sublist(0, _itemsToShow)
             : allTransactions;
         final hasMore = allTransactions.length > _itemsToShow;
         final remaining = allTransactions.length - _itemsToShow;
@@ -97,20 +135,45 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Transaction count header
-                Text(
-                  AppLocalizations.of(context)!.showingTransactions('${transactions.length}', '${allTransactions.length}'),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: widget.isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context)!.showingTransactions(
+                          '${transactions.length}', '${allTransactions.length}'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: widget.isDark
+                            ? AppColors.textMutedDark
+                            : AppColors.textMutedLight,
+                      ),
+                    ),
+                    if (allTransactions.any((t) => !t.approved))
+                      TextButton.icon(
+                        onPressed:
+                            _approving ? null : () => _approveAll(provider),
+                        icon: _approving
+                            ? const SizedBox(
+                                height: 14,
+                                width: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: AppColors.primary),
+                              )
+                            : const Icon(Icons.done_all, size: 16),
+                        label: Text(
+                          AppLocalizations.of(context)!.approveAll,
+                          style: const TextStyle(color: AppColors.primary),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 8),
-                
+
                 // Grouped transactions
                 ...groupedTransactions.entries.map((entry) {
                   final dateKey = entry.key;
                   final dayTransactions = entry.value;
-                  
+
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -121,18 +184,23 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: widget.isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                            color: widget.isDark
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
                           ),
                         ),
                       ),
                       ...dayTransactions.map((tx) => WorkerTransactionTile(
-                        transaction: tx, 
-                        isDark: widget.isDark,
-                      )),
+                            transaction: tx,
+                            isDark: widget.isDark,
+                            onApprove: tx.approved
+                                ? null
+                                : () => _approveTransaction(provider, tx.id),
+                          )),
                     ],
                   );
                 }),
-                
+
                 // Load More button
                 if (hasMore)
                   Padding(
@@ -141,11 +209,14 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                       child: OutlinedButton.icon(
                         onPressed: _loadMore,
                         icon: const Icon(Icons.expand_more),
-                        label: Text(AppLocalizations.of(context)!.loadMore('$remaining')),
+                        label: Text(AppLocalizations.of(context)!
+                            .loadMore('$remaining')),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          side: BorderSide(
+                              color: AppColors.primary.withOpacity(0.5)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -161,12 +232,14 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                         AppLocalizations.of(context)!.endOfTransactions,
                         style: TextStyle(
                           fontSize: 12,
-                          color: widget.isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                          color: widget.isDark
+                              ? AppColors.textMutedDark
+                              : AppColors.textMutedLight,
                         ),
                       ),
                     ),
                   ),
-                  
+
                 const SizedBox(height: 80),
               ],
             ),

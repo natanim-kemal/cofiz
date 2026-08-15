@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/worker_model.dart';
-import '../../../core/models/transaction_model.dart';
 import '../../../core/providers/worker_provider.dart';
-import '../../../core/providers/transaction_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -15,6 +13,7 @@ import '../../dialogs/ping_dialog.dart';
 import '../../widgets/worker_transactions_list.dart';
 import '../../widgets/background_pattern.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 
 class WorkerDetailScreen extends StatelessWidget {
   final String workerId;
@@ -32,195 +31,199 @@ class WorkerDetailScreen extends StatelessWidget {
         children: [
           const BackgroundPattern(),
           Consumer<WorkerProvider>(
-        builder: (context, workerProvider, _) {
-          // Find worker from the reactive list (using full list)
-          final worker = workerProvider.findById(workerId);
+            builder: (context, workerProvider, _) {
+              // Find worker from the reactive list (using full list)
+              final worker = workerProvider.findById(workerId);
 
-          if (worker == null) {
-            // If not found in list, try fetching it (or show loading/error)
-            if (workerProvider.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-                  const SizedBox(height: 16),
-                  Text(AppLocalizations.of(context)!.workerNotFound),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(AppLocalizations.of(context)!.goBack),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          
-          return CustomScrollView(
-            slivers: [
-              // App Bar
-              SliverAppBar(
-                expandedHeight: 120,
-                floating: false,
-                pinned: true,
-                backgroundColor: AppColors.primary,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                actions: [
-                  Consumer<AuthProvider>(
-                    builder: (context, authProvider, _) {
-                      final canEdit = authProvider.userRole?.canEditWorkers ?? false;
-                      final canDelete = authProvider.userRole?.canDeleteWorkers ?? false;
-                      
-                      return Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (canEdit) ...[
-                            if (worker.userId != null)
-                              IconButton(
-                                icon: const Icon(Icons.notifications_active, color: Colors.white),
-                                tooltip: AppLocalizations.of(context)!.pingWorker,
-                                onPressed: () => _showPingDialog(context, worker, authProvider),
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.white),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => WorkerFormScreen(worker: worker),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                          if (canDelete)
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.white),
-                              onPressed: () async {
-                                final confirmed = await WorkerActions.showDeleteConfirmation(
-                                  context,
-                                  worker.name,
-                                );
-                                
-                                if (confirmed == true && context.mounted) {
-                                  final workerProvider = Provider.of<WorkerProvider>(
-                                    context,
-                                    listen: false,
-                                  );
-                                  final success = await workerProvider.deleteWorker(worker.id);
-                                  
-                                  if (context.mounted) {
-                                    if (success) {
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(AppLocalizations.of(context)!.workerDeletedSuccessfully),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            workerProvider.errorMessage ?? AppLocalizations.of(context)!.failedToDeleteWorker,
-                                          ),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                }
-                              },
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  title: Text(
-                    worker.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.primary,
-                          AppColors.primary.withOpacity(0.8),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Content
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+              if (worker == null) {
+                // If not found in list, try fetching it (or show loading/error)
+                if (workerProvider.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Profile Card
-                      _buildProfileCard(context, worker),
-                      
-                      const SizedBox(height: 20),
-
-                      // Balance Card
-                      _buildBalanceCard(context, worker),
-
-                      const SizedBox(height: 20),
-
-                      // Action Buttons
-                      _buildActionButtons(context, worker),
-
-                      const SizedBox(height: 24),
-
-                      // Statistics
-                      _buildStatistics(context, worker),
-
-                      const SizedBox(height: 24),
-
-                      // Transaction History Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            AppLocalizations.of(context)!.transactionHistory,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ],
+                      Icon(Icons.error_outline,
+                          size: 64, color: Colors.red.shade300),
+                      const SizedBox(height: 16),
+                      Text(AppLocalizations.of(context)!.workerNotFound),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(AppLocalizations.of(context)!.goBack),
                       ),
-
-                      // Worker Transactions List
-                      WorkerTransactionsList(workerId: workerId),
-
-                      const SizedBox(height: 80),
                     ],
                   ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                );
+              }
+
+              return CustomScrollView(
+                slivers: [
+                  // App Bar
+                  SliverAppBar(
+                    expandedHeight: 120,
+                    floating: false,
+                    pinned: true,
+                    backgroundColor: AppColors.primary,
+                    leading: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    actions: [
+                      Consumer<AuthProvider>(
+                        builder: (context, authProvider, _) {
+                          final canEdit =
+                              authProvider.userRole?.canEditWorkers ?? false;
+                          final canDelete =
+                              authProvider.userRole?.canDeleteWorkers ?? false;
+
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (canEdit) ...[
+                                if (worker.userId != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.notifications_active,
+                                        color: Colors.white),
+                                    tooltip: AppLocalizations.of(context)!
+                                        .pingWorker,
+                                    onPressed: () => _showPingDialog(
+                                        context, worker, authProvider),
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit,
+                                      color: Colors.white),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            WorkerFormScreen(worker: worker),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                              if (canDelete)
+                                IconButton(
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.white),
+                                  onPressed: () async {
+                                    final confirmed = await WorkerActions
+                                        .showDeleteConfirmation(
+                                      context,
+                                      worker.name,
+                                    );
+
+                                    if (confirmed == true && context.mounted) {
+                                      final workerProvider =
+                                          Provider.of<WorkerProvider>(
+                                        context,
+                                        listen: false,
+                                      );
+                                      final success = await workerProvider
+                                          .deleteWorker(worker.id);
+
+                                      if (context.mounted) {
+                                        if (success) {
+                                          Navigator.pop(context);
+                                          AppToast.show(
+                                              AppLocalizations.of(context)!
+                                                  .workerDeletedSuccessfully,
+                                              success: true);
+                                        } else {
+                                          AppToast.show(workerProvider
+                                                  .errorMessage ??
+                                              AppLocalizations.of(context)!
+                                                  .failedToDeleteWorker);
+                                        }
+                                      }
+                                    }
+                                  },
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      title: Text(
+                        worker.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      background: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.primary,
+                              AppColors.primary.withOpacity(0.8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Content
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Profile Card
+                          _buildProfileCard(context, worker),
+
+                          const SizedBox(height: 20),
+
+                          // Balance Card
+                          _buildBalanceCard(context, worker),
+
+                          const SizedBox(height: 20),
+
+                          // Action Buttons
+                          _buildActionButtons(context, worker),
+
+                          const SizedBox(height: 24),
+
+                          // Transaction History Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                AppLocalizations.of(context)!
+                                    .transactionHistory,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Worker Transactions List
+                          WorkerTransactionsList(
+                            workerId: workerId,
+                            worker: worker,
+                          ),
+
+                          const SizedBox(height: 80),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -234,7 +237,8 @@ class WorkerDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05),
+            color: Colors.black.withOpacity(
+                Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -279,10 +283,12 @@ class WorkerDetailScreen extends StatelessWidget {
 
           // Role
           Text(
-            worker.role,
+            worker.roleDisplay,
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).brightness == Brightness.dark ? AppColors.textMutedDark : AppColors.textMutedLight,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppColors.textMutedDark
+                  : AppColors.textMutedLight,
             ),
           ),
 
@@ -292,7 +298,8 @@ class WorkerDetailScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _getStatusColor(worker.status).withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.1),
+              color: _getStatusColor(worker.status).withOpacity(
+                  Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -327,15 +334,19 @@ class WorkerDetailScreen extends StatelessWidget {
 
           if (worker.phone.isNotEmpty)
             _buildInfoRow(context, Icons.phone, worker.phone),
-          
+
           if (worker.email != null && worker.email!.isNotEmpty) ...[
             const SizedBox(height: 12),
             _buildInfoRow(context, Icons.email, worker.email!),
           ],
 
           const SizedBox(height: 12),
-          _buildInfoRow(context, Icons.work_history, AppLocalizations.of(context)!.yearsExperience('${worker.yearsOfExperience}')),
-          
+          _buildInfoRow(
+              context,
+              Icons.work_history,
+              AppLocalizations.of(context)!
+                  .yearsExperience('${worker.yearsOfExperience}')),
+
           // Call/SMS Actions
           if (worker.phone.isNotEmpty) ...[
             const SizedBox(height: 20),
@@ -350,9 +361,8 @@ class WorkerDetailScreen extends StatelessWidget {
                         await WorkerActions.makePhoneCall(worker.phone);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(AppLocalizations.of(context)!.couldNotMakeCall(e.toString()))),
-                          );
+                          AppToast.show(AppLocalizations.of(context)!
+                              .couldNotMakeCall(e.toString()));
                         }
                       }
                     },
@@ -376,9 +386,8 @@ class WorkerDetailScreen extends StatelessWidget {
                         await WorkerActions.sendSMS(worker.phone);
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(AppLocalizations.of(context)!.couldNotSendSMS(e.toString()))),
-                          );
+                          AppToast.show(AppLocalizations.of(context)!
+                              .couldNotSendSMS(e.toString()));
                         }
                       }
                     },
@@ -418,7 +427,11 @@ class WorkerDetailScreen extends StatelessWidget {
   Widget _buildInfoRow(BuildContext context, IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Theme.of(context).brightness == Brightness.dark ? AppColors.textMutedDark : AppColors.textMutedLight),
+        Icon(icon,
+            size: 18,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppColors.textMutedDark
+                : AppColors.textMutedLight),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -562,13 +575,14 @@ class WorkerDetailScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context, Worker worker) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
-        final canCreateTransactions = authProvider.userRole?.canCreateTransactions ?? false;
-        
+        final canCreateTransactions =
+            authProvider.userRole?.canCreateTransactions ?? false;
+
         // Don't show action buttons if user can't create transactions (viewers)
         if (!canCreateTransactions) {
           return const SizedBox.shrink();
         }
-        
+
         return Row(
           children: [
             Expanded(
@@ -576,7 +590,6 @@ class WorkerDetailScreen extends StatelessWidget {
                 context,
                 AppLocalizations.of(context)!.distribute,
                 Icons.add_circle,
-                Colors.green,
                 () async {
                   final result = await showDialog<bool>(
                     context: context,
@@ -591,50 +604,46 @@ class WorkerDetailScreen extends StatelessWidget {
                 },
               ),
             ),
-            if (!worker.hasLoginAccess) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionButton(
-                  context,
-                  AppLocalizations.of(context)!.recordPurchase,
-                  Icons.shopping_cart,
-                  Colors.orange,
-                  () async {
-                    final result = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => TransactionDialog(
-                        worker: worker,
-                        type: 'purchase',
-                      ),
-                    );
-                    if (result == true) {
-                      // Refresh worker data
-                    }
-                  },
-                ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                context,
+                AppLocalizations.of(context)!.recordPurchase,
+                Icons.shopping_cart,
+                () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => TransactionDialog(
+                      worker: worker,
+                      type: 'purchase',
+                    ),
+                  );
+                  if (result == true) {
+                    // Refresh worker data
+                  }
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildActionButton(
-                  context,
-                  AppLocalizations.of(context)!.returnMoney,
-                  Icons.remove_circle,
-                  Colors.red,
-                  () async {
-                    final result = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => TransactionDialog(
-                        worker: worker,
-                        type: 'return',
-                      ),
-                    );
-                    if (result == true) {
-                      // Refresh worker data
-                    }
-                  },
-                ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                context,
+                AppLocalizations.of(context)!.returnMoney,
+                Icons.remove_circle,
+                () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => TransactionDialog(
+                      worker: worker,
+                      type: 'return',
+                    ),
+                  );
+                  if (result == true) {
+                    // Refresh worker data
+                  }
+                },
               ),
-            ],
+            ),
           ],
         );
       },
@@ -645,14 +654,15 @@ class WorkerDetailScreen extends StatelessWidget {
     BuildContext context,
     String label,
     IconData icon,
-    Color color,
     VoidCallback onPressed,
   ) {
+    const warmOrange = Color(0xFFF0A04B);
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: color.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.1),
-        foregroundColor: color,
+        backgroundColor: warmOrange.withOpacity(
+            Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.12),
+        foregroundColor: warmOrange,
         padding: const EdgeInsets.symmetric(vertical: 16),
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -676,134 +686,6 @@ class WorkerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatistics(BuildContext context, Worker worker) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppLocalizations.of(context)!.statistics,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  context,
-                  AppLocalizations.of(context)!.coffeePurchased,
-                  '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${worker.totalCoffeePurchased.formatted}',
-                  Icons.local_cafe,
-                  Colors.brown,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatItem(
-                  context,
-                  AppLocalizations.of(context)!.performance,
-                  '${worker.ratingPercentage}%',
-                  Icons.star,
-                  Colors.amber,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(BuildContext context, String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyTransactions(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 48,
-              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              AppLocalizations.of(context)!.noTransactionsYet,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              AppLocalizations.of(context)!.transactionsWillAppearHere,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'active':
@@ -817,7 +699,8 @@ class WorkerDetailScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _showPingDialog(BuildContext context, Worker worker, AuthProvider authProvider) async {
+  Future<void> _showPingDialog(
+      BuildContext context, Worker worker, AuthProvider authProvider) async {
     await showDialog(
       context: context,
       builder: (context) => PingDialog(
@@ -826,19 +709,19 @@ class WorkerDetailScreen extends StatelessWidget {
         onSend: (message) async {
           final notificationProvider =
               Provider.of<NotificationProvider>(context, listen: false);
-          
+
           await notificationProvider.sendPing(
             targetUserId: worker.userId!,
             title: AppLocalizations.of(context)!.messageFromAdmin,
             body: message,
-            senderName: authProvider.user?.displayName ?? AppLocalizations.of(context)!.admin,
+            senderName: authProvider.user?.displayName ??
+                AppLocalizations.of(context)!.admin,
             senderId: authProvider.user?.uid ?? '',
           );
-          
+
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(AppLocalizations.of(context)!.notificationSentToUser(worker.name))),
-            );
+            AppToast.show(AppLocalizations.of(context)!
+                .notificationSentToUser(worker.name));
           }
         },
       ),

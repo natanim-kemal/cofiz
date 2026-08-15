@@ -5,13 +5,14 @@ import '../../../../core/utils/number_formatter.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/providers/transaction_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../widgets/app_toast.dart';
 
 class RecordReturnDialog extends StatefulWidget {
   final Worker worker;
   final VoidCallback onSuccess;
 
   const RecordReturnDialog({
-    super.key, 
+    super.key,
     required this.worker,
     required this.onSuccess,
   });
@@ -66,18 +67,11 @@ class _RecordReturnDialogState extends State<RecordReturnDialog> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Title
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.arrow_upward, color: Colors.green),
-                  ),
+                  const Icon(Icons.arrow_upward, color: Colors.green, size: 28),
                   const SizedBox(width: 12),
                   Text(
                     AppLocalizations.of(context)!.returnMoneyTitle,
@@ -96,19 +90,22 @@ class _RecordReturnDialogState extends State<RecordReturnDialog> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Amount field
               TextFormField(
                 controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: AppLocalizations.of(context)!.amountLabel(AppLocalizations.of(context)?.currency ?? 'ETB'),
+                  labelText: AppLocalizations.of(context)!.amountLabel(
+                      AppLocalizations.of(context)?.currency ?? 'ETB'),
                   prefixIcon: const Icon(Icons.attach_money),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                  fillColor:
+                      isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -125,7 +122,7 @@ class _RecordReturnDialogState extends State<RecordReturnDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Notes field
               TextFormField(
                 controller: notesController,
@@ -136,12 +133,13 @@ class _RecordReturnDialogState extends State<RecordReturnDialog> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+                  fillColor:
+                      isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                 ),
                 maxLines: 2,
               ),
               const SizedBox(height: 24),
-              
+
               // Current balance info
               Container(
                 padding: const EdgeInsets.all(12),
@@ -151,68 +149,74 @@ class _RecordReturnDialogState extends State<RecordReturnDialog> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                    const Icon(Icons.info_outline,
+                        color: Colors.blue, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      AppLocalizations.of(context)!.currentBalanceInfo(AppLocalizations.of(context)?.currency ?? 'ETB', widget.worker.currentBalance.formatted),
+                      AppLocalizations.of(context)!.currentBalanceInfo(
+                          AppLocalizations.of(context)?.currency ?? 'ETB',
+                          widget.worker.currentBalance.formatted),
                       style: const TextStyle(color: Colors.blue),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Submit button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isLoading ? null : () async {
-                    if (formKey.currentState!.validate()) {
-                      setState(() => isLoading = true);
-                      
-                      try {
-                        final transactionProvider = Provider.of<TransactionProvider>(
-                          context, 
-                          listen: false,
-                        );
-                        final authProvider = Provider.of<AuthProvider>(
-                          context, 
-                          listen: false,
-                        );
-                        
-                        final success = await transactionProvider.returnMoneyFromWorker(
-                          workerId: widget.worker.id,
-                          workerName: widget.worker.name,
-                          amount: double.parse(amountController.text),
-                          createdBy: authProvider.getUserEmail() ?? 'Worker',
-                          notes: notesController.text.isEmpty ? null : notesController.text,
-                        );
-                        
-                        if (mounted) {
-                          Navigator.pop(context);
-                          widget.onSuccess();
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                success 
-                                    ? AppLocalizations.of(context)!.returnRecordedSuccess 
-                                    : AppLocalizations.of(context)!.failedToRecordReturn,
-                              ),
-                              backgroundColor: success ? Colors.green : Colors.red,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                         if (mounted) {
-                            setState(() => isLoading = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                            );
-                         }
-                      }
-                    }
-                  },
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (formKey.currentState!.validate()) {
+                            setState(() => isLoading = true);
+
+                            try {
+                              final transactionProvider =
+                                  Provider.of<TransactionProvider>(
+                                context,
+                                listen: false,
+                              );
+                              final authProvider = Provider.of<AuthProvider>(
+                                context,
+                                listen: false,
+                              );
+
+                              final success = await transactionProvider
+                                  .returnMoneyFromWorker(
+                                workerId: widget.worker.id,
+                                workerName: widget.worker.name,
+                                amount: double.parse(amountController.text),
+                                createdBy:
+                                    authProvider.getUserEmail() ?? 'Collector',
+                                notes: notesController.text.isEmpty
+                                    ? null
+                                    : notesController.text,
+                              );
+
+                              if (mounted) {
+                                Navigator.pop(context);
+                                widget.onSuccess();
+
+                                AppToast.show(
+                                  success
+                                      ? AppLocalizations.of(context)!
+                                          .returnRecordedSuccess
+                                      : AppLocalizations.of(context)!
+                                          .failedToRecordReturn,
+                                  success: success,
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                setState(() => isLoading = false);
+                                AppToast.show('Error: $e');
+                              }
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
@@ -221,7 +225,7 @@ class _RecordReturnDialogState extends State<RecordReturnDialog> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: isLoading 
+                  child: isLoading
                       ? const SizedBox(
                           height: 20,
                           width: 20,

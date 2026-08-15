@@ -7,13 +7,10 @@ import '../../../core/providers/worker_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/worker_model.dart';
-import '../../../core/models/transaction_model.dart';
 import '../../widgets/custom_header.dart';
 import '../settings/settings_screen.dart';
 import 'tabs/worker_home_tab.dart';
 import 'tabs/worker_history_tab.dart';
-import 'dialogs/record_return_dialog.dart';
-import 'dialogs/record_purchase_dialog.dart';
 import '../notifications/notifications_screen.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/notification_badge.dart';
@@ -32,10 +29,13 @@ class WorkerDashboardScreen extends StatefulWidget {
 
 class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   int _currentIndex = 0;
+  late PageController _pageController;
+  Future<Worker?>? _workerFuture;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
     // Load worker's transactions
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TransactionProvider>(context, listen: false)
@@ -43,38 +43,19 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     });
   }
 
-  void _showRecordReturnDialog(Worker worker) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => RecordReturnDialog(
-        worker: worker,
-        onSuccess: () {
-          setState(() {}); // Refresh dashboard to show new balance
-          // Reload transactions
-          Provider.of<TransactionProvider>(context, listen: false)
-            .loadWorkerTransactions(widget.workerId);
-        },
-      ),
-    );
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
-  void _showRecordPurchaseDialog(Worker worker) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => RecordPurchaseDialog(
-        worker: worker,
-        onSuccess: () {
-          setState(() {}); // Refresh dashboard
-           // Reload transactions
-          Provider.of<TransactionProvider>(context, listen: false)
-            .loadWorkerTransactions(widget.workerId);
-        },
-      ),
-    );
+  void _onPageChanged(int index) {
+    setState(() => _currentIndex = index);
+  }
+
+  void _onNavTap(int index) {
+    if (index == _currentIndex) return;
+    _pageController.jumpToPage(index);
   }
 
   @override
@@ -85,7 +66,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return FutureBuilder<Worker?>(
-      future: workerProvider.getWorkerById(widget.workerId),
+      future: _workerFuture ??=
+          workerProvider.getWorkerById(widget.workerId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -120,135 +102,130 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             children: [
               const BackgroundPattern(),
               Column(
-            children: [
-              // Hide header on Settings screen to avoid double headers
-              if (_currentIndex != 2)
-              CustomHeader(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              AppLocalizations.of(context)!.welcomeBack,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              worker.name,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                         Row(
-                          children: [
-                            Container(
-                              margin: const EdgeInsets.only(right: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: const Icon(Icons.refresh, color: Colors.white),
-                                tooltip: AppLocalizations.of(context)!.refresh,
-                                onPressed: () => setState(() {}),
-                              ),
-                            ),
-                            NotificationBadge(
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const NotificationsScreen(),
+                children: [
+                  // Hide header on Settings screen to avoid double headers
+                  if (_currentIndex != 2)
+                    CustomHeader(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    AppLocalizations.of(context)!.welcomeBack,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white70,
                                     ),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
-                                    Icons.notifications_outlined,
-                                    color: Colors.white,
-                                    size: 24,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    worker.name,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
+                              Row(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: IconButton(
+                                      icon: const Icon(Icons.refresh,
+                                          color: Colors.white),
+                                      tooltip:
+                                          AppLocalizations.of(context)!.refresh,
+                                      onPressed: () => setState(() {}),
+                                    ),
+                                  ),
+                                  NotificationBadge(
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.notifications_outlined,
+                                        color: Colors.white,
+                                        size: 28,
+                                      ),
+                                      tooltip: AppLocalizations.of(context)!
+                                          .notifications,
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const NotificationsScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            DateFormat('EEEE, MMMM d, yyyy')
+                                .format(DateTime.now()),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w500,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: IndexedStack(
-                  index: _currentIndex,
-                  children: [
-                    WorkerHomeTab(
-                      worker: worker,
-                      isDark: isDark,
-                      onRefresh: () {
-                        setState(() {});
-                        Provider.of<TransactionProvider>(context, listen: false)
-                            .loadWorkerTransactions(widget.workerId);
-                      },
-                      onRecordReturn: _showRecordReturnDialog,
-                      onRecordPurchase: _showRecordPurchaseDialog,
-                      onViewHistory: () => setState(() => _currentIndex = 1),
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: _onPageChanged,
+                      children: [
+                        WorkerHomeTab(
+                          worker: worker,
+                          isDark: isDark,
+                          onRefresh: () {
+                            setState(() {});
+                            Provider.of<TransactionProvider>(context,
+                                    listen: false)
+                                .loadWorkerTransactions(widget.workerId);
+                          },
+                          onViewHistory: () => _onNavTap(1),
+                        ),
+                        WorkerHistoryTab(
+                            worker: worker,
+                            isDark: isDark,
+                            onRefresh: () {
+                              Provider.of<TransactionProvider>(context,
+                                      listen: false)
+                                  .loadWorkerTransactions(widget.workerId);
+                            }),
+                        const SettingsScreen(),
+                      ],
                     ),
-                    WorkerHistoryTab(
-                      worker: worker, 
-                      isDark: isDark,
-                      onRefresh: () {
-                         Provider.of<TransactionProvider>(context, listen: false)
-                            .loadWorkerTransactions(widget.workerId);
-                      }
-                    ),
-                    const SettingsScreen(),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
             ],
           ),
           bottomNavigationBar: BottomNavigationBar(
             currentIndex: _currentIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
+            onTap: _onNavTap,
             selectedItemColor: AppColors.primary,
             selectedFontSize: 10,
             unselectedFontSize: 10,
             iconSize: 24,
             items: [
               BottomNavigationBarItem(
-                icon: const Icon(Icons.grid_view_rounded), // Uniform with Admin Dashboard
+                icon: const Icon(
+                    Icons.grid_view_rounded), // Uniform with Admin Dashboard
                 label: AppLocalizations.of(context)!.navHome,
               ),
               BottomNavigationBarItem(
@@ -256,7 +233,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 label: AppLocalizations.of(context)!.navHistory,
               ),
               BottomNavigationBarItem(
-                icon: const Icon(Icons.settings_outlined), // Uniform with Admin Settings
+                icon: const Icon(
+                    Icons.settings_outlined), // Uniform with Admin Settings
                 label: AppLocalizations.of(context)!.navSettings,
               ),
             ],
