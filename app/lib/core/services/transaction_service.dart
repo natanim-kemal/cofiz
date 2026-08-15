@@ -157,6 +157,92 @@ class TransactionService {
     }
   }
 
+  /// Record a collector-to-collector transfer: two linked records + balances.
+  Future<String?> addTransfer({
+    required String fromWorkerId,
+    required String fromWorkerName,
+    required String toWorkerId,
+    required String toWorkerName,
+    required double amount,
+    required String createdBy,
+    String? notes,
+  }) async {
+    if (amount <= 0) {
+      throw 'Amount must be greater than 0';
+    }
+
+    // Validate sender balance
+    final senderDoc = await _firestore
+        .collection('workers')
+        .doc(fromWorkerId)
+        .get();
+    if (!senderDoc.exists) {
+      throw 'Collector not found';
+    }
+    final senderBalance =
+        (senderDoc.data()?['currentBalance'] ?? 0.0).toDouble();
+    if (amount > senderBalance) {
+      throw 'Insufficient balance. Available: ETB ${senderBalance.toStringAsFixed(2)}, Required: ETB ${amount.toStringAsFixed(2)}';
+    }
+
+    final now = DateTime.now();
+    final transferId =
+        '${fromWorkerId}_${toWorkerId}_${now.millisecondsSinceEpoch}';
+
+    final senderTx = MoneyTransaction(
+      id: '',
+      workerId: fromWorkerId,
+      workerName: fromWorkerName,
+      type: 'transfer',
+      amount: amount,
+      notes: notes,
+      createdAt: now,
+      createdBy: createdBy,
+      approved: false,
+      fromWorkerId: fromWorkerId,
+      toWorkerId: toWorkerId,
+      transferId: transferId,
+      transferRole: 'sender',
+    );
+
+    final receiverTx = MoneyTransaction(
+      id: '',
+      workerId: toWorkerId,
+      workerName: toWorkerName,
+      type: 'transfer',
+      amount: amount,
+      notes: notes,
+      createdAt: now,
+      createdBy: createdBy,
+      approved: false,
+      fromWorkerId: fromWorkerId,
+      toWorkerId: toWorkerId,
+      transferId: transferId,
+      transferRole: 'receiver',
+    );
+
+    final batch = _firestore.batch();
+    final senderRef = _firestore
+        .collection(_transactionsCollection)
+        .doc();
+    final receiverRef = _firestore
+        .collection(_transactionsCollection)
+        .doc();
+    batch.set(senderRef, senderTx.toFirestore());
+    batch.set(receiverRef, receiverTx.toFirestore());
+    batch.update(
+      _firestore.collection('workers').doc(fromWorkerId),
+      {'currentBalance': FieldValue.increment(-amount)},
+    );
+    batch.update(
+      _firestore.collection('workers').doc(toWorkerId),
+      {'currentBalance': FieldValue.increment(amount)},
+    );
+    await batch.commit();
+    print('Transfer added successfully: $transferId');
+    return transferId;
+  }
+
   /// Approve a single transaction entry
   Future<void> approveTransaction(String transactionId) async {
     try {
@@ -196,6 +282,62 @@ class TransactionService {
     }
   }
 
+  /// Approve both records of a transfer by shared transferId.
+  Future<void> approveTransfer(String transferId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(_transactionsCollection)
+          .where('transferId', isEqualTo: transferId)
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.update(doc.reference, {'approved': true});
+      }
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      print('Firestore error approving transfer: ${e.code} - ${e.message}');
+      throw _handleFirestoreError(e);
+    } catch (e) {
+      print('Error approving transfer: $e');
+      throw 'Failed to approve transfer. Please try again.';
+    }
+  }
+
+  /// Delete both records of a transfer by shared transferId, reversing balances.
+  Future<void> deleteTransfer(String transferId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(_transactionsCollection)
+          .where('transferId', isEqualTo: transferId)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        throw 'Transfer not found';
+      }
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        final tx = MoneyTransaction.fromFirestore(doc.data(), doc.id);
+        final workerRef =
+            _firestore.collection('workers').doc(tx.workerId);
+        final updates = _balanceUpdates(tx, -1);
+        if (updates.isNotEmpty) {
+          batch.update(workerRef, updates);
+        }
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      print('Transfer deleted successfully: $transferId');
+    } on FirebaseException catch (e) {
+      print('Firestore error deleting transfer: ${e.code} - ${e.message}');
+      throw _handleFirestoreError(e);
+    } catch (e) {
+      print('Error deleting transfer: $e');
+      throw 'Failed to delete transfer. Please try again.';
+    }
+  }
+
   /// Edit an existing transaction, reversing the old balance effect and applying the new one
   Future<void> updateTransaction(MoneyTransaction transaction) async {
     try {
@@ -209,6 +351,10 @@ class TransactionService {
       }
 
       final old = MoneyTransaction.fromFirestore(doc.data()!, transaction.id);
+
+      if (old.isTransfer || transaction.isTransfer) {
+        throw 'Transfers cannot be edited.';
+      }
 
       // Validate balance for money-out types, accounting for the reversed old effect
       if (transaction.type.toLowerCase() == 'purchase' ||
@@ -281,6 +427,10 @@ class TransactionService {
       final transaction =
           MoneyTransaction.fromFirestore(doc.data()!, transactionId);
 
+      if (transaction.isTransfer) {
+        throw 'Use transfer delete for transfers.';
+      }
+
       // Reversing a distribution removes money from the balance - validate it
       if (transaction.type.toLowerCase() == 'distribution') {
         final workerDoc = await _firestore
@@ -348,6 +498,11 @@ class TransactionService {
               FieldValue.increment(t.commissionAmount! * mult);
         }
         return updates;
+      case 'transfer':
+        final effect = t.isTransferSender ? -1.0 : 1.0;
+        return {
+          'currentBalance': FieldValue.increment(t.amount * mult * effect),
+        };
       default:
         return {};
     }
