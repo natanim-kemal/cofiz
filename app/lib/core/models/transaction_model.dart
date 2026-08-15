@@ -16,6 +16,12 @@ class MoneyTransaction {
   final double? pricePerKg;
   final double? commissionAmount;
 
+  // Transfer-specific (collector-to-collector)
+  final String? fromWorkerId;
+  final String? toWorkerId;
+  final String? transferId;
+  final String? transferRole; // 'sender' or 'receiver'
+
   MoneyTransaction({
     required this.id,
     required this.workerId,
@@ -31,6 +37,10 @@ class MoneyTransaction {
     this.coffeeWeight,
     this.pricePerKg,
     this.commissionAmount,
+    this.fromWorkerId,
+    this.toWorkerId,
+    this.transferId,
+    this.transferRole,
   });
 
   factory MoneyTransaction.fromFirestore(Map<String, dynamic> data, String id) {
@@ -57,6 +67,10 @@ class MoneyTransaction {
       commissionAmount: (data['commissionAmount'] ?? 0.0).toDouble() == 0.0
           ? null
           : (data['commissionAmount'] ?? 0.0).toDouble(),
+      fromWorkerId: data['fromWorkerId'],
+      toWorkerId: data['toWorkerId'],
+      transferId: data['transferId'],
+      transferRole: data['transferRole'],
     );
   }
 
@@ -75,6 +89,10 @@ class MoneyTransaction {
       'coffeeWeight': coffeeWeight,
       'pricePerKg': pricePerKg,
       'commissionAmount': commissionAmount,
+      'fromWorkerId': fromWorkerId,
+      'toWorkerId': toWorkerId,
+      'transferId': transferId,
+      'transferRole': transferRole,
     };
   }
 
@@ -110,6 +128,10 @@ class MoneyTransaction {
       commissionAmount: (json['commissionAmount'] ?? 0.0).toDouble() == 0.0
           ? null
           : (json['commissionAmount'] ?? 0.0).toDouble(),
+      fromWorkerId: json['fromWorkerId'],
+      toWorkerId: json['toWorkerId'],
+      transferId: json['transferId'],
+      transferRole: json['transferRole'],
     );
   }
 
@@ -150,4 +172,8 @@ class MoneyTransaction {
   bool get decreasesBalance {
     return type.toLowerCase() == 'return' || type.toLowerCase() == 'purchase';
   }
+
+  bool get isTransfer => type.toLowerCase() == 'transfer';
+  bool get isTransferSender => isTransfer && transferRole == 'sender';
+  bool get isTransferReceiver => isTransfer && transferRole == 'receiver';
 }
