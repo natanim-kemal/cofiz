@@ -9,7 +9,9 @@ import '../../../core/utils/number_formatter.dart';
 import '../../../core/utils/worker_actions.dart';
 import '../worker_form/worker_form_screen.dart';
 import '../transaction/transaction_dialog.dart';
+import '../transaction/transfer_dialog.dart';
 import '../../dialogs/ping_dialog.dart';
+import '../../widgets/worker_picker_sheet.dart';
 import '../../widgets/worker_transactions_list.dart';
 import '../../widgets/background_pattern.dart';
 import '../../../l10n/app_localizations.dart';
@@ -628,19 +630,36 @@ class WorkerDetailScreen extends StatelessWidget {
             Expanded(
               child: _buildActionButton(
                 context,
-                AppLocalizations.of(context)!.returnMoney,
-                Icons.remove_circle,
+                AppLocalizations.of(context)!.transfer,
+                Icons.swap_horiz,
                 () async {
-                  final result = await showDialog<bool>(
+                  final workerProvider =
+                      Provider.of<WorkerProvider>(context, listen: false);
+                  final workers = workerProvider.workers
+                      .where((w) => w.isActive && w.id != worker.id)
+                      .toList();
+                  if (workers.isEmpty) {
+                    AppToast.show('No collectors available');
+                    return;
+                  }
+
+                  final receiver = await showModalBottomSheet<Worker>(
                     context: context,
-                    builder: (context) => TransactionDialog(
-                      worker: worker,
-                      type: 'return',
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => WorkerPickerSheet(
+                      workers: workers,
+                      mode: 'transfer_receiver',
+                      exclude: worker,
                     ),
                   );
-                  if (result == true) {
-                    // Refresh worker data
-                  }
+                  if (receiver == null || !context.mounted) return;
+
+                  await showDialog<bool>(
+                    context: context,
+                    builder: (context) =>
+                        TransferDialog(sender: worker, receiver: receiver),
+                  );
                 },
               ),
             ),
