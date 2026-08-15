@@ -18,10 +18,11 @@ import '../notifications/notifications_screen.dart';
 import '../income/company_income_screen.dart';
 import '../income/my_investments_screen.dart';
 import '../expense/expenses_screen.dart';
-import '../transaction/transaction_dialog.dart';
+import '../transaction/transfer_dialog.dart';
 import '../../widgets/custom_header.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/worker_picker_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -429,9 +430,9 @@ _buildContainerDivider(isDark),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildEntryButton(
-                  Icons.remove_circle,
-                  localizations?.returnMoney ?? 'Return',
-                  () => _pickWorkerForEntry('return'),
+                  Icons.swap_horiz,
+                  localizations?.transfer ?? 'Transfer',
+                  () => _pickWorkerForEntry('transfer'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -493,14 +494,50 @@ _buildContainerDivider(isDark),
       return;
     }
 
+    if (type == 'transfer') {
+      _showTransferFlow(workers);
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _WorkerPickerSheet(
+      builder: (context) => WorkerPickerSheet(workers: workers, mode: type),
+    );
+  }
+
+  Future<void> _showTransferFlow(List<Worker> workers) async {
+    final sender = await showModalBottomSheet<Worker>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => WorkerPickerSheet(
         workers: workers,
-        type: type,
+        mode: 'transfer',
+        onSwitchToReturn: () {
+          Navigator.pop(context);
+          _pickWorkerForEntry('return');
+        },
       ),
+    );
+    if (sender == null || !mounted) return;
+
+    final receiver = await showModalBottomSheet<Worker>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => WorkerPickerSheet(
+        workers: workers,
+        mode: 'transfer_receiver',
+        exclude: sender,
+      ),
+    );
+    if (receiver == null || !mounted) return;
+
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => TransferDialog(sender: sender, receiver: receiver),
     );
   }
 
@@ -656,122 +693,6 @@ _buildContainerDivider(isDark),
       width: 1,
       height: 40,
       color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-    );
-  }
-}
-
-class _WorkerPickerSheet extends StatefulWidget {
-  final List<Worker> workers;
-  final String type;
-
-  const _WorkerPickerSheet({
-    required this.workers,
-    required this.type,
-  });
-
-  @override
-  State<_WorkerPickerSheet> createState() => _WorkerPickerSheetState();
-}
-
-class _WorkerPickerSheetState extends State<_WorkerPickerSheet> {
-  String _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final filtered = widget.workers
-        .where((w) =>
-            _query.isEmpty ||
-            w.name.toLowerCase().contains(_query.toLowerCase()))
-        .toList();
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade400,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              localizations?.selectCollector ?? 'Select Collector',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              onChanged: (value) => setState(() => _query = value),
-              decoration: InputDecoration(
-                hintText: localizations?.searchCollector ?? 'Search collectors',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      localizations?.noCollectorsFound ?? 'No collectors found',
-                      style: TextStyle(
-                          color: isDark ? Colors.grey.shade400 : Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final worker = filtered[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(worker.name.isNotEmpty
-                              ? worker.name[0].toUpperCase()
-                              : '?'),
-                        ),
-                        title: Text(worker.name),
-                        subtitle: Text(
-                          '${localizations?.currentBalance ?? 'Balance'}: '
-                          '${worker.currentBalance.asCurrency}',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          Navigator.pop(context);
-                          showDialog(
-                            context: context,
-                            builder: (context) => TransactionDialog(
-                              worker: worker,
-                              type: widget.type,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
     );
   }
 }
