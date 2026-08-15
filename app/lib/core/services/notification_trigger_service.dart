@@ -5,7 +5,7 @@ import '../models/notification_model.dart';
 /// Service for triggering automated notifications based on app events
 class NotificationTriggerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Thresholds for notifications
   static const double lowBalanceThreshold = 500.0;
   static const double largePurchaseThreshold = 10000.0;
@@ -49,7 +49,8 @@ class NotificationTriggerService {
     await _sendNotification(
       targetUserId: workerUserId,
       title: '💰 Money Received',
-      body: 'You received ETB ${amount.toStringAsFixed(0)} from ${adminName ?? 'Admin'}',
+      body:
+          'You received ETB ${amount.toStringAsFixed(0)} from ${adminName ?? 'Admin'}',
       type: NotificationType.moneyDistributed,
       senderName: adminName ?? 'Admin',
       metadata: {
@@ -71,7 +72,8 @@ class NotificationTriggerService {
       await _sendNotification(
         targetUserId: workerUserId,
         title: '⚠️ Low Balance Alert',
-        body: 'Your balance is low (ETB ${newBalance.toStringAsFixed(0)}). Please return funds soon.',
+        body:
+            'Your balance is low (ETB ${newBalance.toStringAsFixed(0)}). Please return funds soon.',
         type: NotificationType.lowBalance,
         metadata: {
           'workerId': workerId,
@@ -82,7 +84,8 @@ class NotificationTriggerService {
       // Also notify all admins
       await _notifyAllAdmins(
         title: '⚠️ Low Balance: $workerName',
-        body: '$workerName has low balance (ETB ${newBalance.toStringAsFixed(0)})',
+        body:
+            '$workerName has low balance (ETB ${newBalance.toStringAsFixed(0)})',
         type: NotificationType.lowBalance,
         metadata: {
           'workerId': workerId,
@@ -103,7 +106,8 @@ class NotificationTriggerService {
     await _sendNotification(
       targetUserId: workerUserId,
       title: '🎉 Commission Earned!',
-      body: 'You earned ETB ${commission.toStringAsFixed(0)} commission. Total: ETB ${totalCommission.toStringAsFixed(0)}',
+      body:
+          'You earned ETB ${commission.toStringAsFixed(0)} commission. Total: ETB ${totalCommission.toStringAsFixed(0)}',
       type: NotificationType.commissionEarned,
       metadata: {
         'commission': commission,
@@ -123,7 +127,8 @@ class NotificationTriggerService {
     if (amount >= largePurchaseThreshold) {
       await _notifyAllAdmins(
         title: '📦 Large Purchase: $workerName',
-        body: '$workerName purchased ETB ${amount.toStringAsFixed(0)} ${coffeeType != null ? "($coffeeType)" : ""} - ${weight?.toStringAsFixed(1) ?? ""} Kg',
+        body:
+            '$workerName purchased ETB ${amount.toStringAsFixed(0)} ${coffeeType != null ? "($coffeeType)" : ""} - ${weight?.toStringAsFixed(1) ?? ""} Kg',
         type: NotificationType.purchaseRecorded,
         metadata: {
           'workerId': workerId,

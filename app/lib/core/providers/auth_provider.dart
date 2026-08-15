@@ -15,7 +15,7 @@ enum AuthStatus {
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   AuthStatus _status = AuthStatus.uninitialized;
   String? _errorMessage;
   User? _user;
@@ -42,7 +42,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> _initializeAuth() async {
     await _authService.enablePersistence();
     final currentUser = _authService.currentUser;
-    
+
     if (currentUser != null) {
       final isValid = await _authService.isSessionValid();
       if (!isValid) {
@@ -66,12 +66,11 @@ class AuthProvider with ChangeNotifier {
     });
   }
 
-
   /// Fetch user data from Firestore
   Future<void> _fetchUserData(String uid) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
-      
+
       if (doc.exists) {
         _appUser = AppUser.fromFirestore(doc.data()!, uid);
         _userRole = _appUser!.role;
@@ -108,13 +107,13 @@ class AuthProvider with ChangeNotifier {
 
       if (credential != null && credential.user != null) {
         _user = credential.user;
-        
+
         // Fetch user role and data from Firestore
         await _fetchUserData(credential.user!.uid);
-        
+
         // Save FCM token for push notifications
         await FCMService().saveTokenForUser(credential.user!.uid);
-        
+
         _status = AuthStatus.authenticated;
         _errorMessage = null;
         notifyListeners();
@@ -156,7 +155,7 @@ class AuthProvider with ChangeNotifier {
       _workerId = null;
       _status = AuthStatus.unauthenticated;
       _errorMessage = null;
-      
+
       notifyListeners();
     } catch (e) {
       print('DEBUG: Sign out ERROR: $e');
@@ -215,16 +214,16 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-
-
   /// Update user profile
-  Future<bool> updateUserProfile({String? displayName, String? photoUrl}) async {
+  Future<bool> updateUserProfile(
+      {String? displayName, String? photoUrl}) async {
     try {
       _status = AuthStatus.loading;
       notifyListeners();
 
-      await _authService.updateProfile(displayName: displayName, photoUrl: photoUrl);
-      
+      await _authService.updateProfile(
+          displayName: displayName, photoUrl: photoUrl);
+
       // Refresh user data
       _user = _authService.currentUser;
       _status = AuthStatus.authenticated;

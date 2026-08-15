@@ -20,8 +20,7 @@ class AuthService {
   Future<void> enablePersistence() async {
     try {
       await _auth.setPersistence(Persistence.LOCAL);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   /// Sign in with email and password
@@ -70,7 +69,7 @@ class AuthService {
       final loginDate = DateTime.fromMillisecondsSinceEpoch(timestamp);
       final now = DateTime.now();
       final difference = now.difference(loginDate);
-      
+
       // Session is valid if less than 7 days
       return difference.inDays < _sessionDurationDays;
     } catch (e) {
@@ -81,7 +80,8 @@ class AuthService {
   /// Save login timestamp to SharedPreferences
   Future<void> _saveLoginTimestamp() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_loginTimestampKey, DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(
+        _loginTimestampKey, DateTime.now().millisecondsSinceEpoch);
   }
 
   /// Clear login timestamp
@@ -144,7 +144,6 @@ class AuthService {
     } catch (e) {
       throw 'Failed to send reset email. Please try again.';
     }
-
   }
 
   Future<void> updateProfile({String? displayName, String? photoUrl}) async {

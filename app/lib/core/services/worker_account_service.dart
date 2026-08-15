@@ -8,7 +8,7 @@ import '../utils/password_generator.dart';
 class WorkerAccountService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Secondary Firebase app for creating accounts without affecting current session
   static FirebaseApp? _secondaryApp;
   static FirebaseAuth? _secondaryAuth;
@@ -39,11 +39,12 @@ class WorkerAccountService {
     try {
       // Initialize secondary app to avoid signing out admin
       await _initSecondaryApp();
-      
+
       final password = PasswordGenerator.generate(length: 8);
-      
+
       // Create Firebase Auth account using secondary app (doesn't affect main session)
-      final UserCredential userCredential = await _secondaryAuth!.createUserWithEmailAndPassword(
+      final UserCredential userCredential =
+          await _secondaryAuth!.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -64,7 +65,10 @@ class WorkerAccountService {
         isActive: true,
       );
 
-      await _firestore.collection('users').doc(userId).set(appUser.toFirestore());
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .set(appUser.toFirestore());
 
       // Update worker document with userId
       await _firestore.collection('workers').doc(workerId).update({
@@ -80,12 +84,13 @@ class WorkerAccountService {
       };
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Failed to create account';
-      
+
       switch (e.code) {
         case 'email-already-in-use':
           // Attempt to restore access if worker already has this account linked
           try {
-            final workerDoc = await _firestore.collection('workers').doc(workerId).get();
+            final workerDoc =
+                await _firestore.collection('workers').doc(workerId).get();
             final currentUserId = workerDoc.data()?['userId'];
             if (currentUserId != null) {
               await _firestore.collection('workers').doc(workerId).update({
@@ -99,7 +104,7 @@ class WorkerAccountService {
               };
             }
           } catch (_) {}
-          
+
           errorMessage = 'This email is already in use';
           break;
         case 'invalid-email':
@@ -128,7 +133,7 @@ class WorkerAccountService {
     try {
       // Delete user document
       await _firestore.collection('users').doc(userId).delete();
-      
+
       // Note: Cannot delete Firebase Auth user from client side
       // This would require Admin SDK or Cloud Functions
       // For now, just delete Firestore document and set worker hasLoginAccess to false

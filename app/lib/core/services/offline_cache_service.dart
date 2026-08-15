@@ -13,7 +13,7 @@ class OfflineCacheService {
 
   Future<void> initialize() async {
     await Hive.initFlutter();
-    
+
     // Open boxes
     await Hive.openBox(_workersBox);
     await Hive.openBox(_transactionsBox);
@@ -31,7 +31,7 @@ class OfflineCacheService {
     final box = Hive.box(_workersBox);
     final cached = box.get('all_workers') as Map<dynamic, dynamic>?;
     if (cached == null) return null;
-    
+
     return cached.values
         .map((json) => Worker.fromJson(Map<String, dynamic>.from(json as Map)))
         .toList();
@@ -48,9 +48,10 @@ class OfflineCacheService {
     final box = Hive.box(_transactionsBox);
     final cached = box.get('all_transactions') as Map<dynamic, dynamic>?;
     if (cached == null) return null;
-    
+
     return cached.values
-        .map((json) => MoneyTransaction.fromJson(Map<String, dynamic>.from(json as Map)))
+        .map((json) =>
+            MoneyTransaction.fromJson(Map<String, dynamic>.from(json as Map)))
         .toList();
   }
 

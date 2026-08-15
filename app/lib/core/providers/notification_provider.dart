@@ -6,7 +6,7 @@ import 'auth_provider.dart';
 
 class NotificationProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   List<AppNotification> _notifications = [];
   int _unreadCount = 0;
   StreamSubscription<QuerySnapshot>? _subscription;
@@ -17,8 +17,8 @@ class NotificationProvider with ChangeNotifier {
 
   /// Initialize listener for a specific user
   void init(String userId) {
-    if (_currentUserId == userId) return; 
-    
+    if (_currentUserId == userId) return;
+
     _currentUserId = userId;
     _subscription?.cancel();
 
@@ -31,10 +31,10 @@ class NotificationProvider with ChangeNotifier {
       _notifications = snapshot.docs
           .map((doc) => AppNotification.fromFirestore(doc.data(), doc.id))
           .toList();
-      
+
       // Sort in memory instead
       _notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      
+
       _unreadCount = _notifications.where((n) => !n.isRead).length;
       notifyListeners();
     }, onError: (e) {
@@ -59,10 +59,13 @@ class NotificationProvider with ChangeNotifier {
       final index = _notifications.indexWhere((n) => n.id == notificationId);
       if (index != -1 && !_notifications[index].isRead) {
         // Create a copy with isRead = true
-        // We can't easily modify the list since it's from the stream, 
+        // We can't easily modify the list since it's from the stream,
         // but the stream update will come shortly.
         // For instant UI feedback we wait for Firestore stream.
-        await _firestore.collection('notifications').doc(notificationId).update({
+        await _firestore
+            .collection('notifications')
+            .doc(notificationId)
+            .update({
           'isRead': true,
         });
       }
@@ -76,12 +79,12 @@ class NotificationProvider with ChangeNotifier {
     try {
       final batch = _firestore.batch();
       final unreadDocs = _notifications.where((n) => !n.isRead);
-      
+
       for (var doc in unreadDocs) {
         final ref = _firestore.collection('notifications').doc(doc.id);
         batch.update(ref, {'isRead': true});
       }
-      
+
       if (unreadDocs.isNotEmpty) {
         await batch.commit();
       }
@@ -110,7 +113,9 @@ class NotificationProvider with ChangeNotifier {
         senderId: senderId,
       );
 
-      await _firestore.collection('notifications').add(notification.toFirestore());
+      await _firestore
+          .collection('notifications')
+          .add(notification.toFirestore());
     } catch (e) {
       debugPrint('Error sending ping: $e');
       rethrow;
@@ -146,7 +151,7 @@ class NotificationProvider with ChangeNotifier {
           senderName: senderName,
           senderId: senderId,
         );
-        
+
         batch.set(newDocRef, notification.toFirestore());
       }
 

@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class WorkerProvider with ChangeNotifier {
   final WorkerService _workerService = WorkerService();
-  
+
   List<Worker> _workers = [];
   List<Worker> _filteredWorkers = [];
   bool _isLoading = false;
@@ -19,7 +19,6 @@ class WorkerProvider with ChangeNotifier {
   int _totalWorkers = 0;
   int _activeToday = 0;
   double _totalRevenue = 0.0;
-  double _avgPerformance = 0.0;
 
   List<Worker> get workers => _filteredWorkers;
   bool get isLoading => _isLoading;
@@ -30,7 +29,6 @@ class WorkerProvider with ChangeNotifier {
   int get totalWorkers => _totalWorkers;
   int get activeToday => _activeToday;
   double get totalRevenue => _totalRevenue;
-  double get avgPerformance => _avgPerformance;
 
   WorkerProvider() {
     _initializeWorkers();
@@ -54,17 +52,19 @@ class WorkerProvider with ChangeNotifier {
       onError: (error) {
         print('Worker stream error: $error');
         // Parse error for user-friendly message
-        String friendlyMessage = 'Unable to load workers.';
-        
-        if (error.toString().contains('permission-denied') || 
+        String friendlyMessage = 'Unable to load collectors.';
+
+        if (error.toString().contains('permission-denied') ||
             error.toString().contains('PERMISSION_DENIED')) {
-          friendlyMessage = 'Database access denied. Please enable Firestore in your Firebase project.';
+          friendlyMessage =
+              'Database access denied. Please enable Firestore in your Firebase project.';
         } else if (error.toString().contains('unavailable')) {
-          friendlyMessage = 'Database is unavailable. Please check your internet connection.';
+          friendlyMessage =
+              'Database is unavailable. Please check your internet connection.';
         } else if (error.toString().contains('unauthenticated')) {
           friendlyMessage = 'Authentication required. Please sign in again.';
         }
-        
+
         _errorMessage = friendlyMessage;
         _isLoading = false;
         notifyListeners();
@@ -95,10 +95,6 @@ class WorkerProvider with ChangeNotifier {
       0.0,
       (sum, worker) => sum + worker.totalCoffeePurchased,
     );
-    _avgPerformance = _workers.isNotEmpty
-        ? _workers.fold<double>(0.0, (sum, worker) => sum + worker.performanceRating) /
-            _workers.length
-        : 0.0;
   }
 
   /// Set search query
@@ -226,18 +222,19 @@ class WorkerProvider with ChangeNotifier {
     if (!enabled) return;
 
     for (var worker in newWorkers) {
-       if (_previousBalances.containsKey(worker.id)) {
-          final double prev = _previousBalances[worker.id]!;
-          // Trigger if dropped below 500 and was previously >= 500
-          if (prev >= 500 && worker.currentBalance < 500 && worker.isActive) {
-             NotificationService().showNotification(
-               id: worker.id.hashCode,
-               title: 'Low Balance Alert',
-               body: '${worker.name} is running low on funds (${worker.currentBalance.toStringAsFixed(0)}).',
-             );
-          }
-       }
-       _previousBalances[worker.id] = worker.currentBalance;
+      if (_previousBalances.containsKey(worker.id)) {
+        final double prev = _previousBalances[worker.id]!;
+        // Trigger if dropped below 500 and was previously >= 500
+        if (prev >= 500 && worker.currentBalance < 500 && worker.isActive) {
+          NotificationService().showNotification(
+            id: worker.id.hashCode,
+            title: 'Low Balance Alert',
+            body:
+                '${worker.name} is running low on funds (${worker.currentBalance.toStringAsFixed(0)}).',
+          );
+        }
+      }
+      _previousBalances[worker.id] = worker.currentBalance;
     }
   }
 }

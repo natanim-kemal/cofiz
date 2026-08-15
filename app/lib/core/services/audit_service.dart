@@ -59,7 +59,8 @@ class AuditService {
   }
 
   /// Get logs for specific action
-  Stream<List<AuditLog>> getActionLogsStream(AuditAction action, {int limit = 50}) {
+  Stream<List<AuditLog>> getActionLogsStream(AuditAction action,
+      {int limit = 50}) {
     return _firestore
         .collection(_collection)
         .where('action', isEqualTo: action.name)

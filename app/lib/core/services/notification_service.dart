@@ -1,4 +1,5 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart' as fln;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    as fln;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/material.dart';
@@ -28,7 +29,8 @@ class NotificationService {
       requestAlertPermission: false,
     );
 
-    const fln.InitializationSettings initializationSettings = fln.InitializationSettings(
+    const fln.InitializationSettings initializationSettings =
+        fln.InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsDarwin,
     );
@@ -48,7 +50,7 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             fln.AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
-        
+
     final ios = await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
             fln.IOSFlutterLocalNotificationsPlugin>()
@@ -57,7 +59,7 @@ class NotificationService {
           badge: true,
           sound: true,
         );
-        
+
     return android ?? ios;
   }
 
@@ -108,7 +110,7 @@ class NotificationService {
       androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
-  
+
   // Daily Summary
   Future<void> scheduleDailyNotification({
     required int id,
@@ -116,13 +118,14 @@ class NotificationService {
     required String body,
     required TimeOfDay time,
   }) async {
-     final now = DateTime.now();
-     var schedule = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-     if (schedule.isBefore(now)) {
-       schedule = schedule.add(const Duration(days: 1));
-     }
+    final now = DateTime.now();
+    var schedule =
+        DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    if (schedule.isBefore(now)) {
+      schedule = schedule.add(const Duration(days: 1));
+    }
 
-      await _notificationsPlugin.zonedSchedule(
+    await _notificationsPlugin.zonedSchedule(
       id,
       title,
       body,
@@ -135,7 +138,7 @@ class NotificationService {
         ),
       ),
       androidScheduleMode: fln.AndroidScheduleMode.exactAllowWhileIdle,
-       matchDateTimeComponents: fln.DateTimeComponents.time, // Recurring daily
+      matchDateTimeComponents: fln.DateTimeComponents.time, // Recurring daily
     );
   }
 

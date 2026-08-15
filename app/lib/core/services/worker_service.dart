@@ -60,7 +60,7 @@ class WorkerService {
       throw _handleFirestoreError(e);
     } catch (e) {
       print('Error adding worker: $e');
-      throw 'Failed to add worker. Please try again.';
+      throw 'Failed to add collector. Please try again.';
     }
   }
 
@@ -76,7 +76,7 @@ class WorkerService {
       throw _handleFirestoreError(e);
     } catch (e) {
       print('Error updating worker: $e');
-      throw 'Failed to update worker. Please try again.';
+      throw 'Failed to update collector. Please try again.';
     }
   }
 
@@ -91,7 +91,7 @@ class WorkerService {
       throw _handleFirestoreError(e);
     } catch (e) {
       print('Error deleting worker: $e');
-      throw 'Failed to delete worker. Please try again.';
+      throw 'Failed to delete collector. Please try again.';
     }
   }
 
@@ -103,9 +103,9 @@ class WorkerService {
       case 'unavailable':
         return 'Database is currently unavailable. Please check your internet connection.';
       case 'not-found':
-        return 'Worker not found in database.';
+        return 'Collector not found in database.';
       case 'already-exists':
-        return 'This worker already exists.';
+        return 'This collector already exists.';
       case 'resource-exhausted':
         return 'Too many requests. Please try again later.';
       case 'unauthenticated':
@@ -126,7 +126,7 @@ class WorkerService {
       });
     } catch (e) {
       print('Error updating worker status: $e');
-      throw 'Failed to update worker status: $e';
+      throw 'Failed to update collector status: $e';
     }
   }
 
@@ -138,7 +138,7 @@ class WorkerService {
   }) async {
     try {
       final worker = await getWorkerById(id);
-      if (worker == null) throw 'Worker not found';
+      if (worker == null) throw 'Collector not found';
 
       double newBalance = worker.currentBalance;
       double newTotalDistributed = worker.totalDistributed;
@@ -168,7 +168,7 @@ class WorkerService {
       });
     } catch (e) {
       print('Error updating worker balance: $e');
-      throw 'Failed to update worker balance: $e';
+      throw 'Failed to update collector balance: $e';
     }
   }
 
@@ -186,14 +186,15 @@ class WorkerService {
 
       final totalWorkers = workers.length;
       final activeToday = workers.where((w) => w.status == 'active').length;
-      
+
       final totalRevenue = workers.fold<double>(
         0.0,
         (sum, worker) => sum + worker.totalCoffeePurchased,
       );
 
       final avgPerformance = workers.isNotEmpty
-          ? workers.fold<double>(0.0, (sum, worker) => sum + worker.performanceRating) /
+          ? workers.fold<double>(
+                  0.0, (sum, worker) => sum + worker.performanceRating) /
               workers.length
           : 0.0;
 

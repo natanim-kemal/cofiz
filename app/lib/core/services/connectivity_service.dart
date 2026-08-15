@@ -7,7 +7,8 @@ class ConnectivityService {
   ConnectivityService._internal();
 
   final Connectivity _connectivity = Connectivity();
-  final StreamController<bool> _connectionStatusController = StreamController<bool>.broadcast();
+  final StreamController<bool> _connectionStatusController =
+      StreamController<bool>.broadcast();
 
   Stream<bool> get connectionStatus => _connectionStatusController.stream;
   bool _isOnline = true;
@@ -17,9 +18,10 @@ class ConnectivityService {
   Future<void> initialize() async {
     // Check initial connectivity
     _isOnline = await _checkConnectivity();
-    
+
     // Listen to connectivity changes
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _connectivity.onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
       _updateConnectionStatus(results);
     });
   }
@@ -43,7 +45,7 @@ class ConnectivityService {
   void _updateConnectionStatus(List<ConnectivityResult> results) {
     final wasOnline = _isOnline;
     _isOnline = _hasConnection(results);
-    
+
     if (wasOnline != _isOnline) {
       _connectionStatusController.add(_isOnline);
     }

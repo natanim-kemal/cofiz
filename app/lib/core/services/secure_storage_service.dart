@@ -4,7 +4,8 @@ class SecureStorageService {
   final _storage = const FlutterSecureStorage();
 
   static const String _keyEmail = 'user_email';
-  static const String _keyPassword = 'user_password'; // specific for biometric re-login integration
+  static const String _keyPassword =
+      'user_password'; // specific for biometric re-login integration
   static const String _keyBiometricEnabled = 'biometric_enabled';
 
   Future<void> saveCredentials(String email, String password) async {

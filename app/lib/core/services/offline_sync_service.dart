@@ -39,7 +39,7 @@ class OfflineSyncService {
 
       for (int i = 0; i < pendingOps.length; i++) {
         final operation = pendingOps[i];
-        
+
         try {
           await _executeOperation(operation);
           await _cache.removePendingOperation(i);
@@ -62,12 +62,12 @@ class OfflineSyncService {
     // This would need to be injected with providers
     // For now, we'll just log it
     debugPrint('Executing: ${operation['type']}');
-    
+
     // In a real implementation, you would:
     // - Get the appropriate provider
     // - Call the service method with the cached data
     // - Handle success/failure
-    
+
     throw UnimplementedError('Sync execution needs provider injection');
   }
 

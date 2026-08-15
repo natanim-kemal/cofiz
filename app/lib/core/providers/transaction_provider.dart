@@ -90,6 +90,7 @@ class TransactionProvider with ChangeNotifier {
         receiptUrl: receiptUrl,
         createdAt: DateTime.now(),
         createdBy: createdBy,
+        approved: false,
       );
 
       await _transactionService.addTransaction(transaction);
@@ -135,6 +136,7 @@ class TransactionProvider with ChangeNotifier {
         receiptUrl: receiptUrl,
         createdAt: DateTime.now(),
         createdBy: createdBy,
+        approved: false,
       );
 
       await _transactionService.addTransaction(transaction);
@@ -184,6 +186,7 @@ class TransactionProvider with ChangeNotifier {
         receiptUrl: receiptUrl,
         createdAt: DateTime.now(),
         createdBy: createdBy,
+        approved: false,
         coffeeType: coffeeType,
         coffeeWeight: weight,
         pricePerKg: pricePerKg,
@@ -216,6 +219,54 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
+  /// Approve a single transaction entry
+  Future<bool> approveTransaction(String transactionId) async {
+    try {
+      await _transactionService.approveTransaction(transactionId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Batch approve all pending transactions for a worker
+  Future<bool> approveAllForWorker(String workerId) async {
+    try {
+      await _transactionService.approveAllForWorker(workerId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Edit an existing transaction (reverses old balance effect, applies new)
+  Future<bool> updateTransaction(MoneyTransaction transaction) async {
+    try {
+      await _transactionService.updateTransaction(transaction);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Delete a transaction (reverses its balance effect)
+  Future<bool> deleteTransaction(String transactionId) async {
+    try {
+      await _transactionService.deleteTransaction(transactionId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Clear error
   void clearError() {
     _errorMessage = null;
@@ -225,7 +276,7 @@ class TransactionProvider with ChangeNotifier {
   /// Parse error message
   String _parseError(dynamic error) {
     String errorStr = error.toString();
-    if (errorStr.contains('permission-denied') || 
+    if (errorStr.contains('permission-denied') ||
         errorStr.contains('PERMISSION_DENIED')) {
       return 'Database access denied. Please check permissions.';
     } else if (errorStr.contains('unavailable')) {

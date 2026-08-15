@@ -17,7 +17,7 @@ class FCMService {
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   String? _currentToken;
   StreamSubscription? _tokenRefreshSubscription;
 
@@ -27,14 +27,14 @@ class FCMService {
   Future<void> initialize() async {
     // Set up background message handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    
+
     // Request permission
     await requestPermission();
-    
+
     // Get initial token
     _currentToken = await _messaging.getToken();
     debugPrint('FCM Token: $_currentToken');
-    
+
     // Listen for token refresh
     _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((newToken) {
       debugPrint('FCM Token refreshed: $newToken');
@@ -42,13 +42,13 @@ class FCMService {
       // If user is logged in, update their token
       _updateStoredToken(newToken);
     });
-    
+
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    
+
     // Handle notification taps when app is in background/terminated
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
-    
+
     // Check if app was opened from a terminated state via notification
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
@@ -68,9 +68,10 @@ class FCMService {
       sound: true,
     );
 
-    final isAuthorized = settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
-    
+    final isAuthorized =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+
     debugPrint('FCM Permission: ${settings.authorizationStatus}');
     return isAuthorized;
   }
@@ -80,7 +81,7 @@ class FCMService {
     if (_currentToken == null) {
       _currentToken = await _messaging.getToken();
     }
-    
+
     if (_currentToken != null) {
       try {
         await _firestore.collection('users').doc(userId).update({
@@ -110,13 +111,14 @@ class FCMService {
   /// Update token in Firestore when it refreshes
   Future<void> _updateStoredToken(String newToken) async {
     // This would need the current user ID - we'll handle this in AuthProvider
-    debugPrint('Token refresh detected. Update will happen on next auth check.');
+    debugPrint(
+        'Token refresh detected. Update will happen on next auth check.');
   }
 
   /// Handle foreground messages - show local notification
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Foreground message received: ${message.notification?.title}');
-    
+
     final notification = message.notification;
     if (notification != null) {
       // Show local notification using NotificationService
