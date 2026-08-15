@@ -38,6 +38,11 @@ class WorkerTransactionTile extends StatelessWidget {
         color = Colors.brown;
         prefix = '-';
         break;
+      case 'transfer':
+        icon = Icons.swap_horiz;
+        color = const Color(0xFFF0A04B);
+        prefix = transaction.isTransferSender ? '-' : '+';
+        break;
       default:
         icon = Icons.swap_horiz;
         color = Colors.grey;
@@ -241,6 +246,12 @@ class WorkerTransactionTile extends StatelessWidget {
       case 'purchase':
         return AppLocalizations.of(context)?.coffeePurchaseTitle ??
             'Coffee Purchase';
+      case 'transfer':
+        return transaction.isTransferSender
+            ? (AppLocalizations.of(context)?.transferredOut ??
+                'Transferred Out')
+            : (AppLocalizations.of(context)?.receivedFrom ??
+                'Received From');
       default:
         return AppLocalizations.of(context)?.transaction ?? 'Transaction';
     }
