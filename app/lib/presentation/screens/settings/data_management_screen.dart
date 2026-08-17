@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/providers/worker_provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
@@ -47,6 +49,17 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       final file = File('${dir.path}/$fileName');
       await file.writeAsString(jsonString);
 
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final auditProvider = Provider.of<AuditProvider>(context, listen: false);
+      await auditProvider.logDataExported(
+        userId: authProvider.user?.uid ?? 'unknown',
+        userName:
+            authProvider.appUser?.displayName ?? authProvider.user?.email ?? '',
+        exportType: 'json',
+        recordCount: workerProvider.workers.length +
+            transactionProvider.allTransactions.length,
+      );
+
       if (mounted) {
         showDialog(
           context: context,
@@ -65,8 +78,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppToast.show(
-            '${AppLocalizations.of(context)!.exportFailed('e')}');
+        AppToast.show(AppLocalizations.of(context)!.exportFailed('e'));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -161,7 +173,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
       title,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
         color: AppColors.primary,
@@ -206,7 +218,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
               )
             : Icon(
                 icon,
-                color: isDestructive ? Colors.red : AppColors.primary,
+                color: AppColors.primary,
                 size: 28,
               ),
         title: Text(
@@ -227,7 +239,7 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
             ),
           ),
         ),
-        trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
+        trailing: const Icon(Icons.chevron_right, color: AppColors.primary),
       ),
     );
   }

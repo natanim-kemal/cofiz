@@ -43,7 +43,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   Icon(
                     Icons.lock_outline,
                     size: 64,
-                    color: Colors.grey.shade400,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -93,7 +93,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                         Icon(
                           _getActionIcon(action),
                           size: 18,
-                          color: _getActionColor(action),
+                          color: AppColors.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(action.displayName),
@@ -120,7 +120,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                       Icon(
                         _getActionIcon(_selectedFilter!),
                         size: 16,
-                        color: _getActionColor(_selectedFilter!),
+                        color: AppColors.primary,
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -155,7 +155,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.error_outline,
-                                size: 48, color: Colors.red.shade300),
+                                size: 48, color: AppColors.primary),
                             const SizedBox(height: 16),
                             Text(
                               AppLocalizations.of(context)!.errorLoadingLogs,
@@ -185,7 +185,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                             Icon(
                               Icons.history,
                               size: 64,
-                              color: Colors.grey.shade400,
+                              color: AppColors.primary,
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -273,7 +273,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
           // Action icon
           Icon(
             _getActionIcon(log.action),
-            color: _getActionColor(log.action),
+            color: AppColors.primary,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -372,32 +372,6 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
   }
 
   Color _getActionColor(AuditAction action) {
-    switch (action) {
-      case AuditAction.userCreated:
-      case AuditAction.workerCreated:
-        return Colors.green;
-      case AuditAction.userUpdated:
-      case AuditAction.workerUpdated:
-      case AuditAction.settingsChanged:
-        return Colors.blue;
-      case AuditAction.userDeleted:
-      case AuditAction.workerDeleted:
-        return Colors.red;
-      case AuditAction.userRoleChanged:
-        return Colors.purple;
-      case AuditAction.transactionCreated:
-        return Colors.orange;
-      case AuditAction.incomeRecorded:
-        return Colors.green;
-      case AuditAction.expenseRecorded:
-        return Colors.red;
-      case AuditAction.dataExported:
-      case AuditAction.dataImported:
-        return Colors.teal;
-      case AuditAction.login:
-        return Colors.green;
-      case AuditAction.logout:
-        return Colors.grey;
-    }
+    return AppColors.primary;
   }
 }
