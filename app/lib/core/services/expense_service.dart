@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 import '../models/expense_record_model.dart';
+import 'offline_cache_service.dart';
+import 'offline_sync_service.dart';
 
 /// A single page of expense records from a cursor-paginated query.
 class ExpensePage {
@@ -30,7 +35,10 @@ class ExpenseService {
     'Other',
   ];
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+
+  ExpenseService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   DocumentReference<Map<String, dynamic>> get _categoriesRef =>
       _firestore.collection(_settingsCollection).doc(_settingsDoc);
@@ -151,15 +159,19 @@ class ExpenseService {
   }
 
   Future<String?> addExpense(ExpenseRecord record) async {
-    try {
-      final docRef = await _firestore
-          .collection(_collectionName)
-          .add(record.toFirestore());
-      return docRef.id;
-    } catch (e) {
-      print('Error adding expense: $e');
-      return null;
-    }
+    final opId = const Uuid().v4();
+    await OfflineCacheService().queueOperation({
+      'opId': opId,
+      'type': 'createExpense',
+      'docId': opId,
+      'payload': record.toFirestore(),
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cached = OfflineCacheService().getCachedExpenses() ?? [];
+    await OfflineCacheService()
+        .cacheExpenses([...cached, record.copyWith(id: opId)]);
+    unawaited(OfflineSyncService().syncNow());
+    return opId;
   }
 
   Future<bool> updateExpense(ExpenseRecord record) async {

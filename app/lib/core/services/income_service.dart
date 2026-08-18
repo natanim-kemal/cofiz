@@ -1,5 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 import '../models/income_record_model.dart';
+import 'offline_cache_service.dart';
+import 'offline_sync_service.dart';
 
 /// A single page of income records from a cursor-paginated query.
 class IncomePage {
@@ -27,7 +32,10 @@ class IncomeService {
     'Other',
   ];
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+
+  IncomeService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   DocumentReference<Map<String, dynamic>> get _categoriesRef =>
       _firestore.collection(_settingsCollection).doc(_settingsDoc);
@@ -255,15 +263,19 @@ class IncomeService {
   }
 
   Future<String?> addIncome(IncomeRecord record) async {
-    try {
-      final docRef = await _firestore
-          .collection(_collectionName)
-          .add(record.toFirestore());
-      return docRef.id;
-    } catch (e) {
-      print('Error adding income: $e');
-      return null;
-    }
+    final opId = const Uuid().v4();
+    await OfflineCacheService().queueOperation({
+      'opId': opId,
+      'type': 'createIncome',
+      'docId': opId,
+      'payload': record.toFirestore(),
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cached = OfflineCacheService().getCachedIncome() ?? [];
+    await OfflineCacheService()
+        .cacheIncome([...cached, record.copyWith(id: opId)]);
+    unawaited(OfflineSyncService().syncNow());
+    return opId;
   }
 
   Future<bool> updateIncome(IncomeRecord record) async {
