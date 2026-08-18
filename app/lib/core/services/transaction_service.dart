@@ -6,6 +6,8 @@ import '../config/cloudinary_config.dart';
 import '../utils/receipt_image_utils.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'connectivity_service.dart';
+import 'offline_cache_service.dart';
 
 /// A single page of transactions from a cursor-paginated query.
 class TransactionPage {
@@ -21,9 +23,12 @@ class TransactionPage {
 }
 
 class TransactionService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final WorkerService _workerService = WorkerService();
-  final NotificationTriggerService _notificationService =
+  FirebaseFirestore _firestore;
+
+  TransactionService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
+  late final WorkerService _workerService = WorkerService();
+  late final NotificationTriggerService _notificationService =
       NotificationTriggerService();
   static const String _transactionsCollection = 'transactions';
 
@@ -304,6 +309,13 @@ class TransactionService {
 
   /// Approve a single transaction entry
   Future<void> approveTransaction(String transactionId) async {
+    if (!ConnectivityService().isOnline) {
+      await OfflineCacheService().queueOperation({
+        'type': 'approveTransaction',
+        'transactionId': transactionId,
+      });
+      return;
+    }
     try {
       await _firestore
           .collection(_transactionsCollection)
@@ -320,6 +332,13 @@ class TransactionService {
 
   /// Batch approve all pending transactions for a worker
   Future<void> approveAllForWorker(String workerId) async {
+    if (!ConnectivityService().isOnline) {
+      await OfflineCacheService().queueOperation({
+        'type': 'approveAll',
+        'workerId': workerId,
+      });
+      return;
+    }
     try {
       final snapshot = await _firestore
           .collection(_transactionsCollection)
@@ -343,6 +362,13 @@ class TransactionService {
 
   /// Approve both records of a transfer by shared transferId.
   Future<void> approveTransfer(String transferId) async {
+    if (!ConnectivityService().isOnline) {
+      await OfflineCacheService().queueOperation({
+        'type': 'approveTransfer',
+        'transferId': transferId,
+      });
+      return;
+    }
     try {
       final snapshot = await _firestore
           .collection(_transactionsCollection)
