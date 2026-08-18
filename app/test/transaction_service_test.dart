@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:cofiz/core/models/transaction_model.dart';
 import 'package:cofiz/core/services/connectivity_service.dart';
 import 'package:cofiz/core/services/offline_cache_service.dart';
 import 'package:cofiz/core/services/transaction_service.dart';
@@ -58,5 +59,34 @@ void main() {
     expect(ops.length, 1);
     expect(ops.first['type'], 'approveAll');
     expect(ops.first['workerId'], 'w1');
+  });
+
+  test(
+      'addTransaction queues and appears in cache, does not directly write while offline',
+      () async {
+    final fake = FakeFirebaseFirestore();
+    final service = TransactionService(firestore: fake);
+    // ensure offline cache initialized in setUpAll already
+    ConnectivityService().setOnlineForTest(false);
+    await service.addTransaction(MoneyTransaction(
+      id: '',
+      workerId: 'w1',
+      workerName: 'W1',
+      type: 'distribution',
+      amount: 50,
+      createdAt: DateTime.now(),
+      createdBy: 'tester',
+    ));
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['type'] == 'createTransaction'),
+        true);
+    expect(
+        OfflineCacheService()
+            .getCachedTransactions()
+            ?.any((t) => t.amount == 50),
+        true);
+    expect((await fake.collection('transactions').get()).docs.length, 0);
   });
 }
