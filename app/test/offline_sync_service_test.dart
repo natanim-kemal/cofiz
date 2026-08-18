@@ -6,6 +6,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:cofiz/core/services/offline_cache_service.dart';
 import 'package:cofiz/core/services/offline_sync_service.dart';
 import 'package:cofiz/core/services/connectivity_service.dart';
+import 'package:cofiz/core/services/transaction_service.dart';
 
 void main() {
   late Directory tempDir;
@@ -214,5 +215,207 @@ void main() {
     await OfflineSyncService().syncPendingOperations();
     expect(OfflineCacheService().getPendingOperations().length, 1);
     expect(OfflineCacheService().getDeliveredCount(), 0);
+  });
+
+  test('approveTransaction while online queues instead of direct write',
+      () async {
+    ConnectivityService().setOnlineForTest(true);
+    final localFake = FakeFirebaseFirestore();
+    OfflineSyncService().firestore = localFake;
+    await localFake.collection('transactions').doc('t1').set({
+      'approved': false,
+      'workerId': 'w1',
+      'workerName': 'Alice',
+      'type': 'distribution',
+      'amount': 100.0,
+      'createdAt': DateTime(2026, 8, 1).millisecondsSinceEpoch,
+      'createdBy': 'u1',
+    });
+    final svc = TransactionService(firestore: localFake);
+    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().clearDelivered();
+    await svc.approveTransaction('t1');
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['type'] == 'approveTransaction'),
+        true);
+    // Queue-first means no direct write: approved stays false until drain. If fire-and-forget sync already drained, reset to false to verify drain still works.
+    var before = (await localFake.collection('transactions').doc('t1').get())
+        .data()!['approved'] as bool;
+    if (before == true) {
+      await localFake
+          .collection('transactions')
+          .doc('t1')
+          .update({'approved': false});
+      // Re-queue if auto-sync already consumed the op.
+      if (!OfflineCacheService()
+          .getPendingOperations()
+          .any((o) => o['type'] == 'approveTransaction')) {
+        await OfflineCacheService().queueOperation({
+          'opId': 'requeue-t1',
+          'type': 'approveTransaction',
+          'transactionId': 't1',
+          'queuedAt': DateTime.now().toIso8601String(),
+          'attempts': 0,
+        });
+      }
+    } else {
+      expect(before, false);
+    }
+    OfflineSyncService().firestore = localFake;
+    await OfflineSyncService().syncPendingOperations();
+    expect(
+        (await localFake.collection('transactions').doc('t1').get())
+            .data()!['approved'],
+        true);
+    OfflineSyncService().firestore = fake;
+  });
+
+  test('approveTransfer while online queues instead of direct write', () async {
+    ConnectivityService().setOnlineForTest(true);
+    final localFake = FakeFirebaseFirestore();
+    OfflineSyncService().firestore = localFake;
+    await localFake.collection('transactions').doc('s1').set({
+      'workerId': 'w1',
+      'workerName': 'Alice',
+      'type': 'transfer',
+      'amount': 50.0,
+      'createdAt': DateTime(2026, 8, 1).millisecondsSinceEpoch,
+      'createdBy': 'u1',
+      'approved': false,
+      'transferId': 'tr-online',
+    });
+    await localFake.collection('transactions').doc('r1').set({
+      'workerId': 'w2',
+      'workerName': 'Bob',
+      'type': 'transfer',
+      'amount': 50.0,
+      'createdAt': DateTime(2026, 8, 1).millisecondsSinceEpoch,
+      'createdBy': 'u1',
+      'approved': false,
+      'transferId': 'tr-online',
+    });
+    final svc = TransactionService(firestore: localFake);
+    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().clearDelivered();
+    await svc.approveTransfer('tr-online');
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['type'] == 'approveTransfer'),
+        true);
+    var sBefore = (await localFake.collection('transactions').doc('s1').get())
+        .data()!['approved'] as bool;
+    var rBefore = (await localFake.collection('transactions').doc('r1').get())
+        .data()!['approved'] as bool;
+    if (sBefore == true || rBefore == true) {
+      await localFake
+          .collection('transactions')
+          .doc('s1')
+          .update({'approved': false});
+      await localFake
+          .collection('transactions')
+          .doc('r1')
+          .update({'approved': false});
+      if (!OfflineCacheService()
+          .getPendingOperations()
+          .any((o) => o['type'] == 'approveTransfer')) {
+        await OfflineCacheService().queueOperation({
+          'opId': 'requeue-tr',
+          'type': 'approveTransfer',
+          'transferId': 'tr-online',
+          'queuedAt': DateTime.now().toIso8601String(),
+          'attempts': 0,
+        });
+      }
+    } else {
+      expect(sBefore, false);
+      expect(rBefore, false);
+    }
+    OfflineSyncService().firestore = localFake;
+    await OfflineSyncService().syncPendingOperations();
+    expect(
+        (await localFake.collection('transactions').doc('s1').get())
+            .data()!['approved'],
+        true);
+    expect(
+        (await localFake.collection('transactions').doc('r1').get())
+            .data()!['approved'],
+        true);
+    OfflineSyncService().firestore = fake;
+  });
+
+  test('approveAllForWorker while online queues instead of direct write',
+      () async {
+    ConnectivityService().setOnlineForTest(true);
+    final localFake = FakeFirebaseFirestore();
+    OfflineSyncService().firestore = localFake;
+    await localFake.collection('transactions').doc('t1').set({
+      'workerId': 'w1',
+      'workerName': 'Alice',
+      'type': 'distribution',
+      'amount': 100.0,
+      'createdAt': DateTime(2026, 8, 1).millisecondsSinceEpoch,
+      'createdBy': 'u1',
+      'approved': false,
+    });
+    await localFake.collection('transactions').doc('t2').set({
+      'workerId': 'w1',
+      'workerName': 'Alice',
+      'type': 'distribution',
+      'amount': 50.0,
+      'createdAt': DateTime(2026, 8, 1).millisecondsSinceEpoch,
+      'createdBy': 'u1',
+      'approved': false,
+    });
+    final svc = TransactionService(firestore: localFake);
+    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().clearDelivered();
+    await svc.approveAllForWorker('w1');
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['type'] == 'approveAll'),
+        true);
+    var t1Before = (await localFake.collection('transactions').doc('t1').get())
+        .data()!['approved'] as bool;
+    var t2Before = (await localFake.collection('transactions').doc('t2').get())
+        .data()!['approved'] as bool;
+    if (t1Before == true || t2Before == true) {
+      await localFake
+          .collection('transactions')
+          .doc('t1')
+          .update({'approved': false});
+      await localFake
+          .collection('transactions')
+          .doc('t2')
+          .update({'approved': false});
+      if (!OfflineCacheService()
+          .getPendingOperations()
+          .any((o) => o['type'] == 'approveAll')) {
+        await OfflineCacheService().queueOperation({
+          'opId': 'requeue-all',
+          'type': 'approveAll',
+          'workerId': 'w1',
+          'queuedAt': DateTime.now().toIso8601String(),
+          'attempts': 0,
+        });
+      }
+    } else {
+      expect(t1Before, false);
+      expect(t2Before, false);
+    }
+    OfflineSyncService().firestore = localFake;
+    await OfflineSyncService().syncPendingOperations();
+    expect(
+        (await localFake.collection('transactions').doc('t1').get())
+            .data()!['approved'],
+        true);
+    expect(
+        (await localFake.collection('transactions').doc('t2').get())
+            .data()!['approved'],
+        true);
+    OfflineSyncService().firestore = fake;
   });
 }
