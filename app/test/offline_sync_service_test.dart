@@ -24,10 +24,13 @@ void main() {
     await OfflineCacheService().clearDelivered();
     ConnectivityService().setOnlineForTest(true);
     await fake.collection('workers').doc('w1').set({'currentBalance': 1000.0});
+    // Disable periodic timer during tests
+    OfflineSyncService().dispose();
   });
 
   tearDown(() async {
     await OfflineCacheService().clearPendingOperations();
+    OfflineSyncService().dispose();
   });
 
   tearDownAll(() async {
@@ -55,8 +58,11 @@ void main() {
   test('replays approveTransaction op', () async {
     await seedTx('t1', approved: false);
     await OfflineCacheService().queueOperation({
+      'opId': 'op-approve-t1',
       'type': 'approveTransaction',
       'transactionId': 't1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
 
     await OfflineSyncService().syncPendingOperations();
@@ -70,8 +76,11 @@ void main() {
     await seedTx('s1', approved: false, transferId: 'tr-1');
     await seedTx('r1', approved: false, transferId: 'tr-1');
     await OfflineCacheService().queueOperation({
+      'opId': 'op-approve-tr1',
       'type': 'approveTransfer',
       'transferId': 'tr-1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
 
     await OfflineSyncService().syncPendingOperations();
@@ -88,8 +97,11 @@ void main() {
     await seedTx('t2', workerId: 'w1', approved: false);
     await seedTx('t3', workerId: 'w2', approved: false);
     await OfflineCacheService().queueOperation({
+      'opId': 'op-approve-all-w1',
       'type': 'approveAll',
       'workerId': 'w1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
 
     await OfflineSyncService().syncPendingOperations();
@@ -109,16 +121,25 @@ void main() {
     await seedTx('r1', approved: false, transferId: 'tr-1');
     await seedTx('t2', workerId: 'w1', approved: false);
     await OfflineCacheService().queueOperation({
+      'opId': 'op-mixed-1',
       'type': 'approveTransaction',
       'transactionId': 't1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineCacheService().queueOperation({
+      'opId': 'op-mixed-2',
       'type': 'approveTransfer',
       'transferId': 'tr-1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineCacheService().queueOperation({
+      'opId': 'op-mixed-3',
       'type': 'approveAll',
       'workerId': 'w1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
 
     await OfflineSyncService().syncPendingOperations();
@@ -138,16 +159,25 @@ void main() {
     await seedTx('t1', approved: false);
     await seedTx('t2', approved: false);
     await OfflineCacheService().queueOperation({
+      'opId': 'op-fail-missing',
       'type': 'approveTransaction',
       'transactionId': 'missing',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineCacheService().queueOperation({
+      'opId': 'op-fail-t1',
       'type': 'approveTransaction',
       'transactionId': 't1',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineCacheService().queueOperation({
+      'opId': 'op-fail-t2',
       'type': 'approveTransaction',
       'transactionId': 't2',
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
 
     await OfflineSyncService().syncPendingOperations();
@@ -175,6 +205,7 @@ void main() {
       'createdBy': 'tester',
       'createdAt': DateTime.now().millisecondsSinceEpoch,
       'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineSyncService().syncPendingOperations();
     // First drain delivered
@@ -197,6 +228,7 @@ void main() {
       'createdBy': 'tester',
       'createdAt': DateTime.now().millisecondsSinceEpoch,
       'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineSyncService().syncPendingOperations();
     expect(
@@ -210,7 +242,8 @@ void main() {
     await OfflineCacheService().queueOperation({
       'opId': 'bad',
       'type': 'unknownType',
-      'queuedAt': DateTime.now().toIso8601String()
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     await OfflineSyncService().syncPendingOperations();
     expect(OfflineCacheService().getPendingOperations().length, 1);
@@ -219,7 +252,6 @@ void main() {
 
   test('approveTransaction while online queues instead of direct write',
       () async {
-    ConnectivityService().setOnlineForTest(true);
     final localFake = FakeFirebaseFirestore();
     OfflineSyncService().firestore = localFake;
     await localFake.collection('transactions').doc('t1').set({
@@ -234,46 +266,30 @@ void main() {
     final svc = TransactionService(firestore: localFake);
     await OfflineCacheService().clearPendingOperations();
     await OfflineCacheService().clearDelivered();
+    // Deterministic: queue while offline, then go online and drain
+    ConnectivityService().setOnlineForTest(false);
     await svc.approveTransaction('t1');
     expect(
         OfflineCacheService()
             .getPendingOperations()
             .any((o) => o['type'] == 'approveTransaction'),
         true);
-    // Queue-first means no direct write: approved stays false until drain. If fire-and-forget sync already drained, reset to false to verify drain still works.
-    var before = (await localFake.collection('transactions').doc('t1').get())
-        .data()!['approved'] as bool;
-    if (before == true) {
-      await localFake
-          .collection('transactions')
-          .doc('t1')
-          .update({'approved': false});
-      // Re-queue if auto-sync already consumed the op.
-      if (!OfflineCacheService()
-          .getPendingOperations()
-          .any((o) => o['type'] == 'approveTransaction')) {
-        await OfflineCacheService().queueOperation({
-          'opId': 'requeue-t1',
-          'type': 'approveTransaction',
-          'transactionId': 't1',
-          'queuedAt': DateTime.now().toIso8601String(),
-          'attempts': 0,
-        });
-      }
-    } else {
-      expect(before, false);
-    }
+    expect(
+        (await localFake.collection('transactions').doc('t1').get())
+            .data()!['approved'],
+        false);
+    ConnectivityService().setOnlineForTest(true);
     OfflineSyncService().firestore = localFake;
     await OfflineSyncService().syncPendingOperations();
     expect(
         (await localFake.collection('transactions').doc('t1').get())
             .data()!['approved'],
         true);
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
     OfflineSyncService().firestore = fake;
   });
 
   test('approveTransfer while online queues instead of direct write', () async {
-    ConnectivityService().setOnlineForTest(true);
     final localFake = FakeFirebaseFirestore();
     OfflineSyncService().firestore = localFake;
     await localFake.collection('transactions').doc('s1').set({
@@ -299,40 +315,22 @@ void main() {
     final svc = TransactionService(firestore: localFake);
     await OfflineCacheService().clearPendingOperations();
     await OfflineCacheService().clearDelivered();
+    ConnectivityService().setOnlineForTest(false);
     await svc.approveTransfer('tr-online');
     expect(
         OfflineCacheService()
             .getPendingOperations()
             .any((o) => o['type'] == 'approveTransfer'),
         true);
-    var sBefore = (await localFake.collection('transactions').doc('s1').get())
-        .data()!['approved'] as bool;
-    var rBefore = (await localFake.collection('transactions').doc('r1').get())
-        .data()!['approved'] as bool;
-    if (sBefore == true || rBefore == true) {
-      await localFake
-          .collection('transactions')
-          .doc('s1')
-          .update({'approved': false});
-      await localFake
-          .collection('transactions')
-          .doc('r1')
-          .update({'approved': false});
-      if (!OfflineCacheService()
-          .getPendingOperations()
-          .any((o) => o['type'] == 'approveTransfer')) {
-        await OfflineCacheService().queueOperation({
-          'opId': 'requeue-tr',
-          'type': 'approveTransfer',
-          'transferId': 'tr-online',
-          'queuedAt': DateTime.now().toIso8601String(),
-          'attempts': 0,
-        });
-      }
-    } else {
-      expect(sBefore, false);
-      expect(rBefore, false);
-    }
+    expect(
+        (await localFake.collection('transactions').doc('s1').get())
+            .data()!['approved'],
+        false);
+    expect(
+        (await localFake.collection('transactions').doc('r1').get())
+            .data()!['approved'],
+        false);
+    ConnectivityService().setOnlineForTest(true);
     OfflineSyncService().firestore = localFake;
     await OfflineSyncService().syncPendingOperations();
     expect(
@@ -343,12 +341,12 @@ void main() {
         (await localFake.collection('transactions').doc('r1').get())
             .data()!['approved'],
         true);
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
     OfflineSyncService().firestore = fake;
   });
 
   test('approveAllForWorker while online queues instead of direct write',
       () async {
-    ConnectivityService().setOnlineForTest(true);
     final localFake = FakeFirebaseFirestore();
     OfflineSyncService().firestore = localFake;
     await localFake.collection('transactions').doc('t1').set({
@@ -372,40 +370,22 @@ void main() {
     final svc = TransactionService(firestore: localFake);
     await OfflineCacheService().clearPendingOperations();
     await OfflineCacheService().clearDelivered();
+    ConnectivityService().setOnlineForTest(false);
     await svc.approveAllForWorker('w1');
     expect(
         OfflineCacheService()
             .getPendingOperations()
             .any((o) => o['type'] == 'approveAll'),
         true);
-    var t1Before = (await localFake.collection('transactions').doc('t1').get())
-        .data()!['approved'] as bool;
-    var t2Before = (await localFake.collection('transactions').doc('t2').get())
-        .data()!['approved'] as bool;
-    if (t1Before == true || t2Before == true) {
-      await localFake
-          .collection('transactions')
-          .doc('t1')
-          .update({'approved': false});
-      await localFake
-          .collection('transactions')
-          .doc('t2')
-          .update({'approved': false});
-      if (!OfflineCacheService()
-          .getPendingOperations()
-          .any((o) => o['type'] == 'approveAll')) {
-        await OfflineCacheService().queueOperation({
-          'opId': 'requeue-all',
-          'type': 'approveAll',
-          'workerId': 'w1',
-          'queuedAt': DateTime.now().toIso8601String(),
-          'attempts': 0,
-        });
-      }
-    } else {
-      expect(t1Before, false);
-      expect(t2Before, false);
-    }
+    expect(
+        (await localFake.collection('transactions').doc('t1').get())
+            .data()!['approved'],
+        false);
+    expect(
+        (await localFake.collection('transactions').doc('t2').get())
+            .data()!['approved'],
+        false);
+    ConnectivityService().setOnlineForTest(true);
     OfflineSyncService().firestore = localFake;
     await OfflineSyncService().syncPendingOperations();
     expect(
@@ -416,6 +396,63 @@ void main() {
         (await localFake.collection('transactions').doc('t2').get())
             .data()!['approved'],
         true);
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
     OfflineSyncService().firestore = fake;
+  });
+
+  test('ops queued during sync are not lost (lost-update regression)',
+      () async {
+    // Seed initial pending op that will take time to drain
+    await OfflineCacheService().queueOperation({
+      'opId': 'op-initial',
+      'type': 'createTransaction',
+      'docId': 'op-initial',
+      'workerId': 'w1',
+      'workerName': 'W1',
+      'transactionType': 'distribution',
+      'amount': 10.0,
+      'createdBy': 'tester',
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+    // Configure firestore to delay runTransaction for the first op
+    // Use aCompleter to hold sync in progress, queue new op while isSyncing=true
+    // Disable timer and ensure online
+    ConnectivityService().setOnlineForTest(true);
+    // Start sync without awaiting, then queue during isSyncing
+    final syncFuture = OfflineSyncService().syncPendingOperations();
+    // Wait a microtask to let isSyncing become true
+    await Future.delayed(Duration.zero);
+    expect(OfflineSyncService().isSyncing, isTrue);
+    // Queue new op while syncing — this simulates queueOperation during isSyncing
+    await OfflineCacheService().queueOperation({
+      'opId': 'op-during-sync',
+      'type': 'createTransaction',
+      'docId': 'op-during-sync',
+      'workerId': 'w1',
+      'workerName': 'W1',
+      'transactionType': 'distribution',
+      'amount': 20.0,
+      'createdBy': 'tester2',
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+    await syncFuture;
+    // After sync, the op queued during sync must still be pending (not overwritten)
+    final pending = OfflineCacheService().getPendingOperations();
+    expect(pending.any((o) => o['opId'] == 'op-during-sync'), isTrue,
+        reason: 'op queued during sync should not be lost');
+    // Drain again and verify both delivered
+    await OfflineSyncService().syncPendingOperations();
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
+    expect(
+        (await fake.collection('transactions').doc('op-initial').get()).exists,
+        isTrue);
+    expect(
+        (await fake.collection('transactions').doc('op-during-sync').get())
+            .exists,
+        isTrue);
   });
 }

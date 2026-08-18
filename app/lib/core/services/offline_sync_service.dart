@@ -43,6 +43,7 @@ class OfflineSyncService {
     });
   }
 
+  /// Cancels the periodic retry timer. Call on app shutdown / test teardown.
   void dispose() {
     _periodicTimer?.cancel();
     _periodicTimer = null;
@@ -75,14 +76,33 @@ class OfflineSyncService {
             await _cache.markDelivered(opId, type);
           }
         } catch (e) {
-          debugPrint('❌ Failed to sync operation: $e');
           final updated = Map<String, dynamic>.from(operation);
           updated['attempts'] = ((operation['attempts'] as int?) ?? 0) + 1;
+          // No cap per spec — permanent failures retry every 30s; attempts logged for observability.
+          // TODO: add cap/circuit-breaker if needed (known debt).
+          debugPrint(
+              '❌ Failed to sync operation: ${operation['type']} attempt ${updated['attempts']}: $e');
           remaining.add(updated);
         }
       }
 
-      await _cache.replacePendingOperations(remaining);
+      // Merge ops queued while syncing to avoid lost-update race (snapshot -> replace overwrites).
+      final snapshotIds = <String>{
+        for (final op in pendingOps)
+          if (op['opId'] is String) op['opId'] as String
+      };
+      final current = _cache.getPendingOperations();
+      final newDuringSync = current.where((op) {
+        final id = op['opId'] as String?;
+        if (id != null) return !snapshotIds.contains(id);
+        // Fallback for legacy ops without opId: consider new if no equal snapshot op.
+        return !pendingOps.any((s) =>
+            s['type'] == op['type'] &&
+            s['transactionId'] == op['transactionId'] &&
+            s['transferId'] == op['transferId'] &&
+            s['workerId'] == op['workerId']);
+      }).toList();
+      await _cache.replacePendingOperations([...remaining, ...newDuringSync]);
       await _cache.pruneDelivered();
       debugPrint('📡 Sync completed!');
     } catch (e) {
@@ -154,20 +174,25 @@ class OfflineSyncService {
                 'commissionAmount': operation['commissionAmount'],
             });
             final workerRef = firestore.collection('workers').doc(workerId);
+            final lastActiveAt = operation['createdAt'] as int? ??
+                DateTime.now().millisecondsSinceEpoch;
             if (txType == 'distribution') {
               txn.update(workerRef, {
                 'currentBalance': FieldValue.increment(amount),
                 'totalDistributed': FieldValue.increment(amount),
+                'lastActiveAt': lastActiveAt,
               });
             } else if (txType == 'return') {
               txn.update(workerRef, {
                 'currentBalance': FieldValue.increment(-amount),
                 'totalReturned': FieldValue.increment(amount),
+                'lastActiveAt': lastActiveAt,
               });
             } else if (txType == 'purchase') {
               final Map<String, dynamic> updates = {
                 'currentBalance': FieldValue.increment(-amount),
                 'totalCoffeePurchased': FieldValue.increment(amount),
+                'lastActiveAt': lastActiveAt,
               };
               final commission =
                   (operation['commissionAmount'] as num?)?.toDouble();
@@ -317,29 +342,6 @@ class OfflineSyncService {
       default:
         throw UnsupportedError('Unknown operation type: $type');
     }
-  }
-
-  Future<void> queueTransaction({
-    required String type,
-    required String workerId,
-    required String workerName,
-    required double amount,
-    required String createdBy,
-    String? notes,
-    String? receiptUrl,
-  }) async {
-    await _cache.queueOperation({
-      'type': type,
-      'workerId': workerId,
-      'workerName': workerName,
-      'amount': amount,
-      'createdBy': createdBy,
-      'notes': notes,
-      'receiptUrl': receiptUrl,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
-
-    debugPrint('📥 Queued $type transaction for offline sync');
   }
 
   int getPendingOperationsCount() {
