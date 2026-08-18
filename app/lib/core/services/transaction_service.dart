@@ -297,86 +297,40 @@ class TransactionService {
     return transferId;
   }
 
-  /// Approve a single transaction entry
+  /// Approve a single transaction entry (queue-first-always)
   Future<void> approveTransaction(String transactionId) async {
-    if (!ConnectivityService().isOnline) {
-      await OfflineCacheService().queueOperation({
-        'type': 'approveTransaction',
-        'transactionId': transactionId,
-      });
-      return;
-    }
-    try {
-      await _firestore
-          .collection(_transactionsCollection)
-          .doc(transactionId)
-          .update({'approved': true});
-    } on FirebaseException catch (e) {
-      print('Firestore error approving transaction: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } catch (e) {
-      print('Error approving transaction: $e');
-      throw 'Failed to approve transaction. Please try again.';
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': const Uuid().v4(),
+      'type': 'approveTransaction',
+      'transactionId': transactionId,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+    unawaited(Future(() => OfflineSyncService().syncNow()));
   }
 
-  /// Batch approve all pending transactions for a worker
+  /// Batch approve all pending transactions for a worker (queue-first-always)
   Future<void> approveAllForWorker(String workerId) async {
-    if (!ConnectivityService().isOnline) {
-      await OfflineCacheService().queueOperation({
-        'type': 'approveAll',
-        'workerId': workerId,
-      });
-      return;
-    }
-    try {
-      final snapshot = await _firestore
-          .collection(_transactionsCollection)
-          .where('workerId', isEqualTo: workerId)
-          .where('approved', isEqualTo: false)
-          .get();
-
-      final batch = _firestore.batch();
-      for (final doc in snapshot.docs) {
-        batch.update(doc.reference, {'approved': true});
-      }
-      await batch.commit();
-    } on FirebaseException catch (e) {
-      print('Firestore error batch approving: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } catch (e) {
-      print('Error batch approving: $e');
-      throw 'Failed to approve transactions. Please try again.';
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': const Uuid().v4(),
+      'type': 'approveAll',
+      'workerId': workerId,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+    unawaited(Future(() => OfflineSyncService().syncNow()));
   }
 
-  /// Approve both records of a transfer by shared transferId.
+  /// Approve both records of a transfer by shared transferId (queue-first-always)
   Future<void> approveTransfer(String transferId) async {
-    if (!ConnectivityService().isOnline) {
-      await OfflineCacheService().queueOperation({
-        'type': 'approveTransfer',
-        'transferId': transferId,
-      });
-      return;
-    }
-    try {
-      final snapshot = await _firestore
-          .collection(_transactionsCollection)
-          .where('transferId', isEqualTo: transferId)
-          .get();
-
-      final batch = _firestore.batch();
-      for (final doc in snapshot.docs) {
-        batch.update(doc.reference, {'approved': true});
-      }
-      await batch.commit();
-    } on FirebaseException catch (e) {
-      print('Firestore error approving transfer: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } catch (e) {
-      print('Error approving transfer: $e');
-      throw 'Failed to approve transfer. Please try again.';
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': const Uuid().v4(),
+      'type': 'approveTransfer',
+      'transferId': transferId,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+    unawaited(Future(() => OfflineSyncService().syncNow()));
   }
 
   /// Delete both records of a transfer by shared transferId, reversing balances.
