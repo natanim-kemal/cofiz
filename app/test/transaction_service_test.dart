@@ -6,6 +6,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:cofiz/core/models/transaction_model.dart';
 import 'package:cofiz/core/services/connectivity_service.dart';
 import 'package:cofiz/core/services/offline_cache_service.dart';
+import 'package:cofiz/core/services/offline_sync_service.dart';
 import 'package:cofiz/core/services/transaction_service.dart';
 
 void main() {
@@ -88,5 +89,44 @@ void main() {
             ?.any((t) => t.amount == 50),
         true);
     expect((await fake.collection('transactions').get()).docs.length, 0);
+  });
+
+  test(
+      'addTransfer queues single op and appears in cache, drain creates two docs atomically',
+      () async {
+    final fake = FakeFirebaseFirestore();
+    await fake.collection('workers').doc('w1').set({'currentBalance': 500});
+    await fake.collection('workers').doc('w2').set({'currentBalance': 0});
+    final service = TransactionService(firestore: fake);
+    OfflineSyncService().firestore = fake;
+    ConnectivityService().setOnlineForTest(false);
+    final tid = await service.addTransfer(
+        fromWorkerId: 'w1',
+        fromWorkerName: 'A',
+        toWorkerId: 'w2',
+        toWorkerName: 'B',
+        amount: 100,
+        createdBy: 'tester');
+    expect(tid, isNotNull);
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .where((o) => o['type'] == 'createTransfer')
+            .length,
+        1);
+    ConnectivityService().setOnlineForTest(true);
+    await OfflineSyncService().syncPendingOperations();
+    expect(
+        (await fake
+                .collection('transactions')
+                .where('transferId', isEqualTo: tid)
+                .get())
+            .docs
+            .length,
+        2);
+    expect(
+        (await fake.collection('workers').doc('w1').get())
+            .data()!['currentBalance'],
+        400);
   });
 }
