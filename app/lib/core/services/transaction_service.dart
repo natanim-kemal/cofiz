@@ -7,6 +7,19 @@ import '../utils/receipt_image_utils.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+/// A single page of transactions from a cursor-paginated query.
+class TransactionPage {
+  final List<MoneyTransaction> items;
+  final DocumentSnapshot<Map<String, dynamic>>? lastDoc;
+  final bool hasMore;
+
+  TransactionPage({
+    required this.items,
+    required this.lastDoc,
+    required this.hasMore,
+  });
+}
+
 class TransactionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final WorkerService _workerService = WorkerService();
@@ -15,20 +28,67 @@ class TransactionService {
   static const String _transactionsCollection = 'transactions';
 
   /// Get transactions for a specific worker
-  Stream<List<MoneyTransaction>> getWorkerTransactionsStream(String workerId) {
+  /// [limit] bounds the real-time stream to the newest items.
+  Stream<List<MoneyTransaction>> getWorkerTransactionsStream(
+    String workerId, {
+    int limit = 20,
+  }) {
     return _firestore
         .collection(_transactionsCollection)
         .where('workerId', isEqualTo: workerId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map((snapshot) {
-      final transactions = snapshot.docs.map((doc) {
+      return snapshot.docs.map((doc) {
         return MoneyTransaction.fromFirestore(doc.data(), doc.id);
       }).toList();
-
-      // Sort by date (newest first)
-      transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return transactions;
     });
+  }
+
+  /// Fetch a page of worker transactions (newest first) via cursor.
+  Future<TransactionPage> getWorkerTransactionsPage(
+    String workerId, {
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int pageSize = 20,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_transactionsCollection)
+          .where('workerId', isEqualTo: workerId)
+          .orderBy('createdAt', descending: true)
+          .limit(pageSize);
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+      final snapshot = await query.get();
+      final transactions = snapshot.docs
+          .map((doc) => MoneyTransaction.fromFirestore(doc.data(), doc.id))
+          .toList();
+      return TransactionPage(
+        items: transactions,
+        lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length == pageSize,
+      );
+    } catch (e) {
+      print('Error fetching worker transactions page: $e');
+      return TransactionPage(items: const [], lastDoc: null, hasMore: false);
+    }
+  }
+
+  /// Total count of transactions for a worker (server-side count).
+  Future<int> getWorkerTransactionCount(String workerId) async {
+    try {
+      final snap = await _firestore
+          .collection(_transactionsCollection)
+          .where('workerId', isEqualTo: workerId)
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      print('Error counting worker transactions: $e');
+      return 0;
+    }
   }
 
   /// Get all transactions
@@ -65,7 +125,8 @@ class TransactionService {
   }
 
   /// Add transaction and update worker balance
-  Future<String?> addTransaction(MoneyTransaction transaction) async {    try {
+  Future<String?> addTransaction(MoneyTransaction transaction) async {
+    try {
       // For purchase and return transactions, validate balance first
       if (transaction.type.toLowerCase() == 'purchase' ||
           transaction.type.toLowerCase() == 'return') {
@@ -172,10 +233,8 @@ class TransactionService {
     }
 
     // Validate sender balance
-    final senderDoc = await _firestore
-        .collection('workers')
-        .doc(fromWorkerId)
-        .get();
+    final senderDoc =
+        await _firestore.collection('workers').doc(fromWorkerId).get();
     if (!senderDoc.exists) {
       throw 'Collector not found';
     }
@@ -201,6 +260,8 @@ class TransactionService {
       approved: false,
       fromWorkerId: fromWorkerId,
       toWorkerId: toWorkerId,
+      fromWorkerName: fromWorkerName,
+      toWorkerName: toWorkerName,
       transferId: transferId,
       transferRole: 'sender',
     );
@@ -217,17 +278,15 @@ class TransactionService {
       approved: false,
       fromWorkerId: fromWorkerId,
       toWorkerId: toWorkerId,
+      fromWorkerName: fromWorkerName,
+      toWorkerName: toWorkerName,
       transferId: transferId,
       transferRole: 'receiver',
     );
 
     final batch = _firestore.batch();
-    final senderRef = _firestore
-        .collection(_transactionsCollection)
-        .doc();
-    final receiverRef = _firestore
-        .collection(_transactionsCollection)
-        .doc();
+    final senderRef = _firestore.collection(_transactionsCollection).doc();
+    final receiverRef = _firestore.collection(_transactionsCollection).doc();
     batch.set(senderRef, senderTx.toFirestore());
     batch.set(receiverRef, receiverTx.toFirestore());
     batch.update(
@@ -319,8 +378,7 @@ class TransactionService {
       final batch = _firestore.batch();
       for (final doc in snapshot.docs) {
         final tx = MoneyTransaction.fromFirestore(doc.data(), doc.id);
-        final workerRef =
-            _firestore.collection('workers').doc(tx.workerId);
+        final workerRef = _firestore.collection('workers').doc(tx.workerId);
         final updates = _balanceUpdates(tx, -1);
         if (updates.isNotEmpty) {
           batch.update(workerRef, updates);
@@ -372,7 +430,8 @@ class TransactionService {
             (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
 
         // Reversing the old transaction: money-out adds back, money-in subtracts
-        final oldDirection = old.type.toLowerCase() == 'distribution' ? 1.0 : -1.0;
+        final oldDirection =
+            old.type.toLowerCase() == 'distribution' ? 1.0 : -1.0;
         final projectedBalance =
             currentBalance + oldDirection * old.amount - transaction.amount;
         if (projectedBalance < 0) {
@@ -382,9 +441,8 @@ class TransactionService {
 
       final batch = _firestore.batch();
 
-      final workerRef = _firestore
-          .collection('workers')
-          .doc(transaction.workerId);
+      final workerRef =
+          _firestore.collection('workers').doc(transaction.workerId);
 
       final oldUpdates = _balanceUpdates(old, -1);
       if (oldUpdates.isNotEmpty) {
@@ -451,9 +509,8 @@ class TransactionService {
 
       final batch = _firestore.batch();
 
-      final workerRef = _firestore
-          .collection('workers')
-          .doc(transaction.workerId);
+      final workerRef =
+          _firestore.collection('workers').doc(transaction.workerId);
 
       final updates = _balanceUpdates(transaction, -1);
       if (updates.isNotEmpty) {
@@ -509,7 +566,8 @@ class TransactionService {
   }
 
   /// Trigger notifications based on transaction type
-  Future<void> _triggerTransactionNotifications({    required MoneyTransaction transaction,
+  Future<void> _triggerTransactionNotifications({
+    required MoneyTransaction transaction,
     required double balanceChange,
   }) async {
     try {

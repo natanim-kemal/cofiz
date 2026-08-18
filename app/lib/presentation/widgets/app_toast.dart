@@ -157,7 +157,7 @@ class _AppToastHostState extends State<AppToastHost>
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.asset(
-                'assets/icon.png',
+                'assets/icon-bgless.png',
                 width: 26,
                 height: 26,
                 fit: BoxFit.cover,

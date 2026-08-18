@@ -1,14 +1,27 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/transaction_model.dart';
 import '../services/transaction_service.dart';
+import '../services/offline_cache_service.dart';
 
 class TransactionProvider with ChangeNotifier {
   final TransactionService _transactionService = TransactionService();
+
+  static const int _workerPageSize = 20;
 
   List<MoneyTransaction> _allTransactions = [];
   List<MoneyTransaction> _workerTransactions = [];
   bool _isLoading = false;
   String? _errorMessage;
+
+  // Worker transactions cursor pagination state
+  DocumentSnapshot<Map<String, dynamic>>? _workerLastDoc;
+  bool _workerHasMore = false;
+  bool _isLoadingMoreWorker = false;
+  bool _workerLoadedExtraPages = false;
+  StreamSubscription<List<MoneyTransaction>>? _workerSub;
+  int _workerTotalCount = 0;
 
   // Today's totals
   double _todayDistributed = 0.0;
@@ -20,16 +33,30 @@ class TransactionProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  bool get hasMoreWorkerTransactions => _workerHasMore;
+  bool get isLoadingMoreWorkerTransactions => _isLoadingMoreWorker;
+  int get workerTransactionTotalCount => _workerTotalCount;
+
   double get todayDistributed => _todayDistributed;
   double get todayReturned => _todayReturned;
   double get todayPurchased => _todayPurchased;
   double get todayNet => _todayDistributed - _todayReturned - _todayPurchased;
 
-  /// Load worker transactions
+  /// Load worker transactions - bounded live stream (first page) + cursor pages
   void loadWorkerTransactions(String workerId) {
-    _transactionService.getWorkerTransactionsStream(workerId).listen(
+    _workerSub?.cancel();
+    _workerTransactions = [];
+    _workerLastDoc = null;
+    _workerHasMore = false;
+    _workerLoadedExtraPages = false;
+    _workerTotalCount = 0;
+    notifyListeners();
+
+    _workerSub = _transactionService
+        .getWorkerTransactionsStream(workerId, limit: _workerPageSize)
+        .listen(
       (transactions) {
-        _workerTransactions = transactions;
+        _mergeFirstPage(transactions);
         notifyListeners();
       },
       onError: (error) {
@@ -38,13 +65,77 @@ class TransactionProvider with ChangeNotifier {
         notifyListeners();
       },
     );
+
+    _loadWorkerCount(workerId);
   }
 
-  /// Load all transactions
+  /// Load the next page of worker transactions from the backend cursor.
+  Future<void> loadMoreWorkerTransactions(String workerId) async {
+    if (_isLoadingMoreWorker || !_workerHasMore) return;
+    _isLoadingMoreWorker = true;
+    notifyListeners();
+
+    final page = await _transactionService.getWorkerTransactionsPage(
+      workerId,
+      startAfter: _workerLastDoc,
+      pageSize: _workerPageSize,
+    );
+
+    if (page.items.isEmpty) {
+      _workerHasMore = false;
+      _isLoadingMoreWorker = false;
+      notifyListeners();
+      return;
+    }
+
+    final knownIds = _workerTransactions.map((t) => t.id).toSet();
+    _workerTransactions = [
+      ..._workerTransactions,
+      ...page.items.where((t) => !knownIds.contains(t.id)),
+    ];
+    _workerLastDoc = page.lastDoc;
+    _workerHasMore = page.hasMore;
+    _workerLoadedExtraPages = true;
+    _isLoadingMoreWorker = false;
+    notifyListeners();
+  }
+
+  /// Merge the live first-page stream into the accumulated list without
+  /// dropping previously loaded pages. Newest items from the stream replace
+  /// the head; older loaded pages are preserved.
+  void _mergeFirstPage(List<MoneyTransaction> freshHead) {
+    if (!_workerLoadedExtraPages) {
+      // No pages loaded yet - take the stream head directly.
+      _workerTransactions = freshHead;
+      return;
+    }
+    // Keep everything beyond the first page; the stream head is the newest.
+    final tail = _workerTransactions.length > freshHead.length
+        ? _workerTransactions.sublist(freshHead.length)
+        : <MoneyTransaction>[];
+    _workerTransactions = [...freshHead, ...tail];
+  }
+
+  Future<void> _loadWorkerCount(String workerId) async {
+    final count = await _transactionService.getWorkerTransactionCount(workerId);
+    _workerTotalCount = count;
+    notifyListeners();
+  }
+
+  /// Load all transactions - seed from cache instantly, then refresh live.
   void loadAllTransactions() {
+    final cached = OfflineCacheService().getCachedTransactions();
+    if (cached != null) {
+      _allTransactions = cached;
+      notifyListeners();
+    }
+
     _transactionService.getAllTransactionsStream().listen(
       (transactions) {
         _allTransactions = transactions;
+        OfflineCacheService()
+            .cacheTransactions(transactions)
+            .catchError((_) {});
         notifyListeners();
       },
       onError: (error) {
@@ -251,11 +342,24 @@ class TransactionProvider with ChangeNotifier {
   /// Load today's totals
   Future<void> loadTodayTotals() async {
     try {
+      final cached = OfflineCacheService().getCachedTodayTotals();
+      if (cached != null) {
+        _todayDistributed = cached['distributed'] ?? 0.0;
+        _todayReturned = cached['returned'] ?? 0.0;
+        _todayPurchased = cached['purchased'] ?? 0.0;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Cache read failure is non-fatal: fall through to network path.
+    }
+
+    try {
       final totals = await _transactionService.getTodayTotals();
       _todayDistributed = totals['distributed'] ?? 0.0;
       _todayReturned = totals['returned'] ?? 0.0;
       _todayPurchased = totals['purchased'] ?? 0.0;
       notifyListeners();
+      OfflineCacheService().cacheTodayTotals(totals).catchError((_) {});
     } catch (e) {
       print('Error loading today totals: $e');
     }

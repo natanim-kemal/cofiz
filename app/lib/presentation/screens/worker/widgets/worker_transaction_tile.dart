@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/utils/number_formatter.dart';
@@ -19,33 +20,27 @@ class WorkerTransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     IconData icon;
-    Color color;
     String prefix;
 
     switch (transaction.type) {
       case 'distribution':
         icon = Icons.arrow_downward;
-        color = Colors.orange;
         prefix = '+';
         break;
       case 'return':
         icon = Icons.arrow_upward;
-        color = Colors.green;
         prefix = '-';
         break;
       case 'purchase':
-        icon = Icons.local_cafe;
-        color = Colors.brown;
+        icon = Icons.shopping_cart;
         prefix = '-';
         break;
       case 'transfer':
         icon = Icons.swap_horiz;
-        color = const Color(0xFFF0A04B);
         prefix = transaction.isTransferSender ? '-' : '+';
         break;
       default:
         icon = Icons.swap_horiz;
-        color = Colors.grey;
         prefix = '';
     }
 
@@ -66,7 +61,7 @@ class WorkerTransactionTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 28),
+          Icon(icon, color: AppColors.primary, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -81,25 +76,6 @@ class WorkerTransactionTile extends StatelessWidget {
                         color: isDark ? Colors.white : Colors.black87,
                       ),
                     ),
-                    if (!transaction.approved) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          AppLocalizations.of(context)!.pending,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.amber,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
                     // Show coffee type badge for purchases
                     if (transaction.type == 'purchase' &&
                         transaction.coffeeType != null) ...[
@@ -151,35 +127,20 @@ class WorkerTransactionTile extends StatelessWidget {
                               : Colors.grey.shade600,
                         ),
                       ),
-                      Icon(Icons.paid, size: 12, color: Colors.teal),
+                      const Icon(Icons.paid,
+                          size: 12, color: AppColors.primary),
                       const SizedBox(width: 2),
                       Text(
                         '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${transaction.commissionAmount!.formatted}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.teal,
+                          color: isDark ? Colors.white : Colors.black87,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ],
                 ),
-                if (transaction.notes != null && transaction.notes!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      transaction.notes!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade500,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -191,9 +152,23 @@ class WorkerTransactionTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
+              if (transaction.notes != null && transaction.notes!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    transaction.notes!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          isDark ? Colors.grey.shade500 : Colors.grey.shade500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               // Show weight and per-kilo price for purchases
               if (transaction.type == 'purchase' &&
                   transaction.coffeeWeight != null)
@@ -212,8 +187,8 @@ class WorkerTransactionTile extends StatelessWidget {
                   onTap: onApprove,
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.green,
                       borderRadius: BorderRadius.circular(8),
@@ -247,11 +222,21 @@ class WorkerTransactionTile extends StatelessWidget {
         return AppLocalizations.of(context)?.coffeePurchaseTitle ??
             'Coffee Purchase';
       case 'transfer':
+        final fromName = transaction.fromWorkerName;
+        final toName = transaction.toWorkerName;
+        if (fromName != null && toName != null) {
+          return transaction.isTransferSender
+              ? (AppLocalizations.of(context)
+                      ?.transferredTo(fromName, toName) ??
+                  '$fromName transferred to $toName')
+              : (AppLocalizations.of(context)
+                      ?.receivedFromName(toName, fromName) ??
+                  '$toName received from $fromName');
+        }
         return transaction.isTransferSender
             ? (AppLocalizations.of(context)?.transferredOut ??
                 'Transferred Out')
-            : (AppLocalizations.of(context)?.receivedFrom ??
-                'Received From');
+            : (AppLocalizations.of(context)?.receivedFrom ?? 'Received From');
       default:
         return AppLocalizations.of(context)?.transaction ?? 'Transaction';
     }

@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../main.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../widgets/background_pattern.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -40,6 +40,15 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = false);
 
       if (success) {
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        final userName = authProvider.appUser?.displayName ??
+            authProvider.user?.email ??
+            'admin';
+        await auditProvider.logLogin(
+          userId: authProvider.user?.uid ?? 'unknown',
+          userName: userName,
+        );
       } else {
         AppToast.show(authProvider.errorMessage ?? 'Login failed');
       }
@@ -74,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: InputDecoration(
                   labelText: AppLocalizations.of(context)!.email,
                   border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.email),
+                  prefixIcon: const Icon(Icons.email, color: AppColors.primary),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -109,11 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   AppToast.show(
                     success
                         ? AppLocalizations.of(context)!
-                            .passwordResetLinkSent(
-                                emailController.text.trim())
+                            .passwordResetLinkSent(emailController.text.trim())
                         : authProvider.errorMessage ??
-                            AppLocalizations.of(context)!
-                                .failedToSendResetLink,
+                            AppLocalizations.of(context)!.failedToSendResetLink,
                     success: success,
                   );
                 }
@@ -161,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Align(
                           alignment: Alignment.center,
                           child: Image.asset(
-                            'assets/icon-bg.png',
+                            'assets/icon-bgless.png',
                             width: 80,
                             height: 80,
                             fit: BoxFit.contain,
@@ -205,6 +212,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         _buildMinimalTextField(
                           controller: _emailController,
                           label: AppLocalizations.of(context)!.email,
+                          icon: Icons.mail_outline_rounded,
+                          isEmail: true,
                           isLast: false,
                           isDark: isDark,
                         )
@@ -217,6 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         _buildMinimalTextField(
                           controller: _passwordController,
                           label: AppLocalizations.of(context)!.password,
+                          icon: Icons.lock_outline_rounded,
                           isObscure: true,
                           isLast: true,
                           isDark: isDark,
@@ -298,7 +308,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildMinimalTextField({
     required TextEditingController controller,
     required String label,
+    required IconData icon,
     bool isObscure = false,
+    bool isEmail = false,
     bool isLast = false,
     required bool isDark,
   }) {
@@ -318,23 +330,22 @@ class _LoginScreenState extends State<LoginScreen> {
         if (value == null || value.trim().isEmpty) {
           return AppLocalizations.of(context)!.thisFieldRequired;
         }
-        // Email validation
-        if (label == 'Email') {
+        if (isEmail) {
           final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
           if (!emailRegex.hasMatch(value.trim())) {
             return AppLocalizations.of(context)!.validEmailRequired;
           }
         }
-        // Password validation
-        if (label == 'Password') {
-          if (value.length < 6) {
-            return AppLocalizations.of(context)!.passwordLengthError;
-          }
+        if (isObscure && value.length < 6) {
+          return AppLocalizations.of(context)!.passwordLengthError;
         }
         return null;
       },
       decoration: InputDecoration(
         labelText: label,
+        prefixIcon: Icon(icon, size: 20),
+        filled: true,
+        fillColor: isDark ? AppColors.surfaceDark : Colors.white,
         labelStyle: theme.textTheme.bodyMedium?.copyWith(
           color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
           fontSize: 14,
@@ -344,22 +355,27 @@ class _LoginScreenState extends State<LoginScreen> {
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
-        isDense: true,
-        errorStyle: const TextStyle(fontSize: 11, height: 0.8),
-        // Underline border style for minimalism
-        enabledBorder: UnderlineInputBorder(
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        errorStyle: const TextStyle(fontSize: 11, height: 1.2),
+        prefixIconColor: AppColors.primary,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(
-              color: isDark ? Colors.white24 : Colors.black.withOpacity(0.2)),
+            color: isDark ? Colors.white24 : Colors.black.withOpacity(0.1),
+          ),
         ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
         ),
-        errorBorder: UnderlineInputBorder(
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: Colors.red.shade300),
         ),
-        focusedErrorBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.red, width: 2),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.red, width: 1.6),
         ),
       ),
     );

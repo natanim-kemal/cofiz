@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/worker_model.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 
@@ -45,8 +46,7 @@ class _TransferDialogState extends State<TransferDialog> {
     final transactionProvider =
         Provider.of<TransactionProvider>(context, listen: false);
 
-    final success =
-        await transactionProvider.transferFromCollectorToCollector(
+    final success = await transactionProvider.transferFromCollectorToCollector(
       fromWorkerId: widget.sender.id,
       fromWorkerName: widget.sender.name,
       toWorkerId: widget.receiver.id,
@@ -75,7 +75,7 @@ class _TransferDialogState extends State<TransferDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    const warmOrange = Color(0xFFF0A04B);
+    const warmOrange = AppColors.primary;
     final l10n = AppLocalizations.of(context)!;
 
     return Dialog(
@@ -89,7 +89,8 @@ class _TransferDialogState extends State<TransferDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.swap_horiz, color: warmOrange, size: 40),
+                const Icon(Icons.swap_horiz,
+                    color: AppColors.primary, size: 40),
                 const SizedBox(height: 16),
                 Text(
                   l10n.transferTitle,
@@ -105,9 +106,7 @@ class _TransferDialogState extends State<TransferDialog> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: isDark
-                        ? Colors.white70
-                        : Colors.black54,
+                    color: isDark ? Colors.white70 : Colors.black54,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -120,9 +119,9 @@ class _TransferDialogState extends State<TransferDialog> {
                         RegExp(r'^\d+\.?\d{0,2}')),
                   ],
                   decoration: InputDecoration(
-                    labelText: l10n.amountWithCurrency(
-                        l10n.currency ?? 'ETB'),
-                    prefixIcon: const Icon(Icons.attach_money),
+                    labelText: l10n.amountWithCurrency(l10n.currency ?? 'ETB'),
+                    prefixIcon: const Icon(Icons.attach_money,
+                        color: AppColors.primary),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
                     filled: true,
@@ -161,12 +160,10 @@ class _TransferDialogState extends State<TransferDialog> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () => Navigator.pop(context),
+                        onPressed:
+                            _isLoading ? null : () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -181,8 +178,7 @@ class _TransferDialogState extends State<TransferDialog> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: warmOrange,
                           foregroundColor: Colors.white,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

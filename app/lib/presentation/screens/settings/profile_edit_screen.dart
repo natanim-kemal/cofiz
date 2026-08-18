@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -34,11 +35,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
-      final success = await Provider.of<AuthProvider>(context, listen: false)
-          .updateUserProfile(displayName: _nameController.text.trim());
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.updateUserProfile(
+          displayName: _nameController.text.trim());
 
       if (mounted) {
         if (success) {
+          final auditProvider =
+              Provider.of<AuditProvider>(context, listen: false);
+          await auditProvider.logUserUpdated(
+            userId: authProvider.user?.uid ?? 'unknown',
+            userName: authProvider.appUser?.displayName ?? '',
+            changes: {'displayName': _nameController.text.trim()},
+          );
           AppToast.show(
             AppLocalizations.of(context)!.profileUpdatedSuccessfully,
             success: true,
@@ -88,7 +97,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           color: AppColors.primary.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.person,
                           size: 50,
                           color: AppColors.primary,
@@ -223,7 +232,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           )
                         : Text(
                             AppLocalizations.of(context)!.saveChanges,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),

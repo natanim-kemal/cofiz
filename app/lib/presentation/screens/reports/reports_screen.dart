@@ -13,8 +13,17 @@ import '../../widgets/custom_header.dart';
 import '../../../core/services/report_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/transfer_pair_card.dart';
 
-enum _ReportKind { distribution, returnMoney, purchase, investment, sale, expense }
+enum _ReportKind {
+  distribution,
+  returnMoney,
+  purchase,
+  transfer,
+  investment,
+  sale,
+  expense
+}
 
 class _ReportEntry {
   final _ReportKind kind;
@@ -36,6 +45,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _itemsToShow = 20; // Pagination - items per page
   static const int _itemsPerLoad = 20;
   DateTime? _selectedDate; // For "Choose Date" option
+  bool _showCashFlow = false;
 
   late List<String> _dateOptions;
   late List<String> _typeOptions;
@@ -65,7 +75,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     // Ensure initial or valid selection
     if (_dateFilter == null || !_dateOptions.contains(_dateFilter)) {
-      _dateFilter = l10n.last7Days;
+      _dateFilter = l10n.allTime;
     }
 
     if (_typeFilter == null || !_typeOptions.contains(_typeFilter)) {
@@ -79,6 +89,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TransactionProvider>(context, listen: false)
           .loadAllTransactions();
+      Provider.of<IncomeProvider>(context, listen: false).loadFullRecords();
+      Provider.of<ExpenseProvider>(context, listen: false).loadFullRecords();
     });
   }
 
@@ -184,11 +196,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final entries = <_ReportEntry>[
       for (final t in allTransactions)
         _ReportEntry(
-          t.type.toLowerCase() == 'return'
-              ? _ReportKind.returnMoney
-              : t.type.toLowerCase() == 'purchase'
-                  ? _ReportKind.purchase
-                  : _ReportKind.distribution,
+          t.isTransfer
+              ? _ReportKind.transfer
+              : t.type.toLowerCase() == 'return'
+                  ? _ReportKind.returnMoney
+                  : t.type.toLowerCase() == 'purchase'
+                      ? _ReportKind.purchase
+                      : _ReportKind.distribution,
           t.createdAt,
           t,
         ),
@@ -218,8 +232,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final entries = _getFilteredEntries(
       transactionProvider.allTransactions,
-      incomeProvider.records,
-      expenseProvider.records,
+      incomeProvider.fullRecords,
+      expenseProvider.fullRecords,
       l10n,
     );
 
@@ -268,17 +282,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           print(stackTrace);
                           if (mounted) {
                             AppToast.show(
-                                '${AppLocalizations.of(context)!
-                                    .errorGeneratingReport}: $e');
+                                '${AppLocalizations.of(context)!.errorGeneratingReport}: $e');
                           }
                         }
                       },
                       icon:
                           const Icon(Icons.picture_as_pdf, color: Colors.white),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      style: IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
                 // Filters matching Search Box style
                 Row(
@@ -325,6 +343,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               onRefresh: () async {
                 Provider.of<TransactionProvider>(context, listen: false)
                     .loadAllTransactions();
+                await Provider.of<IncomeProvider>(context, listen: false)
+                    .loadFullRecords();
+                await Provider.of<ExpenseProvider>(context, listen: false)
+                    .loadFullRecords();
                 await Future.delayed(const Duration(milliseconds: 500));
               },
               child: SingleChildScrollView(
@@ -348,13 +370,40 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          AppLocalizations.of(context)!.transactions,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: theme.textTheme.bodyLarge?.color,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              _showCashFlow
+                                  ? AppLocalizations.of(context)!.cashFlow
+                                  : AppLocalizations.of(context)!.transactions,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: theme.textTheme.bodyLarge?.color,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () => setState(
+                                  () => _showCashFlow = !_showCashFlow),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: _showCashFlow
+                                      ? AppColors.primary.withOpacity(0.15)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.swap_horiz,
+                                  size: 22,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         Text(
                           '${entries.length} ${AppLocalizations.of(context)!.records}',
@@ -367,6 +416,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
 
                     if (entries.isEmpty)
                       Padding(
@@ -386,20 +436,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ),
                         ),
                       )
+                    else if (_showCashFlow)
+                      _buildCashFlowTable(entries)
                     else
                       Column(
                         children: [
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount:
-                                entries.length > _itemsToShow
-                                    ? _itemsToShow
-                                    : entries.length,
-                            itemBuilder: (context, index) {
-                              return _buildReportItem(entries[index]);
-                            },
-                          ),
+                          ..._buildReportItems(entries),
                           // Load More button
                           if (entries.length > _itemsToShow)
                             Padding(
@@ -408,8 +450,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 onPressed: _loadMore,
                                 icon: const Icon(Icons.expand_more),
                                 label: Text(
-                                  AppLocalizations.of(context)!.loadMore(
-                                      entries.length - _itemsToShow),
+                                  AppLocalizations.of(context)!.loadMore,
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppColors.primary,
@@ -459,7 +500,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return GestureDetector(
       onTap: _pickDate,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
@@ -473,7 +516,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
+            const Icon(Icons.calendar_today,
+                size: 18, color: AppColors.primary),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -517,7 +561,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
@@ -532,10 +578,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon,
-              size: 18,
-              color:
-                  isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+          Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: DropdownButtonHideUnderline(
@@ -582,8 +625,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           .toList();
 
   List<IncomeRecord> _incomeFrom(List<_ReportEntry> entries) => entries
-      .where((e) =>
-          e.kind == _ReportKind.investment || e.kind == _ReportKind.sale)
+      .where(
+          (e) => e.kind == _ReportKind.investment || e.kind == _ReportKind.sale)
       .map((e) => e.payload as IncomeRecord)
       .toList();
 
@@ -597,6 +640,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       case _ReportKind.distribution:
       case _ReportKind.returnMoney:
       case _ReportKind.purchase:
+      case _ReportKind.transfer:
         return (e.payload as MoneyTransaction).amount;
       case _ReportKind.investment:
       case _ReportKind.sale:
@@ -612,74 +656,114 @@ class _ReportsScreenState extends State<ReportsScreen> {
       case _ReportKind.expense:
         return '-';
       case _ReportKind.returnMoney:
-      case _ReportKind.purchase:
       case _ReportKind.investment:
       case _ReportKind.sale:
         return '+';
+      case _ReportKind.purchase:
+      case _ReportKind.transfer:
+        return '';
     }
   }
 
-  Widget _buildReportItem(_ReportEntry entry) {
+  Widget _buildReportItem(_ReportEntry entry,
+      {double bottomMargin = 12, VoidCallback? onTapOverride}) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final mutedColor =
+        isDark ? AppColors.textMutedDark : AppColors.textMutedLight;
 
-    Color amountColor;
     IconData icon;
     String title;
-    String typeLabel;
+    String amount;
+    String? weightLabel;
+    String? note;
+    String? subtitleOverride;
+    Color amountColor;
 
     switch (entry.kind) {
       case _ReportKind.distribution:
         final t = entry.payload as MoneyTransaction;
-        amountColor = Colors.red;
         icon = Icons.arrow_upward;
-        title = t.workerName;
-        typeLabel = t.typeDisplay;
+        title = '${l10n?.distributed ?? 'Distributed'} · ${t.workerName}';
+        amountColor = AppColors.error;
+        amount = '-${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
+        note = t.notes;
         break;
       case _ReportKind.returnMoney:
         final t = entry.payload as MoneyTransaction;
-        amountColor = Colors.green;
         icon = Icons.arrow_downward;
-        title = t.workerName;
-        typeLabel = t.typeDisplay;
+        title = '${l10n?.returned ?? 'Returned'} · ${t.workerName}';
+        amountColor = AppColors.success;
+        amount = '+${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
+        note = t.notes;
         break;
       case _ReportKind.purchase:
         final t = entry.payload as MoneyTransaction;
+        icon = Icons.shopping_cart;
+        title = '${l10n?.purchased ?? 'Purchased'} · ${t.workerName}';
         amountColor = Colors.orange;
-        icon = Icons.local_cafe;
-        title = t.workerName;
-        typeLabel = t.typeDisplay;
+        amount = '${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
+        if (t.coffeeWeight != null) {
+          weightLabel = '${t.coffeeWeight!.formatted} ${l10n?.kg ?? 'kg'}'
+              ' • '
+              '${l10n?.currency ?? 'ETB'} ${(t.pricePerKg ?? 0).formatted}';
+        }
+        note = t.notes;
+        if (note != null && note.isNotEmpty) {
+          subtitleOverride = ' · $note';
+        }
+        break;
+      case _ReportKind.transfer:
+        final t = entry.payload as MoneyTransaction;
+        icon = Icons.swap_horiz;
+        final fromName = t.fromWorkerName;
+        final toName = t.toWorkerName;
+        title = fromName != null && toName != null
+            ? (t.isTransferSender
+                ? l10n?.transferredTo(fromName, toName) ??
+                    '$fromName transferred to $toName'
+                : l10n?.receivedFromName(toName, fromName) ??
+                    '$toName received from $fromName')
+            : (t.isTransferSender
+                ? l10n?.transferredOut ?? 'Transferred Out'
+                : l10n?.receivedFrom ?? 'Received From');
+        amountColor = AppColors.primary;
+        amount = '${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
         break;
       case _ReportKind.investment:
         final r = entry.payload as IncomeRecord;
-        amountColor = Colors.green;
         icon = Icons.account_balance;
-        title = r.viewerName ?? (AppLocalizations.of(context)?.investment ??
-            'Investment');
-        typeLabel = AppLocalizations.of(context)?.investment ?? 'Investment';
+        amountColor = AppColors.success;
+        title = '${l10n?.investment ?? 'Investment'} · '
+            '${r.viewerName ?? '-'}';
+        amount = '+${l10n?.currency ?? 'ETB'} ${r.amount.formatted}';
+        note = r.description;
         break;
       case _ReportKind.sale:
         final r = entry.payload as IncomeRecord;
-        amountColor = Colors.green;
         icon = Icons.point_of_sale;
-        title = r.saleCategory ?? (AppLocalizations.of(context)?.sale ?? 'Sale');
-        typeLabel = AppLocalizations.of(context)?.sale ?? 'Sale';
+        amountColor = AppColors.success;
+        title = r.saleCategory ?? (l10n?.sale ?? 'Sale');
+        amount = '+${l10n?.currency ?? 'ETB'} ${r.amount.formatted}';
+        note = r.description;
         break;
       case _ReportKind.expense:
         final e = entry.payload as ExpenseRecord;
-        amountColor = Colors.red;
         icon = Icons.receipt_long;
+        amountColor = AppColors.error;
         title = e.expenseCategory;
-        typeLabel =
-            AppLocalizations.of(context)?.expenses ?? 'Expenses';
+        amount = '-${l10n?.currency ?? 'ETB'} ${e.amount.formatted}';
+        note = e.description;
         break;
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: bottomMargin),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -689,60 +773,337 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: amountColor,
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: InkWell(
+        onTap: onTapOverride,
+        borderRadius: BorderRadius.circular(12),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${DateFormat('MMM d, h:mm a').format(entry.createdAt)}'
+                    '${subtitleOverride ?? ''}',
+                    style: TextStyle(fontSize: 12, color: mutedColor),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  title,
+                  amount,
                   style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: theme.textTheme.bodyLarge?.color,
+                    color: amountColor,
                   ),
                 ),
-                Text(
-                  DateFormat('MMM d, h:mm a').format(entry.createdAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? AppColors.textMutedDark
-                        : AppColors.textMutedLight,
+                if (weightLabel != null)
+                  Text(
+                    weightLabel,
+                    style: TextStyle(fontSize: 10, color: mutedColor),
                   ),
-                ),
+                if (note != null && note.isNotEmpty && subtitleOverride == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      note,
+                      style: TextStyle(fontSize: 10, color: mutedColor),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${_entryPrefix(entry)}${AppLocalizations.of(context)?.currency ?? 'ETB'} ${_entryAmount(entry).formatted}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: amountColor,
-                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isTransferPair(_ReportEntry a, _ReportEntry b) {
+    if (a.kind != _ReportKind.transfer || b.kind != _ReportKind.transfer) {
+      return false;
+    }
+    final ta = a.payload as MoneyTransaction;
+    final tb = b.payload as MoneyTransaction;
+    return ta.transferId != null && ta.transferId == tb.transferId;
+  }
+
+  List<_ReportEntry> _takeWithPairs(List<_ReportEntry> entries, int limit) {
+    final chosen = <_ReportEntry>[];
+    for (var i = 0; i < entries.length && chosen.length < limit; i++) {
+      chosen.add(entries[i]);
+      if (chosen.length >= limit) break;
+      if (i + 1 < entries.length &&
+          _isTransferPair(entries[i], entries[i + 1])) {
+        chosen.add(entries[i + 1]);
+        i++;
+      }
+    }
+    return chosen;
+  }
+
+  List<Widget> _buildReportItems(List<_ReportEntry> entries) {
+    final shown = _takeWithPairs(entries, _itemsToShow);
+    final children = <Widget>[];
+    var i = 0;
+    while (i < shown.length) {
+      if (i + 1 < shown.length && _isTransferPair(shown[i], shown[i + 1])) {
+        children.add(_buildLinkedPair(shown[i], shown[i + 1]));
+        i += 2;
+      } else {
+        children.add(_buildReportItem(shown[i]));
+        i += 1;
+      }
+    }
+    return children;
+  }
+
+  Widget _buildLinkedPair(_ReportEntry a, _ReportEntry b) {
+    return TransferPairCard<_ReportEntry>(
+      first: a,
+      second: b,
+      buildRow: (item,
+              {double bottomMargin = 12, VoidCallback? onTapOverride}) =>
+          _buildReportItem(item,
+              bottomMargin: bottomMargin, onTapOverride: onTapOverride),
+    );
+  }
+
+  Widget _buildCashFlowTable(List<_ReportEntry> entries) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final mutedColor =
+        isDark ? AppColors.textMutedDark : AppColors.textMutedLight;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final l10n = AppLocalizations.of(context);
+
+    final rows = entries.where((e) => e.kind != _ReportKind.transfer).toList();
+
+    String flowOf(_ReportEntry e) {
+      switch (e.kind) {
+        case _ReportKind.distribution:
+        case _ReportKind.expense:
+          return l10n?.moneyOut ?? 'Cash Out';
+        case _ReportKind.returnMoney:
+        case _ReportKind.investment:
+        case _ReportKind.sale:
+          return l10n?.moneyIn ?? 'Cash In';
+        case _ReportKind.purchase:
+        case _ReportKind.transfer:
+          return l10n?.neutral ?? 'Neutral';
+      }
+    }
+
+    Color flowColor(_ReportEntry e) {
+      switch (e.kind) {
+        case _ReportKind.distribution:
+        case _ReportKind.expense:
+          return AppColors.error;
+        case _ReportKind.returnMoney:
+        case _ReportKind.investment:
+        case _ReportKind.sale:
+          return AppColors.success;
+        case _ReportKind.purchase:
+        case _ReportKind.transfer:
+          return mutedColor;
+      }
+    }
+
+    String whoAndWhat(_ReportEntry e) {
+      final l = l10n;
+      switch (e.kind) {
+        case _ReportKind.distribution:
+          final t = e.payload as MoneyTransaction;
+          return '${l?.distributed ?? 'Distributed'} · ${t.workerName}';
+        case _ReportKind.returnMoney:
+          final t = e.payload as MoneyTransaction;
+          return '${l?.returned ?? 'Returned'} · ${t.workerName}';
+        case _ReportKind.purchase:
+          final t = e.payload as MoneyTransaction;
+          return '${l?.purchased ?? 'Purchased'} · ${t.workerName}';
+        case _ReportKind.transfer:
+          final t = e.payload as MoneyTransaction;
+          final fromName = t.fromWorkerName;
+          final toName = t.toWorkerName;
+          return fromName != null && toName != null
+              ? '$fromName → $toName'
+              : (l?.transfer ?? 'Transfer');
+        case _ReportKind.investment:
+          final r = e.payload as IncomeRecord;
+          return '${l?.investment ?? 'Investment'} · ${r.viewerName ?? '-'}';
+        case _ReportKind.sale:
+          final r = e.payload as IncomeRecord;
+          return r.saleCategory ?? (l?.sale ?? 'Sale');
+        case _ReportKind.expense:
+          final r = e.payload as ExpenseRecord;
+          return '${r.createdByName.isNotEmpty ? r.createdByName : '-'}'
+              ' · ${r.expenseCategory}';
+      }
+    }
+
+    double net = 0;
+    for (final e in rows) {
+      switch (e.kind) {
+        case _ReportKind.distribution:
+        case _ReportKind.expense:
+          net -= _entryAmount(e);
+          break;
+        case _ReportKind.returnMoney:
+        case _ReportKind.investment:
+        case _ReportKind.sale:
+          net += _entryAmount(e);
+          break;
+        case _ReportKind.purchase:
+        case _ReportKind.transfer:
+          break;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Data rows
+          ...rows.map((e) {
+            final flow = flowOf(e);
+            final color = flowColor(e);
+            final amount = '${_entryPrefix(e)}'
+                '${l10n?.currency ?? 'ETB'} ${_entryAmount(e).formatted}';
+            final note = e.kind == _ReportKind.expense
+                ? (e.payload as ExpenseRecord).description
+                : e.kind == _ReportKind.investment || e.kind == _ReportKind.sale
+                    ? (e.payload as IncomeRecord).description
+                    : (e.payload as MoneyTransaction).notes;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      flow,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          whoAndWhat(e),
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: color,
+                              fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          DateFormat('MMM d, h:mm a').format(e.createdAt),
+                          style: TextStyle(fontSize: 11, color: mutedColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          amount,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                        if (note != null && note.isNotEmpty)
+                          Text(
+                            note,
+                            style: TextStyle(fontSize: 10, color: mutedColor),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                typeLabel,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isDark
-                      ? AppColors.textMutedDark
-                      : AppColors.textMutedLight,
-                ),
+            );
+          }),
+
+          if (rows.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Divider(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+            const SizedBox(height: 4),
+
+            // Net flow row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      l10n?.netBalance ?? 'Net Balance',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  const Expanded(flex: 3, child: SizedBox.shrink()),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      '${net >= 0 ? '+' : '-'}${l10n?.currency ?? 'ETB'} '
+                      '${net.abs().formatted}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: net >= 0 ? AppColors.success : AppColors.error,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
@@ -799,7 +1160,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             value: topBuyer.length > 10
                 ? '${topBuyer.substring(0, 10)}...'
                 : topBuyer,
-            color: Colors.amber,
+            color: AppColors.primary,
             isDark: isDark,
           ),
         ),
@@ -809,7 +1170,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             icon: Icons.trending_up,
             label: 'Avg Price',
             value: 'ETB ${avgPrice.formatted}/Kg',
-            color: Colors.purple,
+            color: AppColors.primary,
             isDark: isDark,
           ),
         ),
@@ -819,7 +1180,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             icon: Icons.paid,
             label: 'Commission',
             value: 'ETB ${totalCommission.formatted}',
-            color: Colors.teal,
+            color: AppColors.primary,
             isDark: isDark,
           ),
         ),
@@ -906,7 +1267,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.local_cafe, color: Colors.brown, size: 20),
+              const Icon(Icons.shopping_cart,
+                  color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Coffee Purchases by Type',
@@ -919,29 +1281,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-
-          // Header
-          Row(
-            children: [
-              Expanded(
-                  flex: 2, child: Text('Type', style: _headerStyle(isDark))),
-              Expanded(
-                  flex: 1,
-                  child: Text('Qty',
-                      style: _headerStyle(isDark), textAlign: TextAlign.right)),
-              Expanded(
-                  flex: 2,
-                  child: Text('Avg Price',
-                      style: _headerStyle(isDark), textAlign: TextAlign.right)),
-              Expanded(
-                  flex: 2,
-                  child: Text('Total',
-                      style: _headerStyle(isDark), textAlign: TextAlign.right)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Divider(color: isDark ? Colors.grey.shade700 : Colors.grey.shade300),
-          const SizedBox(height: 8),
 
           // Data rows
           ...coffeeData.entries.map((entry) {
@@ -1003,14 +1342,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
           }),
         ],
       ),
-    );
-  }
-
-  TextStyle _headerStyle(bool isDark) {
-    return TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
-      color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
     );
   }
 

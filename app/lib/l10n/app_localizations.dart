@@ -425,8 +425,8 @@ abstract class AppLocalizations {
   /// No description provided for @loadMore.
   ///
   /// In en, this message translates to:
-  /// **'Load More ({remaining} remaining)'**
-  String loadMore(Object remaining);
+  /// **'Load More'**
+  String get loadMore;
 
   /// No description provided for @save.
   ///
@@ -511,6 +511,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All'**
   String get all;
+
+  /// No description provided for @filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get filter;
+
+  /// No description provided for @historyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View your transaction history'**
+  String get historyDescription;
 
   /// No description provided for @type.
   ///
@@ -698,6 +710,18 @@ abstract class AppLocalizations {
   /// **'Received From'**
   String get receivedFrom;
 
+  /// No description provided for @transferredTo.
+  ///
+  /// In en, this message translates to:
+  /// **'{sender} transferred to {receiver}'**
+  String transferredTo(Object sender, Object receiver);
+
+  /// No description provided for @receivedFromName.
+  ///
+  /// In en, this message translates to:
+  /// **'{receiver} received from {sender}'**
+  String receivedFromName(Object receiver, Object sender);
+
   /// No description provided for @transferFailed.
   ///
   /// In en, this message translates to:
@@ -709,6 +733,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Record Purchase'**
   String get recordPurchase;
+
+  /// No description provided for @purchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get purchase;
 
   /// No description provided for @coffeePurchase.
   ///
@@ -1520,6 +1550,12 @@ abstract class AppLocalizations {
   /// **'Contact Support'**
   String get contactSupport;
 
+  /// No description provided for @contactDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Details'**
+  String get contactDetails;
+
   /// No description provided for @visitWebsite.
   ///
   /// In en, this message translates to:
@@ -1898,6 +1934,24 @@ abstract class AppLocalizations {
   /// **'Failed to upload receipt'**
   String get failedToUploadReceipt;
 
+  /// No description provided for @receipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt'**
+  String get receipt;
+
+  /// No description provided for @receiptDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt downloaded'**
+  String get receiptDownloaded;
+
+  /// No description provided for @failedToDownloadReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to download receipt'**
+  String get failedToDownloadReceipt;
+
   /// No description provided for @transactionCompleted.
   ///
   /// In en, this message translates to:
@@ -2087,7 +2141,7 @@ abstract class AppLocalizations {
   /// No description provided for @commissionRateInfo.
   ///
   /// In en, this message translates to:
-  /// **'(Rate: {currency} {rate} per Kg)'**
+  /// **'Rate: {currency} {rate} per Kg'**
   String commissionRateInfo(Object currency, Object rate);
 
   /// No description provided for @purchaseLocation.
@@ -2477,13 +2531,13 @@ abstract class AppLocalizations {
   /// No description provided for @moneyIn.
   ///
   /// In en, this message translates to:
-  /// **'Money In'**
+  /// **'Cash In'**
   String get moneyIn;
 
   /// No description provided for @moneyOut.
   ///
   /// In en, this message translates to:
-  /// **'Money Out'**
+  /// **'Cash Out'**
   String get moneyOut;
 
   /// No description provided for @myInvestments.
@@ -2659,6 +2713,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Filter by date'**
   String get filterByDate;
+
+  /// No description provided for @cashFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash flow'**
+  String get cashFlow;
+
+  /// No description provided for @neutral.
+  ///
+  /// In en, this message translates to:
+  /// **'Neutral'**
+  String get neutral;
+
+  /// No description provided for @tapAgainToExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap back again to exit'**
+  String get tapAgainToExit;
 }
 
 class _AppLocalizationsDelegate

@@ -100,14 +100,14 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Color get color {
-    const warmOrange = Color(0xFFF0A04B);
+    const warmOrange = AppColors.primary;
     switch (widget.type) {
       case 'distribution':
         return warmOrange;
       case 'return':
         return warmOrange;
       case 'purchase':
-        return Colors.orange;
+        return warmOrange;
       default:
         return AppColors.primary;
     }
@@ -122,11 +122,11 @@ class _TransactionDialogState extends State<TransactionDialog> {
           _receiptImage = File(pickedFile.path);
         });
       }
-      } catch (e) {
-        if (mounted) {
-          AppToast.show(
-              AppLocalizations.of(context)!.errorPickingImage(e.toString()));
-        }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(
+            AppLocalizations.of(context)!.errorPickingImage(e.toString()));
+      }
     }
   }
 
@@ -187,8 +187,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
       final existing = widget.existing!;
       final weight = double.tryParse(_weightController.text.trim());
       final price = double.tryParse(_priceController.text.trim());
-      final commission =
-          widget.type == 'purchase' ? (weight ?? 0) * widget.worker.commissionRate : null;
+      final commission = widget.type == 'purchase'
+          ? (weight ?? 0) * widget.worker.commissionRate
+          : null;
 
       final updated = MoneyTransaction(
         id: existing.id,
@@ -204,57 +205,57 @@ class _TransactionDialogState extends State<TransactionDialog> {
         coffeeType: widget.type == 'purchase'
             ? _selectedCoffeeType?.name
             : existing.coffeeType,
-        coffeeWeight: widget.type == 'purchase' ? weight : existing.coffeeWeight,
+        coffeeWeight:
+            widget.type == 'purchase' ? weight : existing.coffeeWeight,
         pricePerKg: widget.type == 'purchase' ? price : existing.pricePerKg,
-        commissionAmount: widget.type == 'purchase'
-            ? commission
-            : existing.commissionAmount,
+        commissionAmount:
+            widget.type == 'purchase' ? commission : existing.commissionAmount,
       );
       success = await transactionProvider.updateTransaction(updated);
     } else {
       switch (widget.type) {
-      case 'distribution':
-        success = await transactionProvider.distributeMoneyToWorker(
-          workerId: widget.worker.id,
-          workerName: widget.worker.name,
-          amount: amount,
-          createdBy: authProvider.user?.uid ?? 'unknown',
-          notes: notes.isEmpty ? null : notes,
-          receiptUrl: receiptUrl,
-        );
-        break;
-      case 'return':
-        success = await transactionProvider.returnMoneyFromWorker(
-          workerId: widget.worker.id,
-          workerName: widget.worker.name,
-          amount: amount,
-          createdBy: authProvider.user?.uid ?? 'unknown',
-          notes: notes.isEmpty ? null : notes,
-          receiptUrl: receiptUrl,
-        );
-        break;
-      case 'purchase':
-        // For purchase, amount is calculated from weight * price (if provided) or strictly validation
-        // But for storage, we pass specific fields.
-        final weight = double.tryParse(_weightController.text.trim());
-        final price = double.tryParse(_priceController.text.trim());
+        case 'distribution':
+          success = await transactionProvider.distributeMoneyToWorker(
+            workerId: widget.worker.id,
+            workerName: widget.worker.name,
+            amount: amount,
+            createdBy: authProvider.user?.uid ?? 'unknown',
+            notes: notes.isEmpty ? null : notes,
+            receiptUrl: receiptUrl,
+          );
+          break;
+        case 'return':
+          success = await transactionProvider.returnMoneyFromWorker(
+            workerId: widget.worker.id,
+            workerName: widget.worker.name,
+            amount: amount,
+            createdBy: authProvider.user?.uid ?? 'unknown',
+            notes: notes.isEmpty ? null : notes,
+            receiptUrl: receiptUrl,
+          );
+          break;
+        case 'purchase':
+          // For purchase, amount is calculated from weight * price (if provided) or strictly validation
+          // But for storage, we pass specific fields.
+          final weight = double.tryParse(_weightController.text.trim());
+          final price = double.tryParse(_priceController.text.trim());
 
-        // Commission = Weight * Worker's Rate
-        final commission = (weight ?? 0) * widget.worker.commissionRate;
+          // Commission = Weight * Worker's Rate
+          final commission = (weight ?? 0) * widget.worker.commissionRate;
 
-        success = await transactionProvider.recordCoffeePurchase(
-          workerId: widget.worker.id,
-          workerName: widget.worker.name,
-          amount: amount, // Total Cost (Weight * Price)
-          createdBy: authProvider.user?.uid ?? 'unknown',
-          notes: notes.isEmpty ? null : notes,
-          receiptUrl: receiptUrl,
-          coffeeType: _selectedCoffeeType?.name,
-          weight: weight,
-          pricePerKg: price,
-          commission: commission,
-        );
-        break;
+          success = await transactionProvider.recordCoffeePurchase(
+            workerId: widget.worker.id,
+            workerName: widget.worker.name,
+            amount: amount, // Total Cost (Weight * Price)
+            createdBy: authProvider.user?.uid ?? 'unknown',
+            notes: notes.isEmpty ? null : notes,
+            receiptUrl: receiptUrl,
+            coffeeType: _selectedCoffeeType?.name,
+            weight: weight,
+            pricePerKg: price,
+            commission: commission,
+          );
+          break;
       }
     }
 
@@ -291,7 +292,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Icon
-                Icon(icon, color: color, size: 40),
+                Icon(icon, color: AppColors.primary, size: 40),
 
                 const SizedBox(height: 16),
 
@@ -334,7 +335,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       labelText: AppLocalizations.of(context)!
                           .amountWithCurrency(
                               AppLocalizations.of(context)?.currency ?? 'ETB'),
-                      prefixIcon: const Icon(Icons.attach_money),
+                      prefixIcon: const Icon(Icons.attach_money,
+                          color: AppColors.primary),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                       filled: true,
@@ -342,11 +344,13 @@ class _TransactionDialogState extends State<TransactionDialog> {
                           isDark ? Colors.grey.shade800 : Colors.grey.shade50,
                     ),
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty)
+                      if (value == null || value.trim().isEmpty) {
                         return AppLocalizations.of(context)!.amountIsRequired;
+                      }
                       final val = double.tryParse(value);
-                      if (val == null || val <= 0)
+                      if (val == null || val <= 0) {
                         return AppLocalizations.of(context)!.invalidAmount;
+                      }
                       if (widget.type == 'return' &&
                           val > widget.worker.currentBalance) {
                         return AppLocalizations.of(context)!
@@ -358,10 +362,11 @@ class _TransactionDialogState extends State<TransactionDialog> {
                 ] else ...[
                   // Purchase Fields: Coffee Type, Weight & Price
                   DropdownButtonFormField<CoffeeType>(
-                    value: _selectedCoffeeType,
+                    initialValue: _selectedCoffeeType,
                     decoration: InputDecoration(
                       labelText: AppLocalizations.of(context)!.coffeeType,
-                      prefixIcon: const Icon(Icons.category),
+                      prefixIcon:
+                          const Icon(Icons.category, color: AppColors.primary),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                       filled: true,
@@ -442,7 +447,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
                     decoration: InputDecoration(
                       labelText:
                           AppLocalizations.of(context)!.totalCostCalculated,
-                      prefixIcon: const Icon(Icons.calculate),
+                      prefixIcon:
+                          const Icon(Icons.calculate, color: AppColors.primary),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                       filled: true,
@@ -510,10 +516,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.camera_alt,
-                            color: isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600),
+                        const Icon(Icons.camera_alt, color: AppColors.primary),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -533,7 +536,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
                           ),
                         ),
                         if (_receiptImage != null)
-                          const Icon(Icons.check_circle, color: Colors.green),
+                          const Icon(Icons.check_circle,
+                              color: AppColors.primary),
                       ],
                     ),
                   ),

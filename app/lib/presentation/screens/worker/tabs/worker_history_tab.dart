@@ -8,6 +8,7 @@ import '../../../../core/models/transaction_model.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/worker_transaction_tile.dart';
 import '../../../widgets/app_toast.dart';
+import '../../../widgets/custom_header.dart';
 
 class WorkerHistoryTab extends StatefulWidget {
   final Worker worker;
@@ -26,17 +27,16 @@ class WorkerHistoryTab extends StatefulWidget {
 }
 
 class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
-  int _itemsToShow = 20;
   static const int _itemsPerLoad = 20;
   bool _approving = false;
+  String? _typeFilter;
 
-  void _loadMore() {
-    setState(() {
-      _itemsToShow += _itemsPerLoad;
-    });
+  Future<void> _loadMore(TransactionProvider provider) async {
+    await provider.loadMoreWorkerTransactions(widget.worker.id);
   }
 
-  Future<void> _approveTransaction(TransactionProvider provider, String id) async {
+  Future<void> _approveTransaction(
+      TransactionProvider provider, String id) async {
     setState(() => _approving = true);
     final success = await provider.approveTransaction(id);
     if (mounted) {
@@ -86,11 +86,87 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
     }
   }
 
+  Widget _buildFilterButton() {
+    final l10n = AppLocalizations.of(context)!;
+    return PopupMenuButton<String?>(
+      tooltip: l10n.filter,
+      icon: Icon(
+        Icons.filter_list,
+        color: _typeFilter != null
+            ? AppColors.primary
+            : (widget.isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+        size: 20,
+      ),
+      onSelected: (value) => setState(() => _typeFilter = value),
+      itemBuilder: (context) => [
+        PopupMenuItem<String?>(
+          value: null,
+          child: Text(
+            l10n.all,
+            style: TextStyle(
+              fontWeight: _typeFilter == null ? FontWeight.bold : null,
+            ),
+          ),
+        ),
+        const PopupMenuDivider(),
+        ...[
+          l10n.distribute,
+          l10n.returnMoney,
+          l10n.coffeePurchase,
+          l10n.transfer,
+        ].map((type) => PopupMenuItem<String?>(
+              value: type,
+              child: Text(
+                type,
+                style: TextStyle(
+                  fontWeight: _typeFilter == type ? FontWeight.bold : null,
+                ),
+              ),
+            )),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CustomHeader(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                AppLocalizations.of(context)!.navHistory,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                AppLocalizations.of(context)!.historyDescription,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _buildContent(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Consumer<TransactionProvider>(
       builder: (context, provider, _) {
         final allTransactions = provider.workerTransactions;
+        final l10n = AppLocalizations.of(context)!;
 
         if (allTransactions.isEmpty) {
           return Center(
@@ -99,12 +175,10 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.receipt_long,
                     size: 64,
-                    color: widget.isDark
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade400,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -130,16 +204,33 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
           );
         }
 
-        // Paginate transactions
-        final transactions = allTransactions.length > _itemsToShow
-            ? allTransactions.sublist(0, _itemsToShow)
-            : allTransactions;
-        final hasMore = allTransactions.length > _itemsToShow;
-        final remaining = allTransactions.length - _itemsToShow;
+        // Paginate transactions (backend cursor-driven)
+        final transactions = allTransactions;
+        final hasMore = provider.hasMoreWorkerTransactions;
+        final isLoadingMore = provider.isLoadingMoreWorkerTransactions;
+
+        bool matchesFilter(MoneyTransaction tx) {
+          switch (_typeFilter) {
+            case null:
+              return true;
+            case _ when _typeFilter == l10n.distribute:
+              return tx.type == 'distribution';
+            case _ when _typeFilter == l10n.returnMoney:
+              return tx.type == 'return';
+            case _ when _typeFilter == l10n.coffeePurchase:
+              return tx.type == 'purchase';
+            case _ when _typeFilter == l10n.transfer:
+              return tx.isTransfer;
+            default:
+              return true;
+          }
+        }
+
+        final filteredTransactions = transactions.where(matchesFilter).toList();
 
         // Group transactions by date
         final groupedTransactions = <String, List<MoneyTransaction>>{};
-        for (final tx in transactions) {
+        for (final tx in filteredTransactions) {
           final dateKey = DateFormat('MMMM d, yyyy').format(tx.createdAt);
           groupedTransactions.putIfAbsent(dateKey, () => []).add(tx);
         }
@@ -158,7 +249,8 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                   children: [
                     Text(
                       AppLocalizations.of(context)!.showingTransactions(
-                          '${transactions.length}', '${allTransactions.length}'),
+                          '${transactions.length}',
+                          '${provider.workerTransactionTotalCount}'),
                       style: TextStyle(
                         fontSize: 12,
                         color: widget.isDark
@@ -197,15 +289,23 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          dateKey,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: widget.isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                          ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                dateKey,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: widget.isDark
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                            if (entry.key == groupedTransactions.keys.first)
+                              _buildFilterButton(),
+                          ],
                         ),
                       ),
                       ...dayTransactions.map((tx) => WorkerTransactionTile(
@@ -217,8 +317,8 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                                         ? () => _approveTransfer(
                                             provider, tx.transferId!)
                                         : null)
-                                    : () => _approveTransaction(
-                                        provider, tx.id))
+                                    : () =>
+                                        _approveTransaction(provider, tx.id))
                                 : null,
                           )),
                     ],
@@ -231,10 +331,17 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: OutlinedButton.icon(
-                        onPressed: _loadMore,
-                        icon: const Icon(Icons.expand_more),
-                        label: Text(AppLocalizations.of(context)!
-                            .loadMore('$remaining')),
+                        onPressed:
+                            isLoadingMore ? null : () => _loadMore(provider),
+                        icon: isLoadingMore
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: AppColors.primary),
+                              )
+                            : const Icon(Icons.expand_more),
+                        label: Text(AppLocalizations.of(context)!.loadMore),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: BorderSide(
@@ -248,7 +355,7 @@ class _WorkerHistoryTabState extends State<WorkerHistoryTab> {
                       ),
                     ),
                   )
-                else if (allTransactions.length > _itemsPerLoad)
+                else if (transactions.length >= _itemsPerLoad)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(

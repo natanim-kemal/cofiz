@@ -63,7 +63,7 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
         title: Text(AppLocalizations.of(context)?.aboutCofiz ?? 'About Cofiz'),
         backgroundColor: theme.appBarTheme.backgroundColor ?? AppColors.primary,
         foregroundColor: Colors.white,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
@@ -74,7 +74,7 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
               children: [
                 const SizedBox(height: 20),
                 Image.asset(
-                  'assets/icon-bg.png',
+                  'assets/icon-bgless.png',
                   width: 100,
                   height: 100,
                 ),

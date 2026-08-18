@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'connectivity_service.dart';
 import 'offline_cache_service.dart';
-import '../providers/transaction_provider.dart';
-import '../providers/worker_provider.dart';
 
 class OfflineSyncService {
   static final OfflineSyncService _instance = OfflineSyncService._internal();

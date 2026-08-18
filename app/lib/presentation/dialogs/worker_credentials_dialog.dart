@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../widgets/app_toast.dart';
 
@@ -25,7 +26,7 @@ class WorkerCredentialsDialog extends StatelessWidget {
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.check_circle, color: Colors.green),
+          const Icon(Icons.check_circle, color: AppColors.primary),
           const SizedBox(width: 12),
           Text(AppLocalizations.of(context)!.workerAccountCreated),
         ],
@@ -63,12 +64,12 @@ class WorkerCredentialsDialog extends StatelessWidget {
         if (phone != null)
           TextButton.icon(
             onPressed: () => _sendViaSMS(context),
-            icon: const Icon(Icons.sms),
+            icon: const Icon(Icons.sms, color: AppColors.primary),
             label: Text(AppLocalizations.of(context)!.sendSms),
           ),
         TextButton.icon(
           onPressed: () => _copyToClipboard(context),
-          icon: const Icon(Icons.copy),
+          icon: const Icon(Icons.copy, color: AppColors.primary),
           label: Text(AppLocalizations.of(context)!.copy),
         ),
         ElevatedButton(
@@ -133,8 +134,7 @@ class WorkerCredentialsDialog extends StatelessWidget {
 
     launchUrl(Uri.parse(smsUri)).then((success) {
       if (!success) {
-        AppToast.show(
-            AppLocalizations.of(context)!.couldNotOpenSms);
+        AppToast.show(AppLocalizations.of(context)!.couldNotOpenSms);
       }
     });
   }

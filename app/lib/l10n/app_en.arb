@@ -71,6 +71,8 @@
   "offline": "Offline",
   "busy": "Busy",
   "all": "All",
+  "filter": "Filter",
+  "historyDescription": "View your transaction history",
   "type": "Type",
   "qty": "Qty",
   "avgPrice": "Avg Price",
@@ -104,8 +106,23 @@
   "transferTitle": "Transfer Money",
   "transferredOut": "Transferred Out",
   "receivedFrom": "Received From",
+  "transferredTo": "{sender} transferred to {receiver}",
+  "@transferredTo": {
+    "placeholders": {
+      "sender": {},
+      "receiver": {}
+    }
+  },
+  "receivedFromName": "{receiver} received from {sender}",
+  "@receivedFromName": {
+    "placeholders": {
+      "receiver": {},
+      "sender": {}
+    }
+  },
   "transferFailed": "Failed to record transfer",
   "recordPurchase": "Record Purchase",
+  "purchase": "Purchase",
   "coffeePurchase": "Coffee Purchase",
 
   "transactionCompletedSuccessfully": "Transaction completed successfully",
@@ -272,6 +289,7 @@
   "legal": "Legal",
   "support": "Support",
   "contactSupport": "Contact Support",
+  "contactDetails": "Contact Details",
   "visitWebsite": "Visit Website",
   "close": "Close",
   "copyright": "© 2026 Cofiz app. All rights reserved.",
@@ -376,6 +394,9 @@
   "transaction": "Transaction",
   "errorPickingImage": "Error picking image: {error}",
   "failedToUploadReceipt": "Failed to upload receipt",
+  "receipt": "Receipt",
+  "receiptDownloaded": "Receipt downloaded",
+  "failedToDownloadReceipt": "Failed to download receipt",
   "transactionCompleted": "Transaction completed successfully",
   "failedToComplete": "Failed to complete transaction",
   "amountWithCurrency": "Amount ({currency})",
@@ -405,7 +426,7 @@
   "recentActivity": "Recent Activity",
   "viewAll": "View All",
   "showingTransactions": "Showing {count} of {total} transactions",
-  "loadMore": "Load More ({remaining} remaining)",
+  "loadMore": "Load More",
   "endOfTransactions": "— End of transactions —",
   "lowBalanceWarning": "Low balance - please return funds",
   "balanceGood": "Balance looks good",
@@ -427,7 +448,7 @@
   "pricePerKgLabel": "Price/Kg ({currency}) *",
   "totalAmount": "Total Amount:",
   "yourCommission": "Your Commission:",
-  "commissionRateInfo": "(Rate: {currency} {rate} per Kg)",
+  "commissionRateInfo": "Rate: {currency} {rate} per Kg",
   "purchaseLocation": "Purchase Location",
   "noAreasConfigured": "No areas configured. Add areas in Settings.",
   "placeLocationLabel": "Place / Location (if not in list above)",
@@ -494,8 +515,8 @@
   "manageExpenseCategories": "Manage Expense Categories",
   "manageSaleCategories": "Manage Sale Categories",
   "manualSales": "Manual Sales",
-  "moneyIn": "Money In",
-  "moneyOut": "Money Out",
+"moneyIn": "Cash In",
+  "moneyOut": "Cash Out",
   "myInvestments": "My Investments",
   "noViewersFound": "No viewers found",
   "recordExpense": "Record Expense",
@@ -524,5 +545,8 @@
   "searchCollector": "Search collectors",
   "noCollectorsFound": "No collectors found",
   "enterSourceName": "Type the source name",
-  "filterByDate": "Filter by date"
+  "filterByDate": "Filter by date",
+  "cashFlow": "Cash flow",
+  "neutral": "Neutral",
+  "tapAgainToExit": "Tap back again to exit"
 }

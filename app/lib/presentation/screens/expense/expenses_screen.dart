@@ -20,11 +20,23 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
-  int _itemsToShow = 20;
-  static const int _itemsPerLoad = 20;
+  DateTime? _selectedDate;
 
-  void _loadMore() {
-    setState(() => _itemsToShow += _itemsPerLoad);
+  Future<void> _loadMore(ExpenseProvider provider) async {
+    await provider.loadMore();
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
   }
 
   @override
@@ -98,11 +110,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         children: [
                           Text(
                             l10n.totalExpenses,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
-                              color: isDark
-                                  ? AppColors.textMutedDark
-                                  : AppColors.textMutedLight,
+                              color: AppColors.primary,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -136,16 +146,43 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      l10n.expenseRecords,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: theme.textTheme.bodyLarge?.color,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.expenseRecords,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: theme.textTheme.bodyLarge?.color,
+                            ),
+                          ),
+                        ),
+                        if (_selectedDate != null)
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() => _selectedDate = null);
+                            },
+                            icon: const Icon(Icons.close, size: 16),
+                            label: Text(
+                              DateFormat('MMM d, yyyy').format(_selectedDate!),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                            ),
+                          )
+                        else
+                          IconButton(
+                            tooltip: l10n.filterByDate,
+                            onPressed: _pickDate,
+                            icon: const Icon(Icons.filter_alt),
+                            color: AppColors.primary,
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    if (provider.records.isEmpty)
+                    if (provider.records.isEmpty ||
+                        _filteredRecords(provider.records).isEmpty)
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.all(32),
@@ -160,19 +197,25 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         ),
                       )
                     else ...[
-                      ...provider.records
-                          .take(_itemsToShow)
+                      ..._filteredRecords(provider.records)
                           .map((r) => _buildRecordTile(context, r)),
-                      if (provider.records.length > _itemsToShow)
+                      if (provider.hasMoreRecords)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: OutlinedButton.icon(
-                            onPressed: _loadMore,
-                            icon: const Icon(Icons.expand_more),
-                            label: Text(
-                              l10n.loadMore(provider.records.length -
-                                  _itemsToShow),
-                            ),
+                            onPressed: provider.isLoadingMore
+                                ? null
+                                : () => _loadMore(provider),
+                            icon: provider.isLoadingMore
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primary),
+                                  )
+                                : const Icon(Icons.expand_more),
+                            label: Text(l10n.loadMore),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: BorderSide(
@@ -185,12 +228,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             ),
                           ),
                         )
-                      else if (provider.records.length > _itemsPerLoad)
+                      else if (provider.totalRecordCount > 20)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Text(
                             l10n.showingAllTransactions(
-                                provider.records.length),
+                                provider.totalRecordCount),
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark
@@ -223,6 +266,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  List<ExpenseRecord> _filteredRecords(List<ExpenseRecord> records) {
+    if (_selectedDate == null) return records;
+    return records
+        .where((r) =>
+            r.createdAt.year == _selectedDate!.year &&
+            r.createdAt.month == _selectedDate!.month &&
+            r.createdAt.day == _selectedDate!.day)
+        .toList();
+  }
+
   Widget _buildRecordTile(BuildContext context, ExpenseRecord record) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -242,16 +295,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withOpacity(0.1),
-                ),
-                child: const Icon(Icons.receipt_long,
-                    color: AppColors.primary, size: 20),
-              ),
+              const Icon(Icons.receipt_long,
+                  color: AppColors.primary, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -278,13 +323,32 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   ],
                 ),
               ),
-              Text(
-                '-${l10n.currency ?? 'ETB'} ${record.amount.formatted}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '-${l10n.currency ?? 'ETB'} ${record.amount.formatted}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  if (record.description != null &&
+                      record.description!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      record.description!,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.textMutedDark
+                            : AppColors.textMutedLight,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -307,8 +371,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Future<void> _deleteRecord(
-      BuildContext context, ExpenseRecord record) async {
+  Future<void> _deleteRecord(BuildContext context, ExpenseRecord record) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -323,8 +386,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child:
-                Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -371,14 +433,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 _buildActionChip(
                   icon: Icons.edit_outlined,
                   label: l10n.edit,
-                  color: const Color(0xFFF0A04B),
+                  color: AppColors.primary,
                   value: 'edit',
                 ),
                 const SizedBox(width: 12),
                 _buildActionChip(
                   icon: Icons.delete_outline,
                   label: l10n.delete,
-                  color: const Color(0xFFF0A04B),
+                  color: AppColors.primary,
                   value: 'delete',
                 ),
               ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -63,6 +64,17 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
           double.tryParse(_limitController.text) ?? 5000.0,
         );
 
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        await auditProvider.logSettingsChanged(
+          userId: authProvider.user?.uid ?? 'unknown',
+          userName: authProvider.appUser?.displayName ??
+              authProvider.user?.email ??
+              '',
+          setting: 'business_settings',
+        );
+
         if (mounted) {
           Navigator.pop(context);
           AppToast.show(
@@ -72,9 +84,7 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
         }
       } catch (e) {
         if (mounted) {
-          AppToast.show(
-              '${AppLocalizations.of(context)!
-                  .errorSavingSettings('e')}');
+          AppToast.show(AppLocalizations.of(context)!.errorSavingSettings('e'));
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -143,10 +153,12 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
                 keyboardType: TextInputType.number,
                 readOnly: !canEdit,
                 validator: (v) {
-                  if (v == null || v.isEmpty)
+                  if (v == null || v.isEmpty) {
                     return AppLocalizations.of(context)!.required;
-                  if (double.tryParse(v) == null)
+                  }
+                  if (double.tryParse(v) == null) {
                     return AppLocalizations.of(context)!.invalidNumber;
+                  }
                   return null;
                 },
               ),
@@ -188,7 +200,7 @@ class _BusinessSettingsScreenState extends State<BusinessSettingsScreen> {
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
       title,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
         color: AppColors.primary,

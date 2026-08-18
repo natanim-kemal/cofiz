@@ -105,6 +105,30 @@ class AuditProvider with ChangeNotifier {
     );
   }
 
+  /// Log transaction deletion
+  Future<void> logTransactionDeleted({
+    required String userId,
+    required String userName,
+    required String transactionId,
+    required String transactionType,
+    required double amount,
+    required String workerName,
+    bool wasUnconfirmed = false,
+  }) async {
+    await _auditService.log(
+      userId: userId,
+      userName: userName,
+      action: AuditAction.transactionDeleted,
+      targetId: transactionId,
+      targetName: workerName,
+      metadata: {
+        'type': transactionType,
+        'amount': amount,
+        'wasUnconfirmed': wasUnconfirmed,
+      },
+    );
+  }
+
   /// Log user account creation (for workers with login)
   Future<void> logUserCreated({
     required String adminUserId,
@@ -125,6 +149,20 @@ class AuditProvider with ChangeNotifier {
     );
   }
 
+  /// Log user profile update
+  Future<void> logUserUpdated({
+    required String userId,
+    required String userName,
+    Map<String, dynamic>? changes,
+  }) async {
+    await _auditService.log(
+      userId: userId,
+      userName: userName,
+      action: AuditAction.userUpdated,
+      metadata: changes,
+    );
+  }
+
   /// Log data export
   Future<void> logDataExported({
     required String userId,
@@ -139,6 +177,46 @@ class AuditProvider with ChangeNotifier {
       metadata: {
         'exportType': exportType,
         if (recordCount != null) 'recordCount': recordCount,
+      },
+    );
+  }
+
+  /// Log income recording
+  Future<void> logIncomeRecorded({
+    required String userId,
+    required String userName,
+    required String incomeId,
+    required String kind,
+    required double amount,
+  }) async {
+    await _auditService.log(
+      userId: userId,
+      userName: userName,
+      action: AuditAction.incomeRecorded,
+      targetId: incomeId,
+      metadata: {
+        'kind': kind,
+        'amount': amount,
+      },
+    );
+  }
+
+  /// Log expense recording
+  Future<void> logExpenseRecorded({
+    required String userId,
+    required String userName,
+    required String expenseId,
+    required String category,
+    required double amount,
+  }) async {
+    await _auditService.log(
+      userId: userId,
+      userName: userName,
+      action: AuditAction.expenseRecorded,
+      targetId: expenseId,
+      metadata: {
+        'category': category,
+        'amount': amount,
       },
     );
   }

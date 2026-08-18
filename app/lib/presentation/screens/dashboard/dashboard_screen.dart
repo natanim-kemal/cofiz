@@ -61,96 +61,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await workerProvider.refresh();
-          await transactionProvider.loadTodayTotals();
-          transactionProvider.loadAllTransactions();
-        },
-        child: Column(
-          children: [
-            CustomHeader(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            localizations?.welcomeBack ?? 'Welcome Back,',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                            ),
+      body: Column(
+        children: [
+          CustomHeader(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          localizations?.welcomeBack ?? 'Welcome Back,',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white70,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            authProvider.user?.displayName ?? 'User',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          authProvider.user?.displayName ?? 'User',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          // Admin Ping All Button
-                          if (authProvider.isAdmin)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: IconButton(
-                                icon: const Icon(Icons.campaign,
-                                    color: Colors.white),
-                                tooltip: localizations?.pingAllWorkers ??
-                                    'Ping All Collectors',
-                                onPressed: () =>
-                                    _showPingAllDialog(context, authProvider),
-                              ),
-                            ),
-                          NotificationBadge(
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.notifications_outlined,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                              tooltip: localizations?.notifications ??
-                                  'Notifications',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const NotificationsScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
+                        ),
+                      ],
                     ),
+                    Row(
+                      children: [
+                        // Admin Ping All Button
+                        if (authProvider.isAdmin)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: IconButton(
+                              icon: const Icon(Icons.campaign,
+                                  color: Colors.white),
+                              tooltip: localizations?.pingAllWorkers ??
+                                  'Ping All Collectors',
+                              onPressed: () =>
+                                  _showPingAllDialog(context, authProvider),
+                            ),
+                          ),
+                        NotificationBadge(
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                            tooltip:
+                                localizations?.notifications ?? 'Notifications',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const NotificationsScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            Expanded(
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await workerProvider.refresh();
+                await transactionProvider.loadTodayTotals();
+                transactionProvider.loadAllTransactions();
+              },
               child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           _buildCompactStat(
                             context,
-                            Icons.trending_up,
+                            Icons.account_balance,
                             '${localizations?.currency ?? 'ETB'} ${incomeProvider.totalIncome.formattedCompact}',
                             localizations?.investment ?? 'Investment',
                             AppColors.primary,
@@ -200,7 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             AppColors.primary,
                             onTap: () => MainLayout.navigateTo(1),
                           ),
-_buildContainerDivider(isDark),
+                          _buildContainerDivider(isDark),
                           _buildCompactStat(
                             context,
                             Icons.receipt_long,
@@ -211,8 +212,7 @@ _buildContainerDivider(isDark),
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ExpensesScreen(),
+                                  builder: (context) => const ExpensesScreen(),
                                 ),
                               );
                             },
@@ -269,9 +269,8 @@ _buildContainerDivider(isDark),
                                 ),
                               ),
                               IconButton(
-                                onPressed: () => setState(
-                                    () => _showTotalActivity =
-                                        !_showTotalActivity),
+                                onPressed: () => setState(() =>
+                                    _showTotalActivity = !_showTotalActivity),
                                 icon: const Icon(
                                   Icons.swap_horiz,
                                   color: Colors.white,
@@ -288,7 +287,7 @@ _buildContainerDivider(isDark),
                             children: [
                               Expanded(
                                 child: _buildTappableStat(
-                                  label: localizations?.moneyIn ?? 'Money In',
+                                  label: localizations?.moneyIn ?? 'Cash In',
                                   value: _showTotalActivity
                                       ? '${localizations?.currency ?? "ETB"} ${_totalMoneyIn(transactionProvider, incomeProvider, expenseProvider).formatted}'
                                       : '${localizations?.currency ?? "ETB"} ${_todayMoneyIn(transactionProvider, incomeProvider, expenseProvider).formatted}',
@@ -308,7 +307,7 @@ _buildContainerDivider(isDark),
                               ),
                               Expanded(
                                 child: _buildTappableStat(
-                                  label: localizations?.moneyOut ?? 'Money Out',
+                                  label: localizations?.moneyOut ?? 'Cash Out',
                                   value: _showTotalActivity
                                       ? '${localizations?.currency ?? "ETB"} ${_totalMoneyOut(transactionProvider, expenseProvider).formatted}'
                                       : '${localizations?.currency ?? "ETB"} ${_todayMoneyOut(transactionProvider, expenseProvider).formatted}',
@@ -324,7 +323,7 @@ _buildContainerDivider(isDark),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          Divider(color: Colors.white24),
+                          const Divider(color: Colors.white24),
                           const SizedBox(height: 12),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -394,8 +393,8 @@ _buildContainerDivider(isDark),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -451,7 +450,7 @@ _buildContainerDivider(isDark),
               Expanded(
                 child: _buildEntryButton(
                   Icons.shopping_cart,
-                  localizations?.recordPurchase ?? 'Purchase',
+                  localizations?.purchase ?? 'Purchase',
                   () => _pickWorkerForEntry('purchase'),
                 ),
               ),
@@ -462,9 +461,8 @@ _buildContainerDivider(isDark),
     );
   }
 
-  Widget _buildEntryButton(
-      IconData icon, String label, VoidCallback onTap) {
-    const warmOrange = Color(0xFFF0A04B);
+  Widget _buildEntryButton(IconData icon, String label, VoidCallback onTap) {
+    const warmOrange = AppColors.primary;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -482,7 +480,7 @@ _buildContainerDivider(isDark),
             const SizedBox(height: 6),
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: warmOrange,
@@ -555,10 +553,7 @@ _buildContainerDivider(isDark),
 
   double _todayMoneyIn(
       TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
-    return tp.todayReturned +
-        tp.todayPurchased +
-        ip.todayInvestmentIncome +
-        ip.todayManualSales;
+    return tp.todayReturned + ip.todayInvestmentIncome + ip.todayManualSales;
   }
 
   double _todayMoneyOut(TransactionProvider tp, ExpenseProvider ep) {
@@ -574,18 +569,10 @@ _buildContainerDivider(isDark),
       TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
     final transactions = tp.allTransactions;
     double returned = 0;
-    double purchased = 0;
     for (final t in transactions) {
-      switch (t.type.toLowerCase()) {
-        case 'return':
-          returned += t.amount;
-          break;
-        case 'purchase':
-          purchased += t.amount;
-          break;
-      }
+      if (t.type.toLowerCase() == 'return') returned += t.amount;
     }
-    return returned + purchased + ip.totalInvestments + ip.totalSales;
+    return returned + ip.totalInvestments + ip.totalSales;
   }
 
   double _totalMoneyOut(TransactionProvider tp, ExpenseProvider ep) {
@@ -623,9 +610,7 @@ _buildContainerDivider(isDark),
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected
-                ? const Color(0xFFF0A04B)
-                : Colors.transparent,
+            color: selected ? const Color(0xFFF0A04B) : Colors.transparent,
             width: 1.5,
           ),
         ),
@@ -672,7 +657,7 @@ _buildContainerDivider(isDark),
           label,
           style: const TextStyle(
             fontSize: 13.2,
-            color: Color(0xFFF0A04B),
+            color: AppColors.primary,
             fontWeight: FontWeight.w600,
           ),
         ),

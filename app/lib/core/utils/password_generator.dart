@@ -10,7 +10,7 @@ class PasswordGenerator {
   /// Format: Mix of uppercase, lowercase, and numbers
   static String generate({int length = 8}) {
     final random = Random.secure();
-    final allChars = _uppercase + _lowercase + _numbers;
+    const allChars = _uppercase + _lowercase + _numbers;
 
     String password = '';
 

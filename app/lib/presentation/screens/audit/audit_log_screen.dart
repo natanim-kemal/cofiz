@@ -257,7 +257,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey.shade800 : Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -354,6 +354,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         return Icons.delete;
       case AuditAction.transactionCreated:
         return Icons.attach_money;
+      case AuditAction.transactionDeleted:
+        return Icons.delete_forever;
       case AuditAction.incomeRecorded:
         return Icons.trending_up;
       case AuditAction.expenseRecorded:

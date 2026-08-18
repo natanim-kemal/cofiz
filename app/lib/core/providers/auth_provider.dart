@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
+import '../services/offline_cache_service.dart';
 import '../models/user_model.dart';
 
 enum AuthStatus {
@@ -145,6 +146,8 @@ class AuthProvider with ChangeNotifier {
 
       await _authService.signOut();
 
+      await OfflineCacheService().clearAllCache();
+
       // Explicitly clear all user data
       _user = null;
       _appUser = null;
@@ -172,6 +175,9 @@ class AuthProvider with ChangeNotifier {
       _userRole = null;
       _workerId = null;
       _status = AuthStatus.unauthenticated;
+      try {
+        await OfflineCacheService().clearAllCache();
+      } catch (_) {}
       notifyListeners();
     }
   }
@@ -226,6 +232,22 @@ class AuthProvider with ChangeNotifier {
 
       // Refresh user data
       _user = _authService.currentUser;
+
+      // Persist to Firestore so appUser reflects the change app-wide
+      final uid = _user?.uid;
+      if (uid != null) {
+        final updates = <String, dynamic>{};
+        if (displayName != null) updates['displayName'] = displayName;
+        if (photoUrl != null) updates['photoUrl'] = photoUrl;
+        if (updates.isNotEmpty) {
+          await _firestore.collection('users').doc(uid).update(updates);
+        }
+        if (_appUser != null) {
+          _appUser =
+              _appUser!.copyWith(displayName: displayName, photoUrl: photoUrl);
+        }
+      }
+
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
