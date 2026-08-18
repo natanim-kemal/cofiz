@@ -128,24 +128,28 @@ void main() {
     expect(OfflineCacheService().getPendingOperations(), isEmpty);
   });
 
-  test('failing op leaves only itself queued after a sync pass', () async {
-    await seedTx('s1', approved: false, transferId: 'tr-1');
-    await seedTx('r1', approved: false, transferId: 'tr-1');
+  test('failing op leaves only itself queued while later ops drain', () async {
+    await seedTx('t1', approved: false);
+    await seedTx('t2', approved: false);
     await OfflineCacheService().queueOperation({
       'type': 'approveTransaction',
       'transactionId': 'missing',
     });
     await OfflineCacheService().queueOperation({
-      'type': 'approveTransfer',
-      'transferId': 'tr-1',
+      'type': 'approveTransaction',
+      'transactionId': 't1',
+    });
+    await OfflineCacheService().queueOperation({
+      'type': 'approveTransaction',
+      'transactionId': 't2',
     });
 
     await OfflineSyncService().syncPendingOperations();
 
-    final s1 = await fake.collection('transactions').doc('s1').get();
-    final r1 = await fake.collection('transactions').doc('r1').get();
-    expect(s1.data()?['approved'], isTrue);
-    expect(r1.data()?['approved'], isTrue);
+    final t1 = await fake.collection('transactions').doc('t1').get();
+    final t2 = await fake.collection('transactions').doc('t2').get();
+    expect(t1.data()?['approved'], isTrue);
+    expect(t2.data()?['approved'], isTrue);
     final remaining = OfflineCacheService().getPendingOperations();
     expect(remaining, hasLength(1));
     expect(remaining.single['type'], 'approveTransaction');
