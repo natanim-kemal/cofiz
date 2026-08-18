@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'connectivity_service.dart';
 import 'offline_cache_service.dart';
@@ -9,6 +10,14 @@ class OfflineSyncService {
 
   final ConnectivityService _connectivity = ConnectivityService();
   final OfflineCacheService _cache = OfflineCacheService();
+
+  FirebaseFirestore? _firestore;
+
+  /// Production uses FirebaseFirestore.instance; tests inject a fake.
+  FirebaseFirestore get firestore => _firestore ??= FirebaseFirestore.instance;
+
+  @visibleForTesting
+  set firestore(FirebaseFirestore value) => _firestore = value;
 
   bool _isSyncing = false;
   bool get isSyncing => _isSyncing;
@@ -57,16 +66,40 @@ class OfflineSyncService {
   }
 
   Future<void> _executeOperation(Map<String, dynamic> operation) async {
-    // This would need to be injected with providers
-    // For now, we'll just log it
-    debugPrint('Executing: ${operation['type']}');
-
-    // In a real implementation, you would:
-    // - Get the appropriate provider
-    // - Call the service method with the cached data
-    // - Handle success/failure
-
-    throw UnimplementedError('Sync execution needs provider injection');
+    final type = operation['type'] as String;
+    switch (type) {
+      case 'approveTransaction':
+        await firestore
+            .collection('transactions')
+            .doc(operation['transactionId'] as String)
+            .update({'approved': true});
+        break;
+      case 'approveTransfer':
+        final snapshot = await firestore
+            .collection('transactions')
+            .where('transferId', isEqualTo: operation['transferId'] as String)
+            .get();
+        final batch = firestore.batch();
+        for (final doc in snapshot.docs) {
+          batch.update(doc.reference, {'approved': true});
+        }
+        await batch.commit();
+        break;
+      case 'approveAll':
+        final snapshot = await firestore
+            .collection('transactions')
+            .where('workerId', isEqualTo: operation['workerId'] as String)
+            .where('approved', isEqualTo: false)
+            .get();
+        final batch = firestore.batch();
+        for (final doc in snapshot.docs) {
+          batch.update(doc.reference, {'approved': true});
+        }
+        await batch.commit();
+        break;
+      default:
+        throw UnsupportedError('Unknown operation type: $type');
+    }
   }
 
   Future<void> queueTransaction({
