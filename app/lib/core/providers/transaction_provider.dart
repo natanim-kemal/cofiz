@@ -6,7 +6,10 @@ import '../services/transaction_service.dart';
 import '../services/offline_cache_service.dart';
 
 class TransactionProvider with ChangeNotifier {
-  final TransactionService _transactionService = TransactionService();
+  final TransactionService _transactionService;
+
+  TransactionProvider({TransactionService? transactionService})
+      : _transactionService = transactionService ?? TransactionService();
 
   static const int _workerPageSize = 20;
 
@@ -67,6 +70,12 @@ class TransactionProvider with ChangeNotifier {
     );
 
     _loadWorkerCount(workerId);
+  }
+
+  /// Test seam: seed the in-memory worker transaction list directly.
+  @visibleForTesting
+  void debugSetWorkerTransactions(List<MoneyTransaction> transactions) {
+    _workerTransactions = List.of(transactions);
   }
 
   /// Load the next page of worker transactions from the backend cursor.
@@ -369,6 +378,7 @@ class TransactionProvider with ChangeNotifier {
   Future<bool> approveTransaction(String transactionId) async {
     try {
       await _transactionService.approveTransaction(transactionId);
+      _flipApproved((t) => t.id == transactionId);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -381,6 +391,7 @@ class TransactionProvider with ChangeNotifier {
   Future<bool> approveAllForWorker(String workerId) async {
     try {
       await _transactionService.approveAllForWorker(workerId);
+      _flipApproved((t) => t.workerId == workerId && !t.approved);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -393,12 +404,31 @@ class TransactionProvider with ChangeNotifier {
   Future<bool> approveTransfer(String transferId) async {
     try {
       await _transactionService.approveTransfer(transferId);
+      _flipApproved((t) => t.transferId == transferId);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
       return false;
     }
+  }
+
+  /// Optimistically mark matching in-memory entries as approved so the UI
+  /// reflects the confirmation immediately. The live stream reconciles once
+  /// back online.
+  void _flipApproved(bool Function(MoneyTransaction) matches) {
+    var changed = false;
+    final updated = <MoneyTransaction>[];
+    for (final t in _workerTransactions) {
+      if (matches(t) && !t.approved) {
+        updated.add(t.copyWith(approved: true));
+        changed = true;
+      } else {
+        updated.add(t);
+      }
+    }
+    _workerTransactions = updated;
+    if (changed) notifyListeners();
   }
 
   /// Edit an existing transaction (reverses old balance effect, applies new)
