@@ -203,7 +203,7 @@ class TransactionService {
     return docId;
   }
 
-  /// Record a collector-to-collector transfer: two linked records + balances.
+  /// Record a collector-to-collector transfer: two linked records + balances (queue-first).
   Future<String?> addTransfer({
     required String fromWorkerId,
     required String fromWorkerName,
@@ -217,24 +217,48 @@ class TransactionService {
       throw 'Amount must be greater than 0';
     }
 
-    // Validate sender balance
-    final senderDoc =
-        await _firestore.collection('workers').doc(fromWorkerId).get();
-    if (!senderDoc.exists) {
-      throw 'Collector not found';
-    }
-    final senderBalance =
-        (senderDoc.data()?['currentBalance'] ?? 0.0).toDouble();
-    if (amount > senderBalance) {
-      throw 'Insufficient balance. Available: ETB ${senderBalance.toStringAsFixed(2)}, Required: ETB ${amount.toStringAsFixed(2)}';
+    // live balance check only when online (skip offline)
+    if (ConnectivityService().isOnline) {
+      final senderDoc =
+          await _firestore.collection('workers').doc(fromWorkerId).get();
+      if (!senderDoc.exists) {
+        throw 'Collector not found';
+      }
+      final senderBalance =
+          (senderDoc.data()?['currentBalance'] ?? 0.0).toDouble();
+      if (amount > senderBalance) {
+        throw 'Insufficient balance. Available: ETB ${senderBalance.toStringAsFixed(2)}, Required: ETB ${amount.toStringAsFixed(2)}';
+      }
     }
 
+    final opId = const Uuid().v4();
+    final transferId = opId;
+    final senderDocId = opId;
+    final receiverDocId = '${opId}_r';
     final now = DateTime.now();
-    final transferId =
-        '${fromWorkerId}_${toWorkerId}_${now.millisecondsSinceEpoch}';
 
+    await OfflineCacheService().queueOperation({
+      'opId': opId,
+      'type': 'createTransfer',
+      'transferId': transferId,
+      'senderDocId': senderDocId,
+      'receiverDocId': receiverDocId,
+      'fromWorkerId': fromWorkerId,
+      'fromWorkerName': fromWorkerName,
+      'toWorkerId': toWorkerId,
+      'toWorkerName': toWorkerName,
+      'amount': amount,
+      'createdAt': now.millisecondsSinceEpoch,
+      'createdBy': createdBy,
+      'notes': notes,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+
+    // optimistic cache: two MoneyTransactions
+    final cached = OfflineCacheService().getCachedTransactions() ?? [];
     final senderTx = MoneyTransaction(
-      id: '',
+      id: senderDocId,
       workerId: fromWorkerId,
       workerName: fromWorkerName,
       type: 'transfer',
@@ -250,9 +274,8 @@ class TransactionService {
       transferId: transferId,
       transferRole: 'sender',
     );
-
     final receiverTx = MoneyTransaction(
-      id: '',
+      id: receiverDocId,
       workerId: toWorkerId,
       workerName: toWorkerName,
       type: 'transfer',
@@ -268,22 +291,9 @@ class TransactionService {
       transferId: transferId,
       transferRole: 'receiver',
     );
-
-    final batch = _firestore.batch();
-    final senderRef = _firestore.collection(_transactionsCollection).doc();
-    final receiverRef = _firestore.collection(_transactionsCollection).doc();
-    batch.set(senderRef, senderTx.toFirestore());
-    batch.set(receiverRef, receiverTx.toFirestore());
-    batch.update(
-      _firestore.collection('workers').doc(fromWorkerId),
-      {'currentBalance': FieldValue.increment(-amount)},
-    );
-    batch.update(
-      _firestore.collection('workers').doc(toWorkerId),
-      {'currentBalance': FieldValue.increment(amount)},
-    );
-    await batch.commit();
-    print('Transfer added successfully: $transferId');
+    await OfflineCacheService()
+        .cacheTransactions([...cached, senderTx, receiverTx]);
+    unawaited(OfflineSyncService().syncNow());
     return transferId;
   }
 
