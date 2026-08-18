@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 class ConnectivityService {
   static final ConnectivityService _instance = ConnectivityService._internal();
@@ -14,6 +15,12 @@ class ConnectivityService {
   bool _isOnline = true;
 
   bool get isOnline => _isOnline;
+
+  /// Force connectivity state for tests. Never call from production code.
+  @visibleForTesting
+  void setOnlineForTest(bool value) {
+    _isOnline = value;
+  }
 
   Future<void> initialize() async {
     // Check initial connectivity
