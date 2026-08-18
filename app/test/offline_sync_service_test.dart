@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:cofiz/core/services/offline_cache_service.dart';
 import 'package:cofiz/core/services/offline_sync_service.dart';
+import 'package:cofiz/core/services/connectivity_service.dart';
 
 void main() {
   late Directory tempDir;
@@ -15,9 +16,13 @@ void main() {
     await OfflineCacheService().initialize(path: tempDir.path);
   });
 
-  setUp(() {
+  setUp(() async {
     fake = FakeFirebaseFirestore();
     OfflineSyncService().firestore = fake;
+    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().clearDelivered();
+    ConnectivityService().setOnlineForTest(true);
+    await fake.collection('workers').doc('w1').set({'currentBalance': 1000.0});
   });
 
   tearDown(() async {
@@ -154,5 +159,60 @@ void main() {
     expect(remaining, hasLength(1));
     expect(remaining.single['type'], 'approveTransaction');
     expect(remaining.single['transactionId'], 'missing');
+  });
+
+  test('createTransaction is idempotent across two drains', () async {
+    const opId = 'op-ctest-1';
+    await OfflineCacheService().queueOperation({
+      'opId': opId,
+      'type': 'createTransaction',
+      'docId': opId,
+      'workerId': 'w1',
+      'workerName': 'W1',
+      'transactionType': 'distribution',
+      'amount': 100.0,
+      'createdBy': 'tester',
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    await OfflineSyncService().syncPendingOperations();
+    // First drain delivered
+    expect(OfflineCacheService().getPendingOperations().length, 0);
+    expect(
+        (await fake.collection('transactions').doc(opId).get()).exists, true);
+    expect(
+        (await fake.collection('workers').doc('w1').get())
+            .data()!['currentBalance'],
+        1100.0);
+    // Re-queue same opId (simulates crash between commit and dequeue) and drain again
+    await OfflineCacheService().queueOperation({
+      'opId': opId,
+      'type': 'createTransaction',
+      'docId': opId,
+      'workerId': 'w1',
+      'workerName': 'W1',
+      'transactionType': 'distribution',
+      'amount': 100.0,
+      'createdBy': 'tester',
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    await OfflineSyncService().syncPendingOperations();
+    expect(
+        (await fake.collection('workers').doc('w1').get())
+            .data()!['currentBalance'],
+        1100.0); // not double
+    expect(OfflineCacheService().getPendingOperations().length, 0);
+  });
+
+  test('failed op stays for retry, delivered log tracks success', () async {
+    await OfflineCacheService().queueOperation({
+      'opId': 'bad',
+      'type': 'unknownType',
+      'queuedAt': DateTime.now().toIso8601String()
+    });
+    await OfflineSyncService().syncPendingOperations();
+    expect(OfflineCacheService().getPendingOperations().length, 1);
+    expect(OfflineCacheService().getDeliveredCount(), 0);
   });
 }
