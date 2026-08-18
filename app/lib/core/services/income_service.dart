@@ -270,6 +270,7 @@ class IncomeService {
       'docId': opId,
       'payload': record.toFirestore(),
       'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     final cached = OfflineCacheService().getCachedIncome() ?? [];
     await OfflineCacheService()

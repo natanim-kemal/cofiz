@@ -306,7 +306,7 @@ class TransactionService {
       'queuedAt': DateTime.now().toIso8601String(),
       'attempts': 0,
     });
-    unawaited(Future(() => OfflineSyncService().syncNow()));
+    unawaited(OfflineSyncService().syncNow());
   }
 
   /// Batch approve all pending transactions for a worker (queue-first-always)
@@ -318,7 +318,7 @@ class TransactionService {
       'queuedAt': DateTime.now().toIso8601String(),
       'attempts': 0,
     });
-    unawaited(Future(() => OfflineSyncService().syncNow()));
+    unawaited(OfflineSyncService().syncNow());
   }
 
   /// Approve both records of a transfer by shared transferId (queue-first-always)
@@ -330,7 +330,7 @@ class TransactionService {
       'queuedAt': DateTime.now().toIso8601String(),
       'attempts': 0,
     });
-    unawaited(Future(() => OfflineSyncService().syncNow()));
+    unawaited(OfflineSyncService().syncNow());
   }
 
   /// Delete both records of a transfer by shared transferId, reversing balances.

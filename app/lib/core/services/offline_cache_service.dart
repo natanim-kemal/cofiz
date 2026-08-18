@@ -160,6 +160,8 @@ class OfflineCacheService {
 
   // Pending operations queue
   Future<void> queueOperation(Map<String, dynamic> operation) async {
+    assert(operation.containsKey('opId'),
+        'queueOperation requires opId for idempotent drain');
     final box = Hive.box(_pendingBox);
     final pending = box.get('queue', defaultValue: <Map>[]) as List;
     pending.add(operation);

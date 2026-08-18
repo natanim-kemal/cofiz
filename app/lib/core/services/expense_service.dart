@@ -166,6 +166,7 @@ class ExpenseService {
       'docId': opId,
       'payload': record.toFirestore(),
       'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
     });
     final cached = OfflineCacheService().getCachedExpenses() ?? [];
     await OfflineCacheService()
