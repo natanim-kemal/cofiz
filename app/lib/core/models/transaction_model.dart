@@ -112,6 +112,31 @@ class MoneyTransaction {
     };
   }
 
+  MoneyTransaction copyWith({bool? approved}) {
+    return MoneyTransaction(
+      id: id,
+      workerId: workerId,
+      workerName: workerName,
+      type: type,
+      amount: amount,
+      notes: notes,
+      receiptUrl: receiptUrl,
+      createdAt: createdAt,
+      createdBy: createdBy,
+      approved: approved ?? this.approved,
+      coffeeType: coffeeType,
+      coffeeWeight: coffeeWeight,
+      pricePerKg: pricePerKg,
+      commissionAmount: commissionAmount,
+      fromWorkerId: fromWorkerId,
+      toWorkerId: toWorkerId,
+      fromWorkerName: fromWorkerName,
+      toWorkerName: toWorkerName,
+      transferId: transferId,
+      transferRole: transferRole,
+    );
+  }
+
   factory MoneyTransaction.fromJson(Map<String, dynamic> json) {
     return MoneyTransaction(
       id: json['id'] ?? '',

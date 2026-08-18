@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cofiz/core/models/transaction_model.dart';
 
-MoneyTransaction base({String type = 'distribution'}) {
+MoneyTransaction base({String type = 'distribution', bool approved = true}) {
   return MoneyTransaction(
     id: 'id1',
     workerId: 'w1',
@@ -10,6 +10,7 @@ MoneyTransaction base({String type = 'distribution'}) {
     amount: 100,
     createdAt: DateTime(2026, 8, 15),
     createdBy: 'admin',
+    approved: approved,
   );
 }
 
@@ -61,5 +62,13 @@ void main() {
     expect(base().isTransfer, isFalse);
     expect(base().isTransferSender, isFalse);
     expect(base().isTransferReceiver, isFalse);
+  });
+
+  test('copyWith overrides approved', () {
+    final t = base(approved: false);
+    final updated = t.copyWith(approved: true);
+    expect(updated.approved, isTrue);
+    expect(updated.id, t.id);
+    expect(updated.amount, t.amount);
   });
 }
