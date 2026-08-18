@@ -80,6 +80,7 @@ dependencies:
   connectivity_plus: ^7.0.0
   local_auth: ^3.0.0
   flutter_secure_storage: ^10.0.0
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:
@@ -144,7 +145,7 @@ flutter:
 # App icon configuration
 flutter_launcher_icons:
   android: true
-  ios: true
-  image_path: "assets/icon.png"
+  ios: false
+  image_path: "assets/icon-bg.jpg"
   adaptive_icon_background: "#221910"
-  adaptive_icon_foreground: "assets/icon.png"
+  adaptive_icon_foreground: "assets/icon-bg.jpg"

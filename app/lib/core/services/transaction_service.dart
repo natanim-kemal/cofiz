@@ -1,12 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../models/transaction_model.dart';
-import 'notification_trigger_service.dart';
 import '../config/cloudinary_config.dart';
 import '../utils/receipt_image_utils.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'connectivity_service.dart';
+import 'notification_trigger_service.dart';
 import 'offline_cache_service.dart';
+import 'offline_sync_service.dart';
 
 /// A single page of transactions from a cursor-paginated query.
 class TransactionPage {
@@ -127,98 +130,77 @@ class TransactionService {
     }
   }
 
-  /// Add transaction and update worker balance
+  /// Add transaction and update worker balance (queue-first)
   Future<String?> addTransaction(MoneyTransaction transaction) async {
-    try {
-      // For purchase and return transactions, validate balance first
-      if (transaction.type.toLowerCase() == 'purchase' ||
-          transaction.type.toLowerCase() == 'return') {
-        final workerDoc = await _firestore
-            .collection('workers')
-            .doc(transaction.workerId)
-            .get();
+    if (transaction.amount <= 0) throw 'Amount must be greater than 0';
+    // live balance check only when online (skip offline)
+    if (ConnectivityService().isOnline &&
+        (transaction.type.toLowerCase() == 'purchase' ||
+            transaction.type.toLowerCase() == 'return')) {
+      final workerDoc = await _firestore
+          .collection('workers')
+          .doc(transaction.workerId)
+          .get();
 
-        if (!workerDoc.exists) {
-          throw 'Collector not found';
-        }
-
-        final currentBalance =
-            (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
-
-        if (transaction.amount > currentBalance) {
-          throw 'Insufficient balance. Available: ETB ${currentBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
-        }
+      if (!workerDoc.exists) {
+        throw 'Collector not found';
       }
 
-      // Start a batch write
-      final batch = _firestore.batch();
+      final currentBalance =
+          (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
 
-      // Add transaction
-      final transactionRef =
-          _firestore.collection(_transactionsCollection).doc();
-      batch.set(transactionRef, transaction.toFirestore());
-
-      // Update worker balance
-      final workerRef =
-          _firestore.collection('workers').doc(transaction.workerId);
-
-      // Calculate balance change
-      double balanceChange = 0;
-      Map<String, dynamic> updates = {};
-
-      switch (transaction.type.toLowerCase()) {
-        case 'distribution':
-          balanceChange = transaction.amount;
-          updates = {
-            'currentBalance': FieldValue.increment(transaction.amount),
-            'totalDistributed': FieldValue.increment(transaction.amount),
-            'lastActiveAt': DateTime.now().millisecondsSinceEpoch,
-          };
-          break;
-        case 'return':
-          balanceChange = -transaction.amount;
-          updates = {
-            'currentBalance': FieldValue.increment(-transaction.amount),
-            'totalReturned': FieldValue.increment(transaction.amount),
-            'lastActiveAt': DateTime.now().millisecondsSinceEpoch,
-          };
-          break;
-        case 'purchase':
-          balanceChange = -transaction.amount;
-          updates = {
-            'currentBalance': FieldValue.increment(-transaction.amount),
-            'totalCoffeePurchased': FieldValue.increment(transaction.amount),
-            'lastActiveAt': DateTime.now().millisecondsSinceEpoch,
-          };
-          // Also update totalCommissionEarned if commission was calculated
-          if (transaction.commissionAmount != null &&
-              transaction.commissionAmount! > 0) {
-            updates['totalCommissionEarned'] =
-                FieldValue.increment(transaction.commissionAmount!);
-          }
-          break;
+      if (transaction.amount > currentBalance) {
+        throw 'Insufficient balance. Available: ETB ${currentBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
       }
-
-      batch.update(workerRef, updates);
-
-      // Commit the batch
-      await batch.commit();
-
-      // Trigger notifications after successful transaction
-      await _triggerTransactionNotifications(
-        transaction: transaction,
-        balanceChange: balanceChange,
-      );
-
-      print('Transaction added successfully: ${transactionRef.id}');
-      return transactionRef.id;
-    } on FirebaseException catch (e) {
-      print('Firestore error adding transaction: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } catch (e) {
-      print('Error adding transaction: $e');
-      throw 'Failed to add transaction. Please try again.';
     }
+    final opId = const Uuid().v4();
+    final docId = opId;
+    await OfflineCacheService().queueOperation({
+      'opId': opId,
+      'type': 'createTransaction',
+      'docId': docId,
+      'workerId': transaction.workerId,
+      'workerName': transaction.workerName,
+      'transactionType': transaction.type,
+      'amount': transaction.amount,
+      'notes': transaction.notes,
+      'receiptUrl': transaction.receiptUrl,
+      'createdAt': transaction.createdAt.millisecondsSinceEpoch,
+      'createdBy': transaction.createdBy,
+      'coffeeType': transaction.coffeeType,
+      'coffeeWeight': transaction.coffeeWeight,
+      'pricePerKg': transaction.pricePerKg,
+      'commissionAmount': transaction.commissionAmount,
+      'queuedAt': DateTime.now().toIso8601String(),
+      'attempts': 0,
+    });
+    // optimistic cache
+    final cached = OfflineCacheService().getCachedTransactions() ?? [];
+    final optimistic = MoneyTransaction(
+      id: docId,
+      workerId: transaction.workerId,
+      workerName: transaction.workerName,
+      type: transaction.type,
+      amount: transaction.amount,
+      notes: transaction.notes,
+      receiptUrl: transaction.receiptUrl,
+      createdAt: transaction.createdAt,
+      createdBy: transaction.createdBy,
+      approved: transaction.approved,
+      coffeeType: transaction.coffeeType,
+      coffeeWeight: transaction.coffeeWeight,
+      pricePerKg: transaction.pricePerKg,
+      commissionAmount: transaction.commissionAmount,
+      fromWorkerId: transaction.fromWorkerId,
+      toWorkerId: transaction.toWorkerId,
+      fromWorkerName: transaction.fromWorkerName,
+      toWorkerName: transaction.toWorkerName,
+      transferId: transaction.transferId,
+      transferRole: transaction.transferRole,
+    );
+    await OfflineCacheService().cacheTransactions([...cached, optimistic]);
+    unawaited(OfflineSyncService().syncNow());
+    return docId;
   }
 
   /// Record a collector-to-collector transfer: two linked records + balances.
