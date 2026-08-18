@@ -12,6 +12,7 @@ class OfflineCacheService {
   static const String _workersBox = 'workers_cache';
   static const String _transactionsBox = 'transactions_cache';
   static const String _pendingBox = 'pending_operations';
+  static const String _deliveredBox = 'delivered_operations';
   static const String _incomeBox = 'income_cache';
   static const String _expensesBox = 'expenses_cache';
   static const String _totalsBox = 'totals_cache';
@@ -32,6 +33,7 @@ class OfflineCacheService {
     await Hive.openBox(_workersBox);
     await Hive.openBox(_transactionsBox);
     await Hive.openBox(_pendingBox);
+    await Hive.openBox(_deliveredBox);
     await Hive.openBox(_incomeBox);
     await Hive.openBox(_expensesBox);
     await Hive.openBox(_totalsBox);
@@ -190,6 +192,37 @@ class OfflineCacheService {
     await box.put('queue', operations);
   }
 
+  Future<void> markDelivered(String opId, String type) async {
+    final box = Hive.box(_deliveredBox);
+    await box.put(opId, {
+      'opId': opId,
+      'type': type,
+      'deliveredAt': DateTime.now().millisecondsSinceEpoch
+    });
+  }
+
+  List<Map<String, dynamic>> getDeliveredOperations() {
+    final box = Hive.box(_deliveredBox);
+    return box.values.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  int getDeliveredCount() => Hive.box(_deliveredBox).length;
+
+  Future<void> pruneDelivered({Duration ttl = const Duration(days: 7)}) async {
+    final box = Hive.box(_deliveredBox);
+    final cutoff = DateTime.now().subtract(ttl).millisecondsSinceEpoch;
+    final toDelete = <dynamic>[];
+    for (final k in box.keys) {
+      final v = Map<String, dynamic>.from(box.get(k) as Map);
+      if ((v['deliveredAt'] as int) < cutoff) toDelete.add(k);
+    }
+    for (final k in toDelete) {
+      await box.delete(k);
+    }
+  }
+
+  Future<void> clearDelivered() async => Hive.box(_deliveredBox).clear();
+
   // Clear all cache
   Future<void> clearAllCache() async {
     await Hive.box(_workersBox).clear();
@@ -197,6 +230,7 @@ class OfflineCacheService {
     await Hive.box(_incomeBox).clear();
     await Hive.box(_expensesBox).clear();
     await Hive.box(_pendingBox).clear();
+    await Hive.box(_deliveredBox).clear();
     await Hive.box(_totalsBox).clear();
   }
 }

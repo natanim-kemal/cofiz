@@ -16,6 +16,11 @@ void main() {
     await OfflineCacheService().initialize(path: tempDir.path);
   });
 
+  tearDown(() async {
+    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().clearDelivered();
+  });
+
   tearDownAll(() async {
     await OfflineCacheService().clearAllCache();
     await Hive.close();
@@ -235,5 +240,21 @@ void main() {
     final cachedExpenses = OfflineCacheService().getCachedExpenses();
     expect(cachedExpenses!.length, 1);
     expect(cachedExpenses.first.id, 'recentExpense');
+  });
+
+  test('delivered log stores opId and prunes', () async {
+    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().markDelivered('op-1', 'createTransaction');
+    expect(OfflineCacheService().getDeliveredOperations().length, 1);
+    expect(OfflineCacheService().getDeliveredCount(), 1);
+  });
+
+  test('queueOperation requires opId', () async {
+    await OfflineCacheService().queueOperation({
+      'opId': 'op-2',
+      'type': 'createIncome',
+      'queuedAt': DateTime.now().toIso8601String()
+    });
+    expect(OfflineCacheService().getPendingOperations().first['opId'], 'op-2');
   });
 }
