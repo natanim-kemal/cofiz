@@ -186,6 +186,14 @@ class ExpenseProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final optimistic = record.copyWith(id: id);
+    if (!_records.any((r) => r.id == id)) {
+      _records = [optimistic, ..._records];
+    }
+    if (!_fullRecords.any((r) => r.id == id)) {
+      _fullRecords = [optimistic, ..._fullRecords];
+    }
+    notifyListeners();
     _refreshTotals();
     return true;
   }

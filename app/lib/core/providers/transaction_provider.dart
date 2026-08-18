@@ -25,6 +25,7 @@ class TransactionProvider with ChangeNotifier {
   bool _workerLoadedExtraPages = false;
   StreamSubscription<List<MoneyTransaction>>? _workerSub;
   int _workerTotalCount = 0;
+  String? _currentWorkerId;
 
   // Today's totals
   double _todayDistributed = 0.0;
@@ -47,6 +48,7 @@ class TransactionProvider with ChangeNotifier {
 
   /// Load worker transactions - bounded live stream (first page) + cursor pages
   void loadWorkerTransactions(String workerId) {
+    _currentWorkerId = workerId;
     _workerSub?.cancel();
     _workerTransactions = [];
     _workerLastDoc = null;
@@ -193,7 +195,31 @@ class TransactionProvider with ChangeNotifier {
         approved: false,
       );
 
-      await _transactionService.addTransaction(transaction);
+      final docId = await _transactionService.addTransaction(transaction);
+      if (docId != null) {
+        _optimisticInsert(MoneyTransaction(
+          id: docId,
+          workerId: transaction.workerId,
+          workerName: transaction.workerName,
+          type: transaction.type,
+          amount: transaction.amount,
+          notes: transaction.notes,
+          receiptUrl: transaction.receiptUrl,
+          createdAt: transaction.createdAt,
+          createdBy: transaction.createdBy,
+          approved: transaction.approved,
+          coffeeType: transaction.coffeeType,
+          coffeeWeight: transaction.coffeeWeight,
+          pricePerKg: transaction.pricePerKg,
+          commissionAmount: transaction.commissionAmount,
+          fromWorkerId: transaction.fromWorkerId,
+          toWorkerId: transaction.toWorkerId,
+          fromWorkerName: transaction.fromWorkerName,
+          toWorkerName: transaction.toWorkerName,
+          transferId: transaction.transferId,
+          transferRole: transaction.transferRole,
+        ));
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -239,7 +265,25 @@ class TransactionProvider with ChangeNotifier {
         approved: false,
       );
 
-      await _transactionService.addTransaction(transaction);
+      final docId2 = await _transactionService.addTransaction(transaction);
+      if (docId2 != null) {
+        _optimisticInsert(MoneyTransaction(
+          id: docId2,
+          workerId: transaction.workerId,
+          workerName: transaction.workerName,
+          type: transaction.type,
+          amount: transaction.amount,
+          notes: transaction.notes,
+          receiptUrl: transaction.receiptUrl,
+          createdAt: transaction.createdAt,
+          createdBy: transaction.createdBy,
+          approved: transaction.approved,
+          coffeeType: transaction.coffeeType,
+          coffeeWeight: transaction.coffeeWeight,
+          pricePerKg: transaction.pricePerKg,
+          commissionAmount: transaction.commissionAmount,
+        ));
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -293,7 +337,25 @@ class TransactionProvider with ChangeNotifier {
         commissionAmount: commission,
       );
 
-      await _transactionService.addTransaction(transaction);
+      final docId3 = await _transactionService.addTransaction(transaction);
+      if (docId3 != null) {
+        _optimisticInsert(MoneyTransaction(
+          id: docId3,
+          workerId: transaction.workerId,
+          workerName: transaction.workerName,
+          type: transaction.type,
+          amount: transaction.amount,
+          notes: transaction.notes,
+          receiptUrl: transaction.receiptUrl,
+          createdAt: transaction.createdAt,
+          createdBy: transaction.createdBy,
+          approved: transaction.approved,
+          coffeeType: transaction.coffeeType,
+          coffeeWeight: transaction.coffeeWeight,
+          pricePerKg: transaction.pricePerKg,
+          commissionAmount: transaction.commissionAmount,
+        ));
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -327,7 +389,7 @@ class TransactionProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
-      await _transactionService.addTransfer(
+      final transferId = await _transactionService.addTransfer(
         fromWorkerId: fromWorkerId,
         fromWorkerName: fromWorkerName,
         toWorkerId: toWorkerId,
@@ -336,6 +398,46 @@ class TransactionProvider with ChangeNotifier {
         createdBy: createdBy,
         notes: notes,
       );
+
+      if (transferId != null) {
+        final now = DateTime.now();
+        final senderTx = MoneyTransaction(
+          id: transferId,
+          workerId: fromWorkerId,
+          workerName: fromWorkerName,
+          type: 'transfer',
+          amount: amount,
+          notes: notes,
+          createdAt: now,
+          createdBy: createdBy,
+          approved: false,
+          fromWorkerId: fromWorkerId,
+          toWorkerId: toWorkerId,
+          fromWorkerName: fromWorkerName,
+          toWorkerName: toWorkerName,
+          transferId: transferId,
+          transferRole: 'sender',
+        );
+        final receiverTx = MoneyTransaction(
+          id: '${transferId}_r',
+          workerId: toWorkerId,
+          workerName: toWorkerName,
+          type: 'transfer',
+          amount: amount,
+          notes: notes,
+          createdAt: now,
+          createdBy: createdBy,
+          approved: false,
+          fromWorkerId: fromWorkerId,
+          toWorkerId: toWorkerId,
+          fromWorkerName: fromWorkerName,
+          toWorkerName: toWorkerName,
+          transferId: transferId,
+          transferRole: 'receiver',
+        );
+        _optimisticInsert(senderTx);
+        _optimisticInsert(receiverTx);
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -411,6 +513,20 @@ class TransactionProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void _optimisticInsert(MoneyTransaction tx) {
+    // Insert at front of allTransactions (newest first)
+    if (!_allTransactions.any((t) => t.id == tx.id)) {
+      _allTransactions = [tx, ..._allTransactions];
+    }
+    // Also insert into workerTransactions if it matches the currently viewed worker
+    if (_currentWorkerId != null && tx.workerId == _currentWorkerId) {
+      if (!_workerTransactions.any((t) => t.id == tx.id)) {
+        _workerTransactions = [tx, ..._workerTransactions];
+      }
+    }
+    notifyListeners();
   }
 
   /// Optimistically mark matching in-memory entries as approved so the UI
