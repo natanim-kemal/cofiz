@@ -1,6 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/income_record_model.dart';
 
+/// A single page of income records from a cursor-paginated query.
+class IncomePage {
+  final List<IncomeRecord> items;
+  final DocumentSnapshot<Map<String, dynamic>>? lastDoc;
+  final bool hasMore;
+
+  IncomePage({
+    required this.items,
+    required this.lastDoc,
+    required this.hasMore,
+  });
+}
+
 class IncomeService {
   static const String _collectionName = 'income_records';
   static const String _settingsDoc = 'saleCategories';
@@ -38,6 +51,207 @@ class IncomeService {
         .map((snap) => snap.docs
             .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
             .toList());
+  }
+
+  /// Bounded live stream of the newest income records (first page only).
+  Stream<List<IncomeRecord>> getIncomePageStream({int limit = 20}) {
+    return _firestore
+        .collection(_collectionName)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
+            .toList());
+  }
+
+  /// Fetch a page of income records (newest first) via cursor.
+  Future<IncomePage> getIncomePage({
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int pageSize = 20,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_collectionName)
+          .orderBy('createdAt', descending: true)
+          .limit(pageSize);
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+      final snapshot = await query.get();
+      final records = snapshot.docs
+          .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+      return IncomePage(
+        items: records,
+        lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length == pageSize,
+      );
+    } catch (e) {
+      print('Error fetching income page: $e');
+      return IncomePage(items: const [], lastDoc: null, hasMore: false);
+    }
+  }
+
+  /// Bounded live stream of the newest income records for a viewer.
+  Stream<List<IncomeRecord>> getIncomeForViewerPageStream(String viewerId,
+      {int limit = 20}) {
+    return _firestore
+        .collection(_collectionName)
+        .where('viewerId', isEqualTo: viewerId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
+            .toList());
+  }
+
+  /// Fetch a page of income records for a viewer (newest first) via cursor.
+  Future<IncomePage> getIncomeForViewerPage(
+    String viewerId, {
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int pageSize = 20,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_collectionName)
+          .where('viewerId', isEqualTo: viewerId)
+          .orderBy('createdAt', descending: true)
+          .limit(pageSize);
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+      final snapshot = await query.get();
+      final records = snapshot.docs
+          .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+      return IncomePage(
+        items: records,
+        lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length == pageSize,
+      );
+    } catch (e) {
+      print('Error fetching viewer income page: $e');
+      return IncomePage(items: const [], lastDoc: null, hasMore: false);
+    }
+  }
+
+  /// Fetch all income records (newest first) - for reports/export.
+  Future<List<IncomeRecord>> getAllIncome() async {
+    try {
+      final snap = await _firestore
+          .collection(_collectionName)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs
+          .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error fetching all income records: $e');
+      return const [];
+    }
+  }
+
+  /// Server-side total income sum.
+  /// Returns null if the query fails (e.g. index not ready/offline).
+  Future<double?> getIncomeTotal({String? viewerId}) async {
+    try {
+      Query<Map<String, dynamic>> query =
+          _firestore.collection(_collectionName);
+      if (viewerId != null) {
+        query = query.where('viewerId', isEqualTo: viewerId);
+      }
+      final snapshot = await query.aggregate(sum('amount')).get();
+      return snapshot.getSum('amount') ?? 0.0;
+    } catch (e) {
+      print('Error fetching income total: $e');
+      return null;
+    }
+  }
+
+  /// Server-side total income sum filtered by kind.
+  /// Returns null if the query fails.
+  Future<double?> getIncomeTotalByKind(IncomeKind kind,
+      {String? viewerId}) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_collectionName)
+          .where('kind', isEqualTo: kind.name);
+      if (viewerId != null) {
+        query = query.where('viewerId', isEqualTo: viewerId);
+      }
+      final snapshot = await query.aggregate(sum('amount')).get();
+      return snapshot.getSum('amount') ?? 0.0;
+    } catch (e) {
+      print('Error fetching income kind total: $e');
+      return null;
+    }
+  }
+
+  /// Server-side total income sum for today.
+  /// Returns null if the query fails.
+  Future<double?> getIncomeTodayTotal({String? viewerId}) async {
+    try {
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, now.day);
+      final end = start.add(const Duration(days: 1));
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_collectionName)
+          .where('createdAt',
+              isGreaterThanOrEqualTo: start.millisecondsSinceEpoch)
+          .where('createdAt', isLessThan: end.millisecondsSinceEpoch);
+      if (viewerId != null) {
+        query = query.where('viewerId', isEqualTo: viewerId);
+      }
+      final snapshot = await query.aggregate(sum('amount')).get();
+      return snapshot.getSum('amount') ?? 0.0;
+    } catch (e) {
+      print('Error fetching today income total: $e');
+      return null;
+    }
+  }
+
+  /// Server-side today total sum by kind.
+  /// Returns null if the query fails.
+  Future<double?> getIncomeTodayTotalByKind(IncomeKind kind,
+      {String? viewerId}) async {
+    try {
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, now.day);
+      final end = start.add(const Duration(days: 1));
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_collectionName)
+          .where('kind', isEqualTo: kind.name)
+          .where('createdAt',
+              isGreaterThanOrEqualTo: start.millisecondsSinceEpoch)
+          .where('createdAt', isLessThan: end.millisecondsSinceEpoch);
+      if (viewerId != null) {
+        query = query.where('viewerId', isEqualTo: viewerId);
+      }
+      final snapshot = await query.aggregate(sum('amount')).get();
+      return snapshot.getSum('amount') ?? 0.0;
+    } catch (e) {
+      print('Error fetching today income kind total: $e');
+      return null;
+    }
+  }
+
+  /// Server-side count of income records.
+  /// Returns null if the query fails.
+  Future<int?> getIncomeCount({String? viewerId}) async {
+    try {
+      Query<Map<String, dynamic>> query =
+          _firestore.collection(_collectionName);
+      if (viewerId != null) {
+        query = query.where('viewerId', isEqualTo: viewerId);
+      }
+      final snapshot = await query.count().get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      print('Error fetching income count: $e');
+      return null;
+    }
   }
 
   Future<String?> addIncome(IncomeRecord record) async {

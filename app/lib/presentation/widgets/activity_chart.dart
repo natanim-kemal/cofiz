@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../../core/theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 
 class ActivityChart extends StatelessWidget {

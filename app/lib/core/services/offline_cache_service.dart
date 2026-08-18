@@ -1,6 +1,8 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/worker_model.dart';
 import '../models/transaction_model.dart';
+import '../models/income_record_model.dart';
+import '../models/expense_record_model.dart';
 
 class OfflineCacheService {
   static final OfflineCacheService _instance = OfflineCacheService._internal();
@@ -10,14 +12,29 @@ class OfflineCacheService {
   static const String _workersBox = 'workers_cache';
   static const String _transactionsBox = 'transactions_cache';
   static const String _pendingBox = 'pending_operations';
+  static const String _incomeBox = 'income_cache';
+  static const String _expensesBox = 'expenses_cache';
+  static const String _totalsBox = 'totals_cache';
 
-  Future<void> initialize() async {
-    await Hive.initFlutter();
+  /// Records older than this are evicted on write, bounding the cache
+  /// regardless of how much history the backend accumulates.
+  static const Duration _retentionWindow = Duration(days: 365);
 
-    // Open boxes
+  static DateTime get _cutoff => DateTime.now().subtract(_retentionWindow);
+
+  Future<void> initialize({String? path}) async {
+    if (path != null) {
+      Hive.init(path);
+    } else {
+      await Hive.initFlutter();
+    }
+
     await Hive.openBox(_workersBox);
     await Hive.openBox(_transactionsBox);
     await Hive.openBox(_pendingBox);
+    await Hive.openBox(_incomeBox);
+    await Hive.openBox(_expensesBox);
+    await Hive.openBox(_totalsBox);
   }
 
   // Workers cache
@@ -37,10 +54,14 @@ class OfflineCacheService {
         .toList();
   }
 
-  // Transactions cache
+  // Transactions cache (kept within the retention window)
   Future<void> cacheTransactions(List<MoneyTransaction> transactions) async {
     final box = Hive.box(_transactionsBox);
-    final transactionsMap = {for (var t in transactions) t.id: t.toJson()};
+    final cutoff = _cutoff;
+    final transactionsMap = {
+      for (final t in transactions)
+        if (t.createdAt.isAfter(cutoff)) t.id: t.toJson(),
+    };
     await box.put('all_transactions', transactionsMap);
   }
 
@@ -53,6 +74,86 @@ class OfflineCacheService {
         .map((json) =>
             MoneyTransaction.fromJson(Map<String, dynamic>.from(json as Map)))
         .toList();
+  }
+
+  // Income cache (kept within the retention window)
+  Future<void> cacheIncome(List<IncomeRecord> records) async {
+    final box = Hive.box(_incomeBox);
+    final cutoff = _cutoff;
+    final recordsMap = {
+      for (final r in records)
+        if (r.createdAt.isAfter(cutoff)) r.id: r.toJson(),
+    };
+    await box.put('all_income', recordsMap);
+  }
+
+  List<IncomeRecord>? getCachedIncome() {
+    final box = Hive.box(_incomeBox);
+    final cached = box.get('all_income') as Map<dynamic, dynamic>?;
+    if (cached == null) return null;
+
+    return cached.values
+        .map((json) =>
+            IncomeRecord.fromJson(Map<String, dynamic>.from(json as Map)))
+        .toList();
+  }
+
+  // Expenses cache (kept within the retention window)
+  Future<void> cacheExpenses(List<ExpenseRecord> records) async {
+    final box = Hive.box(_expensesBox);
+    final cutoff = _cutoff;
+    final recordsMap = {
+      for (final r in records)
+        if (r.createdAt.isAfter(cutoff)) r.id: r.toJson(),
+    };
+    await box.put('all_expenses', recordsMap);
+  }
+
+  List<ExpenseRecord>? getCachedExpenses() {
+    final box = Hive.box(_expensesBox);
+    final cached = box.get('all_expenses') as Map<dynamic, dynamic>?;
+    if (cached == null) return null;
+
+    return cached.values
+        .map((json) =>
+            ExpenseRecord.fromJson(Map<String, dynamic>.from(json as Map)))
+        .toList();
+  }
+
+  // Income totals cache (last-known server-side aggregates)
+  Future<void> cacheIncomeTotals(Map<String, double> totals) async {
+    await Hive.box(_totalsBox).put('income_totals', totals);
+  }
+
+  Map<String, double>? getCachedIncomeTotals() {
+    final box = Hive.box(_totalsBox);
+    final cached = box.get('income_totals') as Map<dynamic, dynamic>?;
+    if (cached == null) return null;
+    return cached.map((k, v) => MapEntry(k as String, (v as num).toDouble()));
+  }
+
+  // Expenses totals cache (last-known server-side aggregates)
+  Future<void> cacheExpenseTotals(Map<String, double> totals) async {
+    await Hive.box(_totalsBox).put('expense_totals', totals);
+  }
+
+  Map<String, double>? getCachedExpenseTotals() {
+    final box = Hive.box(_totalsBox);
+    final cached = box.get('expense_totals') as Map<dynamic, dynamic>?;
+    if (cached == null) return null;
+    return cached.map((k, v) => MapEntry(k as String, (v as num).toDouble()));
+  }
+
+  // Today totals cache (transactions)
+  Future<void> cacheTodayTotals(Map<String, double> totals) async {
+    await Hive.box(_totalsBox).put('today_totals', totals);
+  }
+
+  Map<String, double>? getCachedTodayTotals() {
+    final box = Hive.box(_totalsBox);
+    final cached = box.get('today_totals') as Map<dynamic, dynamic>?;
+    if (cached == null) return null;
+    return cached.map((k, v) => MapEntry(k as String, (v as num).toDouble()));
   }
 
   // Pending operations queue
@@ -87,6 +188,9 @@ class OfflineCacheService {
   Future<void> clearAllCache() async {
     await Hive.box(_workersBox).clear();
     await Hive.box(_transactionsBox).clear();
+    await Hive.box(_incomeBox).clear();
+    await Hive.box(_expensesBox).clear();
     await Hive.box(_pendingBox).clear();
+    await Hive.box(_totalsBox).clear();
   }
 }

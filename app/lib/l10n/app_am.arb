@@ -71,6 +71,8 @@
   "offline": "ከመስመር ውጭ",
   "busy": "ስራ ላይ",
   "all": "ሁሉም",
+  "filter": "አጣራ",
+  "historyDescription": "የግብይት ታሪክዎን ይመልከቱ",
   "type": "ዓይነት",
   "qty": "ብዛት",
   "avgPrice": "አማካይ ዋጋ",
@@ -104,8 +106,23 @@
   "transferTitle": "ገንዘብ ማስተላለፍ",
   "transferredOut": "ተላልፏል",
   "receivedFrom": "የተቀበለው ከ",
+  "transferredTo": "{sender} ወደ {receiver} ተላልፏል",
+  "@transferredTo": {
+    "placeholders": {
+      "sender": {},
+      "receiver": {}
+    }
+  },
+  "receivedFromName": "{receiver} ከ{sender} የተቀበለው",
+  "@receivedFromName": {
+    "placeholders": {
+      "receiver": {},
+      "sender": {}
+    }
+  },
   "transferFailed": "ገንዘብ ማስተላለፍ አልተሳካም",
   "recordPurchase": "ግዢ መዝግብ",
+  "purchase": "ግዢ",
   "coffeePurchase": "የቡና ግዢ",
 
   "transactionCompletedSuccessfully": "ግብይት በተሳካ ሁኔታ ተጠናቀቀ",
@@ -272,6 +289,7 @@
   "legal": "ሕጋዊ",
   "support": "ድጋፍ",
   "contactSupport": "ድጋፍን ያነጋግሩ",
+  "contactDetails": "የእውቂያ ዝርዝሮች",
   "visitWebsite": "ድረ-ገጽን ይጎብኙ",
   "close": "ዝጋ",
   "copyright": "© 2026 Cofiz መተግበሪያ። ሁሉም መብቶች የተጠበቁ ናቸው።",
@@ -376,6 +394,9 @@
   "transaction": "ግብይት",
   "errorPickingImage": "ምስል በመምረጥ ላይ ስህተት: {error}",
   "failedToUploadReceipt": "ደረሰኝ መስቀል አልተሳካም",
+  "receipt": "ደረሰኝ",
+  "receiptDownloaded": "ደረሰኝ ተወርዷል",
+  "failedToDownloadReceipt": "ደረሰኝን ማውረድ አልተቻለም",
   "transactionCompleted": "ግብይት በተሳካ ሁኔታ ተጠናቅቋል",
   "failedToComplete": "ግብይቱን ማጠናቀቅ አልተቻለም",
   "amountWithCurrency": "መጠን ({currency})",
@@ -405,7 +426,7 @@
   "recentActivity": "የቅርብ ጊዜ እንቅስቃሴ",
   "viewAll": "ሁሉንም ይመልከቱ",
   "showingTransactions": "{count} ከ {total} ግብይቶችን በማሳየት ላይ",
-  "loadMore": "ተጨማሪ ይጫኑ ({remaining} ቀሪ)",
+  "loadMore": "ተጨማሪ ይጫኑ",
   "endOfTransactions": "— የግብይቶች መጨረሻ —",
   "lowBalanceWarning": "ዝቅተኛ ቀሪ ሂሳብ - እባክዎ ገንዘብ ይመልሱ",
   "balanceGood": "ሂሳቡ ጥሩ ይመስላል",
@@ -427,7 +448,7 @@
   "pricePerKgLabel": "ዋጋ/ኪሎ ({currency}) *",
   "totalAmount": "ጠቅላላ መጠን:",
   "yourCommission": "የእርስዎ ኮሚሽን:",
-  "commissionRateInfo": "(ተመን: {currency} {rate} በኪሎ)",
+  "commissionRateInfo": "ተመን: {currency} {rate} በኪሎ",
   "purchaseLocation": "የግዢ ቦታ",
   "noAreasConfigured": "ምንም ቦታዎች አልተዋቀሩም። በቅንብሮች ውስጥ ቦታዎችን ያክሉ።",
   "placeLocationLabel": "ቦታ / አካባቢ (ከላይ ባለው ዝርዝር ውስጥ ከሌለ)",
@@ -524,5 +545,8 @@
   "searchCollector": "ሰብሳቢዎችን ይፈልጉ",
   "noCollectorsFound": "ሰብሳቢዎች አልተገኙም",
   "enterSourceName": "የምንጭን ስም ይጻፉ",
-  "filterByDate": "በቀን አጣራ"
+  "filterByDate": "በቀን አጣራ",
+  "cashFlow": "የገንዘብ ፍሰት",
+  "neutral": "ገለልተኛ",
+  "tapAgainToExit": "ለመውጣት እንደገና ይጫኑ"
 }

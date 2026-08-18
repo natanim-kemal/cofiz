@@ -171,9 +171,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get submitReport => 'Submit Report';
 
   @override
-  String loadMore(Object remaining) {
-    return 'Load More ($remaining remaining)';
-  }
+  String get loadMore => 'Load More';
 
   @override
   String get save => 'Save';
@@ -216,6 +214,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get all => 'All';
+
+  @override
+  String get filter => 'Filter';
+
+  @override
+  String get historyDescription => 'View your transaction history';
 
   @override
   String get type => 'Type';
@@ -311,10 +315,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receivedFrom => 'Received From';
 
   @override
+  String transferredTo(Object sender, Object receiver) {
+    return '$sender transferred to $receiver';
+  }
+
+  @override
+  String receivedFromName(Object receiver, Object sender) {
+    return '$receiver received from $sender';
+  }
+
+  @override
   String get transferFailed => 'Failed to record transfer';
 
   @override
   String get recordPurchase => 'Record Purchase';
+
+  @override
+  String get purchase => 'Purchase';
 
   @override
   String get coffeePurchase => 'Coffee Purchase';
@@ -758,6 +775,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contactSupport => 'Contact Support';
 
   @override
+  String get contactDetails => 'Contact Details';
+
+  @override
   String get visitWebsite => 'Visit Website';
 
   @override
@@ -978,6 +998,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get failedToUploadReceipt => 'Failed to upload receipt';
 
   @override
+  String get receipt => 'Receipt';
+
+  @override
+  String get receiptDownloaded => 'Receipt downloaded';
+
+  @override
+  String get failedToDownloadReceipt => 'Failed to download receipt';
+
+  @override
   String get transactionCompleted => 'Transaction completed successfully';
 
   @override
@@ -1081,7 +1110,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String commissionRateInfo(Object currency, Object rate) {
-    return '(Rate: $currency $rate per Kg)';
+    return 'Rate: $currency $rate per Kg';
   }
 
   @override
@@ -1298,10 +1327,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get manualSales => 'Manual Sales';
 
   @override
-  String get moneyIn => 'Money In';
+  String get moneyIn => 'Cash In';
 
   @override
-  String get moneyOut => 'Money Out';
+  String get moneyOut => 'Cash Out';
 
   @override
   String get myInvestments => 'My Investments';
@@ -1389,4 +1418,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get filterByDate => 'Filter by date';
+
+  @override
+  String get cashFlow => 'Cash flow';
+
+  @override
+  String get neutral => 'Neutral';
+
+  @override
+  String get tapAgainToExit => 'Tap back again to exit';
 }

@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/income_record_model.dart';
 import '../../../../core/providers/income_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/audit_provider.dart';
 import '../../../../core/services/income_service.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../widgets/app_toast.dart';
@@ -81,9 +82,8 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
       createdBy: widget.existing?.createdBy ?? auth.user?.uid ?? 'unknown',
       createdByName:
           widget.existing?.createdByName ?? auth.user?.displayName ?? '',
-      viewerId: _kind == IncomeKind.investment && source.isNotEmpty
-          ? source
-          : null,
+      viewerId:
+          _kind == IncomeKind.investment && source.isNotEmpty ? source : null,
       viewerName:
           _kind == IncomeKind.investment && source.isNotEmpty ? source : null,
       saleCategory: _kind == IncomeKind.sale ? _selectedSaleCategory : null,
@@ -96,6 +96,16 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        final userName = auth.user?.displayName ?? auth.user?.email ?? '';
+        await auditProvider.logIncomeRecorded(
+          userId: auth.user?.uid ?? 'unknown',
+          userName: userName,
+          incomeId: record.id,
+          kind: _kind.name,
+          amount: amount,
+        );
         Navigator.pop(context, true);
         AppToast.show(
           AppLocalizations.of(context)!.incomeRecorded,
@@ -139,22 +149,23 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                     ButtonSegment(
                       value: IncomeKind.investment,
                       label: Text(l10n.investment),
-                      icon: const Icon(Icons.trending_up),
+                      icon: const Icon(Icons.account_balance),
                     ),
                     ButtonSegment(
                       value: IncomeKind.sale,
                       label: Text(l10n.sale),
-                      icon: const Icon(Icons.storefront),
+                      icon: const Icon(Icons.point_of_sale),
                     ),
                   ],
                   selected: {_kind},
                   style: SegmentedButton.styleFrom(
-                    selectedBackgroundColor: const Color(0xFFF0A04B),
+                    selectedBackgroundColor: AppColors.primary,
                     selectedForegroundColor: Colors.white,
                     foregroundColor:
                         isDark ? Colors.grey.shade300 : Colors.grey.shade700,
                     side: BorderSide(
-                      color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                      color:
+                          isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                     ),
                   ),
                   onSelectionChanged: (selection) {
@@ -168,7 +179,8 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                     decoration: InputDecoration(
                       labelText: l10n.selectSource,
                       hintText: l10n.enterSourceName,
-                      prefixIcon: const Icon(Icons.person),
+                      prefixIcon:
+                          const Icon(Icons.person, color: AppColors.primary),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                       filled: true,
@@ -178,12 +190,14 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                   ),
                 ] else ...[
                   DropdownButtonFormField<String>(
-                    value: _saleCategories.contains(_selectedSaleCategory)
-                        ? _selectedSaleCategory
-                        : null,
+                    initialValue:
+                        _saleCategories.contains(_selectedSaleCategory)
+                            ? _selectedSaleCategory
+                            : null,
                     decoration: InputDecoration(
                       labelText: l10n.selectSaleCategory,
-                      prefixIcon: const Icon(Icons.category),
+                      prefixIcon:
+                          const Icon(Icons.category, color: AppColors.primary),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                       filled: true,
@@ -210,7 +224,8 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                   ],
                   decoration: InputDecoration(
                     labelText: 'Amount (${l10n.currency ?? 'ETB'})',
-                    prefixIcon: const Icon(Icons.attach_money),
+                    prefixIcon: const Icon(Icons.attach_money,
+                        color: AppColors.primary),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
                     filled: true,

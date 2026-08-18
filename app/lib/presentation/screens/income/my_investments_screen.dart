@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/income_record_model.dart';
 import '../../../core/providers/auth_provider.dart';
@@ -20,11 +21,33 @@ class MyInvestmentsScreen extends StatefulWidget {
 class _MyInvestmentsScreenState extends State<MyInvestmentsScreen> {
   List<IncomeRecord> _records = [];
   StreamSubscription<List<IncomeRecord>>? _subscription;
-  int _itemsToShow = 20;
-  static const int _itemsPerLoad = 20;
+  DocumentSnapshot<Map<String, dynamic>>? _lastDoc;
+  bool _hasMore = false;
+  bool _isLoadingMore = false;
+  bool _loadedExtraPages = false;
+  int _totalCount = 0;
+  double _totalAmount = 0.0;
 
-  void _loadMore() {
-    setState(() => _itemsToShow += _itemsPerLoad);
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final uid = auth.user?.uid;
+    if (uid == null) return;
+    setState(() => _isLoadingMore = true);
+    final page =
+        await IncomeService().getIncomeForViewerPage(uid, startAfter: _lastDoc);
+    if (!mounted) return;
+    final knownIds = _records.map((r) => r.id).toSet();
+    setState(() {
+      _records = [
+        ..._records,
+        ...page.items.where((r) => !knownIds.contains(r.id)),
+      ];
+      _lastDoc = page.lastDoc;
+      _hasMore = page.hasMore;
+      _loadedExtraPages = true;
+      _isLoadingMore = false;
+    });
   }
 
   @override
@@ -38,8 +61,27 @@ class _MyInvestmentsScreenState extends State<MyInvestmentsScreen> {
     final uid = auth.user?.uid;
     if (uid == null) return;
     _subscription =
-        IncomeService().getIncomeForViewerStream(uid).listen((records) {
-      if (mounted) setState(() => _records = records);
+        IncomeService().getIncomeForViewerPageStream(uid).listen((records) {
+      if (mounted)
+        setState(() {
+          if (_loadedExtraPages) {
+            final tail = _records.length > records.length
+                ? _records.sublist(records.length)
+                : <IncomeRecord>[];
+            _records = [...records, ...tail];
+          } else {
+            _records = records;
+            _hasMore = records.length >= 20;
+          }
+        });
+    });
+    IncomeService().getIncomeCount(viewerId: uid).then((count) {
+      if (mounted && count != null) setState(() => _totalCount = count);
+    });
+    IncomeService()
+        .getIncomeTotalByKind(IncomeKind.investment, viewerId: uid)
+        .then((amount) {
+      if (mounted && amount != null) setState(() => _totalAmount = amount);
     });
   }
 
@@ -54,7 +96,7 @@ class _MyInvestmentsScreenState extends State<MyInvestmentsScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final total = _records.fold<double>(0.0, (s, r) => s + r.amount);
+    final total = _totalAmount;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -142,17 +184,21 @@ class _MyInvestmentsScreenState extends State<MyInvestmentsScreen> {
                     ),
                   )
                 else ...[
-                  ..._records.take(_itemsToShow).map(
-                      (r) => _buildRecordTile(context, r)),
-                  if (_records.length > _itemsToShow)
+                  ..._records.map((r) => _buildRecordTile(context, r)),
+                  if (_hasMore)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: OutlinedButton.icon(
-                        onPressed: _loadMore,
-                        icon: const Icon(Icons.expand_more),
-                        label: Text(
-                          l10n.loadMore(_records.length - _itemsToShow),
-                        ),
+                        onPressed: _isLoadingMore ? null : _loadMore,
+                        icon: _isLoadingMore
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: AppColors.primary),
+                              )
+                            : const Icon(Icons.expand_more),
+                        label: Text(l10n.loadMore),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: BorderSide(
@@ -165,11 +211,11 @@ class _MyInvestmentsScreenState extends State<MyInvestmentsScreen> {
                         ),
                       ),
                     )
-                  else if (_records.length > _itemsPerLoad)
+                  else if (_totalCount > 20)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
-                        l10n.showingAllTransactions(_records.length),
+                        l10n.showingAllTransactions(_totalCount),
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark
@@ -200,16 +246,7 @@ class _MyInvestmentsScreenState extends State<MyInvestmentsScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withOpacity(0.1),
-            ),
-            child: const Icon(Icons.trending_up,
-                color: AppColors.primary, size: 20),
-          ),
+          const Icon(Icons.account_balance, color: AppColors.primary, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

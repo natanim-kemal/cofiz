@@ -1,6 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/expense_record_model.dart';
 
+/// A single page of expense records from a cursor-paginated query.
+class ExpensePage {
+  final List<ExpenseRecord> items;
+  final DocumentSnapshot<Map<String, dynamic>>? lastDoc;
+  final bool hasMore;
+
+  ExpensePage({
+    required this.items,
+    required this.lastDoc,
+    required this.hasMore,
+  });
+}
+
 class ExpenseService {
   static const String _collectionName = 'expenses';
   static const String _settingsDoc = 'expenseCategories';
@@ -30,6 +43,111 @@ class ExpenseService {
         .map((snap) => snap.docs
             .map((doc) => ExpenseRecord.fromFirestore(doc.data(), doc.id))
             .toList());
+  }
+
+  /// Bounded live stream of the newest expense records (first page only).
+  Stream<List<ExpenseRecord>> getExpensesPageStream({int limit = 20}) {
+    return _firestore
+        .collection(_collectionName)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => ExpenseRecord.fromFirestore(doc.data(), doc.id))
+            .toList());
+  }
+
+  /// Fetch a page of expense records (newest first) via cursor.
+  Future<ExpensePage> getExpensesPage({
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int pageSize = 20,
+  }) async {
+    try {
+      Query<Map<String, dynamic>> query = _firestore
+          .collection(_collectionName)
+          .orderBy('createdAt', descending: true)
+          .limit(pageSize);
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+      final snapshot = await query.get();
+      final records = snapshot.docs
+          .map((doc) => ExpenseRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+      return ExpensePage(
+        items: records,
+        lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length == pageSize,
+      );
+    } catch (e) {
+      print('Error fetching expenses page: $e');
+      return ExpensePage(items: const [], lastDoc: null, hasMore: false);
+    }
+  }
+
+  /// Fetch all expense records (newest first) - for reports/export.
+  Future<List<ExpenseRecord>> getAllExpenses() async {
+    try {
+      final snap = await _firestore
+          .collection(_collectionName)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs
+          .map((doc) => ExpenseRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error fetching all expense records: $e');
+      return const [];
+    }
+  }
+
+  /// Server-side total expenses sum.
+  /// Returns null if the query fails (e.g. index not ready/offline).
+  Future<double?> getExpensesTotal() async {
+    try {
+      final snapshot = await _firestore
+          .collection(_collectionName)
+          .aggregate(sum('amount'))
+          .get();
+      return snapshot.getSum('amount') ?? 0.0;
+    } catch (e) {
+      print('Error fetching expenses total: $e');
+      return null;
+    }
+  }
+
+  /// Server-side total expenses sum for today.
+  /// Returns null if the query fails.
+  Future<double?> getExpensesTodayTotal() async {
+    try {
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, now.day);
+      final end = start.add(const Duration(days: 1));
+      final snapshot = await _firestore
+          .collection(_collectionName)
+          .where('createdAt',
+              isGreaterThanOrEqualTo: start.millisecondsSinceEpoch)
+          .where('createdAt', isLessThan: end.millisecondsSinceEpoch)
+          .aggregate(sum('amount'))
+          .get();
+      return snapshot.getSum('amount') ?? 0.0;
+    } catch (e) {
+      print('Error fetching today expenses total: $e');
+      return null;
+    }
+  }
+
+  /// Server-side count of expense records.
+  /// Returns null if the query fails.
+  Future<int?> getExpensesCount() async {
+    try {
+      final snapshot =
+          await _firestore.collection(_collectionName).count().get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      print('Error fetching expenses count: $e');
+      return null;
+    }
   }
 
   Future<String?> addExpense(ExpenseRecord record) async {

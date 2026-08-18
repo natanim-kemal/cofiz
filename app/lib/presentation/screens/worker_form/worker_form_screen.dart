@@ -3,6 +3,8 @@ import '../../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/worker_model.dart';
 import '../../../core/providers/worker_provider.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/worker_account_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -117,6 +119,30 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
 
     if (mounted) {
       if (success) {
+        final authProvider =
+            Provider.of<AuthProvider>(context, listen: false);
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        final adminName =
+            authProvider.appUser?.displayName ?? authProvider.user?.email ?? '';
+        final adminId = authProvider.user?.uid ?? 'unknown';
+
+        if (isEditMode) {
+          await auditProvider.logWorkerUpdated(
+            userId: adminId,
+            userName: adminName,
+            workerId: widget.worker!.id,
+            workerName: worker.name,
+          );
+        } else if (newWorkerId != null) {
+          await auditProvider.logWorkerCreated(
+            userId: adminId,
+            userName: adminName,
+            workerId: newWorkerId,
+            workerName: worker.name,
+            hasLoginAccount: _createLoginAccount,
+          );
+        }
         // Determine if account creation is needed
         final targetId = isEditMode ? widget.worker!.id : newWorkerId;
         final shouldCreateAccount = _createLoginAccount &&
@@ -137,6 +163,13 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
           setState(() => _isLoading = false);
 
           if (result['success'] == true) {
+            await auditProvider.logUserCreated(
+              adminUserId: adminId,
+              adminUserName: adminName,
+              newUserId: result['userId'] as String? ?? targetId,
+              newUserEmail: _emailController.text.trim(),
+              role: 'worker',
+            );
             // Check if it was a restoration (existing account)
             if (result['message'] != null) {
               if (mounted) {
@@ -230,7 +263,7 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
               onPressed: _saveWorker,
               child: Text(
                 AppLocalizations.of(context)!.save,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
@@ -393,7 +426,7 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
                           onChanged: (value) {
                             setState(() => _createLoginAccount = value);
                           },
-                          activeColor: AppColors.primary,
+                          activeThumbColor: AppColors.primary,
                         ),
                       ],
                     ),
@@ -456,7 +489,7 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
                             ),
                             child: Text(
                               '$_yearsOfExperience',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.primary,

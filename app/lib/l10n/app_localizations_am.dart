@@ -171,9 +171,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get submitReport => 'ሪፖርት አስገባ';
 
   @override
-  String loadMore(Object remaining) {
-    return 'ተጨማሪ ይጫኑ ($remaining ቀሪ)';
-  }
+  String get loadMore => 'ተጨማሪ ይጫኑ';
 
   @override
   String get save => 'አስቀምጥ';
@@ -216,6 +214,12 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get all => 'ሁሉም';
+
+  @override
+  String get filter => 'አጣራ';
+
+  @override
+  String get historyDescription => 'የግብይት ታሪክዎን ይመልከቱ';
 
   @override
   String get type => 'ዓይነት';
@@ -311,10 +315,23 @@ class AppLocalizationsAm extends AppLocalizations {
   String get receivedFrom => 'የተቀበለው ከ';
 
   @override
+  String transferredTo(Object sender, Object receiver) {
+    return '$sender ወደ $receiver ተላልፏል';
+  }
+
+  @override
+  String receivedFromName(Object receiver, Object sender) {
+    return '$receiver ከ$sender የተቀበለው';
+  }
+
+  @override
   String get transferFailed => 'ገንዘብ ማስተላለፍ አልተሳካም';
 
   @override
   String get recordPurchase => 'ግዢ መዝግብ';
+
+  @override
+  String get purchase => 'ግዢ';
 
   @override
   String get coffeePurchase => 'የቡና ግዢ';
@@ -754,6 +771,9 @@ class AppLocalizationsAm extends AppLocalizations {
   String get contactSupport => 'ድጋፍን ያነጋግሩ';
 
   @override
+  String get contactDetails => 'የእውቂያ ዝርዝሮች';
+
+  @override
   String get visitWebsite => 'ድረ-ገጽን ይጎብኙ';
 
   @override
@@ -971,6 +991,15 @@ class AppLocalizationsAm extends AppLocalizations {
   String get failedToUploadReceipt => 'ደረሰኝ መስቀል አልተሳካም';
 
   @override
+  String get receipt => 'ደረሰኝ';
+
+  @override
+  String get receiptDownloaded => 'ደረሰኝ ተወርዷል';
+
+  @override
+  String get failedToDownloadReceipt => 'ደረሰኝን ማውረድ አልተቻለም';
+
+  @override
   String get transactionCompleted => 'ግብይት በተሳካ ሁኔታ ተጠናቅቋል';
 
   @override
@@ -1073,7 +1102,7 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String commissionRateInfo(Object currency, Object rate) {
-    return '(ተመን: $currency $rate በኪሎ)';
+    return 'ተመን: $currency $rate በኪሎ';
   }
 
   @override
@@ -1378,4 +1407,13 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get filterByDate => 'በቀን አጣራ';
+
+  @override
+  String get cashFlow => 'የገንዘብ ፍሰት';
+
+  @override
+  String get neutral => 'ገለልተኛ';
+
+  @override
+  String get tapAgainToExit => 'ለመውጣት እንደገና ይጫኑ';
 }

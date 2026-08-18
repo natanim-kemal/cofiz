@@ -10,6 +10,7 @@ class WorkerItem extends StatelessWidget {
   final String status;
   final String? photoUrl;
   final double? currentBalance; // Optional balance to display
+  final double? dailyCommission; // Commission earned today
   final VoidCallback? onTap;
 
   const WorkerItem({
@@ -20,6 +21,7 @@ class WorkerItem extends StatelessWidget {
     this.status = 'active',
     this.photoUrl,
     this.currentBalance,
+    this.dailyCommission,
     this.onTap,
   });
 
@@ -126,8 +128,9 @@ class WorkerItem extends StatelessWidget {
   }
 
   Widget _buildBalanceDisplay(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isLowBalance = currentBalance! < 500;
-    final balanceColor = isLowBalance ? Colors.red : AppColors.success;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -138,14 +141,29 @@ class WorkerItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: balanceColor,
+            color: theme.textTheme.bodyLarge?.color,
           ),
         ),
         if (isLowBalance)
           Text(
             AppLocalizations.of(context)!.low,
-            style: TextStyle(fontSize: 10, color: balanceColor),
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? Colors.red.shade300 : Colors.red,
+            ),
           ),
+        if (dailyCommission != null && dailyCommission! > 0) ...[
+          const SizedBox(height: 2),
+          Text(
+            '${AppLocalizations.of(context)?.commission ?? 'Commission'}: '
+            '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${dailyCommission!.formatted}',
+            style: TextStyle(
+              fontSize: 11,
+              color:
+                  isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -160,7 +178,7 @@ class WorkerItem extends StatelessWidget {
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary,
             image: hasPhoto
                 ? DecorationImage(
                     image: NetworkImage(photoUrl!),
@@ -172,8 +190,8 @@ class WorkerItem extends StatelessWidget {
               ? Center(
                   child: Text(
                     name.substring(0, 2).toUpperCase(),
-                    style: TextStyle(
-                      color: AppColors.primary,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),

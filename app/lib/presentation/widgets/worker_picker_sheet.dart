@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/models/worker_model.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -55,8 +56,7 @@ class _WorkerPickerSheetState extends State<WorkerPickerSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          if (widget.mode == 'transfer' ||
-              widget.mode == 'transfer_receiver')
+          if (widget.mode == 'transfer' || widget.mode == 'transfer_receiver')
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -74,7 +74,9 @@ class _WorkerPickerSheetState extends State<WorkerPickerSheet> {
                         icon: Icon(Icons.remove_circle),
                       ),
                     ],
-                    selected: {widget.mode == 'transfer_receiver' ? 'return' : 'transfer'},
+                    selected: {
+                      widget.mode == 'transfer_receiver' ? 'return' : 'transfer'
+                    },
                     onSelectionChanged: widget.mode == 'transfer_receiver'
                         ? null
                         : (selection) {
@@ -86,10 +88,10 @@ class _WorkerPickerSheetState extends State<WorkerPickerSheet> {
                       foregroundColor: WidgetStateProperty.resolveWith(
                           (states) => states.contains(WidgetState.selected)
                               ? Colors.white
-                              : const Color(0xFFF0A04B)),
+                              : AppColors.primary),
                       backgroundColor: WidgetStateProperty.resolveWith(
                           (states) => states.contains(WidgetState.selected)
-                              ? const Color(0xFFF0A04B)
+                              ? AppColors.primary
                               : null),
                     ),
                   ),
@@ -97,7 +99,8 @@ class _WorkerPickerSheetState extends State<WorkerPickerSheet> {
                   Text(
                     widget.mode == 'transfer_receiver'
                         ? (localizations?.chooseReceiver ?? 'Choose Receiver')
-                        : (localizations?.selectCollector ?? 'Select Collector'),
+                        : (localizations?.selectCollector ??
+                            'Select Collector'),
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -125,7 +128,7 @@ class _WorkerPickerSheetState extends State<WorkerPickerSheet> {
               onChanged: (value) => setState(() => _query = value),
               decoration: InputDecoration(
                 hintText: localizations?.searchCollector ?? 'Search collectors',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -158,7 +161,8 @@ class _WorkerPickerSheetState extends State<WorkerPickerSheet> {
                           '${localizations?.currentBalance ?? 'Balance'}: '
                           '${worker.currentBalance.asCurrency}',
                         ),
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: const Icon(Icons.chevron_right,
+                            color: AppColors.primary),
                         onTap: () {
                           if (widget.mode == 'transfer' ||
                               widget.mode == 'transfer_receiver') {

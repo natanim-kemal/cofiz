@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -151,8 +152,10 @@ class SettingsScreen extends StatelessWidget {
                   subtitle: localizations.systemDefault,
                   trailing: Switch(
                       value: isDark,
-                      onChanged: (val) => themeProvider.toggleTheme(val),
-                      activeColor: AppColors.primary),
+                      onChanged: (val) async {
+                        await themeProvider.toggleTheme(val);
+                      },
+                      activeThumbColor: AppColors.primary),
                 ),
                 _buildSettingsTile(
                   context,
@@ -266,6 +269,15 @@ class SettingsScreen extends StatelessWidget {
                     if (confirmed == true && context.mounted) {
                       final authProvider =
                           Provider.of<AuthProvider>(context, listen: false);
+                      final auditProvider =
+                          Provider.of<AuditProvider>(context, listen: false);
+                      final userName = authProvider.appUser?.displayName ??
+                          authProvider.user?.email ??
+                          'admin';
+                      await auditProvider.logLogout(
+                        userId: authProvider.user?.uid ?? 'unknown',
+                        userName: userName,
+                      );
                       await authProvider.signOut();
                       if (context.mounted) {
                         Navigator.of(context)
@@ -291,7 +303,7 @@ class SettingsScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12, left: 4),
       child: Text(
         title.toUpperCase(),
-        style: TextStyle(
+        style: const TextStyle(
           color: AppColors.textMutedDark,
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -373,9 +385,8 @@ class SettingsScreen extends StatelessWidget {
                     success
                         ? AppLocalizations.of(context)!
                             .passwordResetEmailSent(email)
-                        : AppLocalizations.of(context)!
-                            .failedToSendResetEmail(
-                                authProvider.errorMessage ?? 'Unknown'),
+                        : AppLocalizations.of(context)!.failedToSendResetEmail(
+                            authProvider.errorMessage ?? 'Unknown'),
                     success: success,
                   );
                 }
@@ -428,7 +439,22 @@ class SettingsScreen extends StatelessWidget {
       trailing:
           isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
-        settings.setLocale(locale);
+        if (settings.locale.languageCode != locale.languageCode) {
+          final authProvider =
+              Provider.of<AuthProvider>(context, listen: false);
+          final auditProvider =
+              Provider.of<AuditProvider>(context, listen: false);
+          auditProvider.logSettingsChanged(
+            userId: authProvider.user?.uid ?? 'unknown',
+            userName: authProvider.appUser?.displayName ??
+                authProvider.user?.email ??
+                '',
+            setting: 'language',
+            oldValue: settings.locale.languageCode,
+            newValue: locale.languageCode,
+          );
+          settings.setLocale(locale);
+        }
         Navigator.pop(context);
       },
     );

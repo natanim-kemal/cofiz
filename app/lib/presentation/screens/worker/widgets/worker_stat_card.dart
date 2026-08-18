@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class WorkerStatCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  final Color color;
   final bool isDark;
 
   const WorkerStatCard({
@@ -12,7 +12,6 @@ class WorkerStatCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
-    required this.color,
     required this.isDark,
   });
 
@@ -34,7 +33,7 @@ class WorkerStatCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 28),
+          Icon(icon, color: AppColors.primary, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

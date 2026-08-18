@@ -19,6 +19,8 @@ class MoneyTransaction {
   // Transfer-specific (collector-to-collector)
   final String? fromWorkerId;
   final String? toWorkerId;
+  final String? fromWorkerName;
+  final String? toWorkerName;
   final String? transferId;
   final String? transferRole; // 'sender' or 'receiver'
 
@@ -39,6 +41,8 @@ class MoneyTransaction {
     this.commissionAmount,
     this.fromWorkerId,
     this.toWorkerId,
+    this.fromWorkerName,
+    this.toWorkerName,
     this.transferId,
     this.transferRole,
   });
@@ -69,6 +73,8 @@ class MoneyTransaction {
           : (data['commissionAmount'] ?? 0.0).toDouble(),
       fromWorkerId: data['fromWorkerId'],
       toWorkerId: data['toWorkerId'],
+      fromWorkerName: data['fromWorkerName'],
+      toWorkerName: data['toWorkerName'],
       transferId: data['transferId'],
       transferRole: data['transferRole'],
     );
@@ -91,6 +97,8 @@ class MoneyTransaction {
       'commissionAmount': commissionAmount,
       'fromWorkerId': fromWorkerId,
       'toWorkerId': toWorkerId,
+      'fromWorkerName': fromWorkerName,
+      'toWorkerName': toWorkerName,
       'transferId': transferId,
       'transferRole': transferRole,
     };
@@ -130,6 +138,8 @@ class MoneyTransaction {
           : (json['commissionAmount'] ?? 0.0).toDouble(),
       fromWorkerId: json['fromWorkerId'],
       toWorkerId: json['toWorkerId'],
+      fromWorkerName: json['fromWorkerName'],
+      toWorkerName: json['toWorkerName'],
       transferId: json['transferId'],
       transferRole: json['transferRole'],
     );

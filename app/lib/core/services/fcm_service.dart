@@ -23,11 +23,14 @@ class FCMService {
 
   String? get currentToken => _currentToken;
 
+  /// Register the background message handler. Cheap and must run as early
+  /// as possible so cold-start notification launches are handled.
+  void setup() {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
+
   /// Initialize FCM - call this after Firebase.initializeApp()
   Future<void> initialize() async {
-    // Set up background message handler
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
     // Request permission
     await requestPermission();
 
@@ -78,9 +81,7 @@ class FCMService {
 
   /// Save FCM token for a user
   Future<void> saveTokenForUser(String userId) async {
-    if (_currentToken == null) {
-      _currentToken = await _messaging.getToken();
-    }
+    _currentToken ??= await _messaging.getToken();
 
     if (_currentToken != null) {
       try {

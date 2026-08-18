@@ -7,6 +7,7 @@ enum AuditAction {
   workerUpdated,
   workerDeleted,
   transactionCreated,
+  transactionDeleted,
   incomeRecorded,
   expenseRecorded,
   settingsChanged,
@@ -33,6 +34,8 @@ enum AuditAction {
         return 'Collector Deleted';
       case AuditAction.transactionCreated:
         return 'Transaction Created';
+      case AuditAction.transactionDeleted:
+        return 'Transaction Deleted';
       case AuditAction.incomeRecorded:
         return 'Income Recorded';
       case AuditAction.expenseRecorded:

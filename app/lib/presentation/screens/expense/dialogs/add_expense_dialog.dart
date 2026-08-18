@@ -7,6 +7,7 @@ import '../../../../core/providers/expense_provider.dart';
 import '../../../../core/providers/transaction_provider.dart';
 import '../../../../core/providers/income_provider.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/audit_provider.dart';
 import '../../../../core/services/expense_service.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -59,8 +60,8 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     }
   }
 
-  double _availableBalance(TransactionProvider tp, IncomeProvider ip,
-      ExpenseProvider ep) {
+  double _availableBalance(
+      TransactionProvider tp, IncomeProvider ip, ExpenseProvider ep) {
     double moneyIn = ip.totalInvestments + ip.totalSales;
     double moneyOut = ep.totalExpenses;
     for (final t in tp.allTransactions) {
@@ -92,11 +93,10 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
         Provider.of<TransactionProvider>(context, listen: false);
     final incomeProvider = Provider.of<IncomeProvider>(context, listen: false);
 
-    if (amount > _availableBalance(
-        transactionProvider, incomeProvider, provider)) {
+    if (amount >
+        _availableBalance(transactionProvider, incomeProvider, provider)) {
       if (mounted) {
-        AppToast.show(
-            AppLocalizations.of(context)!.insufficientBalance);
+        AppToast.show(AppLocalizations.of(context)!.insufficientBalance);
       }
       return;
     }
@@ -121,6 +121,16 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        final userName = auth.user?.displayName ?? auth.user?.email ?? '';
+        await auditProvider.logExpenseRecorded(
+          userId: auth.user?.uid ?? 'unknown',
+          userName: userName,
+          expenseId: record.id,
+          category: record.expenseCategory,
+          amount: amount,
+        );
         Navigator.pop(context, true);
         AppToast.show(
           AppLocalizations.of(context)!.expenseRecorded,
@@ -160,12 +170,13 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: _categories.contains(_selectedCategory)
+                  initialValue: _categories.contains(_selectedCategory)
                       ? _selectedCategory
                       : null,
                   decoration: InputDecoration(
                     labelText: l10n.selectExpenseCategory,
-                    prefixIcon: const Icon(Icons.category),
+                    prefixIcon:
+                        const Icon(Icons.category, color: AppColors.primary),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
                     filled: true,
@@ -191,7 +202,8 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                   ],
                   decoration: InputDecoration(
                     labelText: 'Amount (${l10n.currency ?? 'ETB'})',
-                    prefixIcon: const Icon(Icons.attach_money),
+                    prefixIcon: const Icon(Icons.attach_money,
+                        color: AppColors.primary),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
                     filled: true,
@@ -225,13 +237,13 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.info_outline,
-                          color: Colors.blue, size: 20),
+                          color: AppColors.primary, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -246,7 +258,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                                   listen: false),
                             ).formatted,
                           ),
-                          style: const TextStyle(color: Colors.blue),
+                          style: const TextStyle(color: AppColors.primary),
                         ),
                       ),
                     ],

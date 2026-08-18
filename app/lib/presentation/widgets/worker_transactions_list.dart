@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 import '../../../core/models/transaction_model.dart';
 import '../../../core/models/worker_model.dart';
 import '../../core/providers/transaction_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/audit_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/number_formatter.dart';
@@ -26,6 +31,10 @@ class WorkerTransactionsList extends StatefulWidget {
 }
 
 class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
+  DateTime? _selectedDate;
+  int _itemsToShow = 20;
+  static const int _itemsPerLoad = 20;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +48,35 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
   void _reload() {
     Provider.of<TransactionProvider>(context, listen: false)
         .loadWorkerTransactions(widget.workerId);
+  }
+
+  Future<void> _loadMore(TransactionProvider provider) async {
+    setState(() => _itemsToShow += _itemsPerLoad);
+    await provider.loadMoreWorkerTransactions(widget.workerId);
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  List<MoneyTransaction> _filteredTransactions(
+      List<MoneyTransaction> transactions) {
+    final day = _selectedDate ?? DateTime.now();
+    return transactions
+        .where((t) =>
+            t.createdAt.year == day.year &&
+            t.createdAt.month == day.month &&
+            t.createdAt.day == day.day)
+        .toList();
   }
 
   Future<void> _editTransaction(MoneyTransaction transaction) async {
@@ -70,8 +108,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.delete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -87,6 +124,19 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
 
     if (!mounted) return;
     if (success) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final auditProvider = Provider.of<AuditProvider>(context, listen: false);
+      await auditProvider.logTransactionDeleted(
+        userId: authProvider.user?.uid ?? 'unknown',
+        userName:
+            authProvider.appUser?.displayName ?? authProvider.user?.email ?? '',
+        transactionId:
+            transaction.isTransfer ? transaction.transferId! : transaction.id,
+        transactionType: transaction.type,
+        amount: transaction.amount,
+        workerName: transaction.workerName,
+        wasUnconfirmed: !transaction.approved,
+      );
       _reload();
       AppToast.show(l10n.transactionDeleted, success: true);
     } else {
@@ -97,22 +147,90 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Consumer<TransactionProvider>(
       builder: (context, transactionProvider, _) {
         final transactions = transactionProvider.workerTransactions;
+        final filtered = _filteredTransactions(transactions);
 
-        if (transactions.isEmpty) {
-          return _buildEmptyState();
-        }
-
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: transactions.length > 5 ? 5 : transactions.length,
-          itemBuilder: (context, index) {
-            final transaction = transactions[index];
-            return _buildTransactionItem(transaction);
-          },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  AppLocalizations.of(context)!.transactionHistory,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                if (_selectedDate != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _selectedDate = null);
+                    },
+                    icon: const Icon(Icons.close, size: 16),
+                    label: Text(
+                      DateFormat('MMM d, yyyy').format(_selectedDate!),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  )
+                else
+                  IconButton(
+                    tooltip: AppLocalizations.of(context)!.filterByDate,
+                    onPressed: _pickDate,
+                    icon: const Icon(Icons.filter_alt),
+                    color: AppColors.primary,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (filtered.isEmpty)
+              _buildEmptyState()
+            else ...[
+              for (final transaction in filtered.take(_itemsToShow))
+                _buildTransactionItem(transaction),
+              if (filtered.length > _itemsToShow ||
+                  transactionProvider.hasMoreWorkerTransactions)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed:
+                          transactionProvider.isLoadingMoreWorkerTransactions
+                              ? null
+                              : () => _loadMore(transactionProvider),
+                      icon: transactionProvider.isLoadingMoreWorkerTransactions
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.primary),
+                            )
+                          : const Icon(Icons.expand_more),
+                      label: Text(AppLocalizations.of(context)!.loadMore),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ],
         );
       },
     );
@@ -133,10 +251,10 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
       child: Center(
         child: Column(
           children: [
-            Icon(
+            const Icon(
               Icons.receipt_long_outlined,
               size: 48,
-              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+              color: AppColors.primary,
             ),
             const SizedBox(height: 12),
             Text(
@@ -182,7 +300,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
         typeIcon = Icons.shopping_cart;
         break;
       case 'transfer':
-        typeColor = const Color(0xFFF0A04B);
+        typeColor = AppColors.primary;
         typeIcon = Icons.swap_horiz;
         break;
       default:
@@ -195,9 +313,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
         final isAdmin = authProvider.isAdmin;
 
         return GestureDetector(
-          onLongPress: isAdmin
-              ? () => _showActionsModal(transaction)
-              : null,
+          onLongPress: isAdmin ? () => _showActionsModal(transaction) : null,
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
@@ -211,7 +327,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
             ),
             child: Row(
               children: [
-                Icon(typeIcon, color: typeColor, size: 24),
+                Icon(typeIcon, color: AppColors.primary, size: 24),
 
                 const SizedBox(width: 12),
 
@@ -230,31 +346,17 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        DateFormat('MMM d, yyyy • h:mm a')
-                            .format(transaction.createdAt),
+                        '${DateFormat('MMM d, h:mm a').format(transaction.createdAt)}'
+                        '${transaction.type == 'purchase' && transaction.notes != null && transaction.notes!.isNotEmpty ? ' · ${transaction.notes}' : ''}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).brightness == Brightness.dark
                               ? AppColors.textMutedDark
                               : AppColors.textMutedLight,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (transaction.notes != null &&
-                          transaction.notes!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          transaction.notes!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? AppColors.textMutedDark
-                                : AppColors.textMutedLight,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -273,6 +375,22 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                         color: typeColor,
                       ),
                     ),
+                    if (transaction.notes != null &&
+                        transaction.notes!.isNotEmpty &&
+                        transaction.type != 'purchase') ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        transaction.notes!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.textMutedDark
+                              : AppColors.textMutedLight,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     if (transaction.type == 'purchase' &&
                         transaction.coffeeWeight != null)
                       Text(
@@ -281,10 +399,9 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                         '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${(transaction.pricePerKg ?? 0).formatted}',
                         style: TextStyle(
                           fontSize: 11,
-                          color:
-                              Theme.of(context).brightness == Brightness.dark
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                         ),
                       ),
                   ],
@@ -317,23 +434,38 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                 ),
               ],
             ),
-            child: Row(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (!transaction.isTransfer)
-                  _buildActionChip(
-                    icon: Icons.edit_outlined,
-                    label: l10n.edit,
-                    color: const Color(0xFFF0A04B),
-                    value: 'edit',
-                  ),
-                if (!transaction.isTransfer) const SizedBox(width: 12),
-                _buildActionChip(
-                  icon: Icons.delete_outline,
-                  label: l10n.delete,
-                  color: const Color(0xFFF0A04B),
-                  value: 'delete',
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!transaction.isTransfer)
+                      _buildActionChip(
+                        icon: Icons.edit_outlined,
+                        label: l10n.edit,
+                        color: AppColors.primary,
+                        value: 'edit',
+                      ),
+                    if (!transaction.isTransfer) const SizedBox(width: 12),
+                    _buildActionChip(
+                      icon: Icons.delete_outline,
+                      label: l10n.delete,
+                      color: AppColors.primary,
+                      value: 'delete',
+                    ),
+                  ],
                 ),
+                if (transaction.receiptUrl != null &&
+                    transaction.receiptUrl!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildActionChip(
+                    icon: Icons.download_outlined,
+                    label: l10n.receipt,
+                    color: AppColors.primary,
+                    value: 'receipt',
+                  ),
+                ],
               ],
             ),
           ),
@@ -346,6 +478,37 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
       await _editTransaction(transaction);
     } else if (action == 'delete') {
       await _deleteTransaction(transaction);
+    } else if (action == 'receipt') {
+      await _downloadReceipt(transaction);
+    }
+  }
+
+  Future<void> _downloadReceipt(MoneyTransaction transaction) async {
+    final l10n = AppLocalizations.of(context)!;
+    final receiptUrl = transaction.receiptUrl;
+    if (receiptUrl == null || receiptUrl.isEmpty) return;
+
+    try {
+      final response = await http.get(Uri.parse(receiptUrl));
+      if (response.statusCode != 200) {
+        if (mounted) AppToast.show(l10n.failedToDownloadReceipt);
+        return;
+      }
+
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        '${dir.path}/receipt_${transaction.id}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      await file.writeAsBytes(response.bodyBytes);
+
+      final result = await OpenFilex.open(file.path);
+      if (result.type != ResultType.done && mounted) {
+        AppToast.show(l10n.failedToDownloadReceipt);
+        return;
+      }
+      if (mounted) AppToast.show(l10n.receiptDownloaded, success: true);
+    } catch (e) {
+      if (mounted) AppToast.show(l10n.failedToDownloadReceipt);
     }
   }
 
@@ -391,11 +554,21 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
       case 'purchase':
         return AppLocalizations.of(context)?.purchased ?? 'Purchased';
       case 'transfer':
+        final fromName = transaction.fromWorkerName;
+        final toName = transaction.toWorkerName;
+        if (fromName != null && toName != null) {
+          return transaction.isTransferSender
+              ? (AppLocalizations.of(context)
+                      ?.transferredTo(fromName, toName) ??
+                  '$fromName transferred to $toName')
+              : (AppLocalizations.of(context)
+                      ?.receivedFromName(toName, fromName) ??
+                  '$toName received from $fromName');
+        }
         return transaction.isTransferSender
             ? (AppLocalizations.of(context)?.transferredOut ??
                 'Transferred Out')
-            : (AppLocalizations.of(context)?.receivedFrom ??
-                'Received From');
+            : (AppLocalizations.of(context)?.receivedFrom ?? 'Received From');
       default:
         return transaction.type;
     }

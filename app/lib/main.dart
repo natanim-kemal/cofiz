@@ -22,6 +22,7 @@ import 'core/services/income_service.dart';
 import 'core/services/expense_service.dart';
 import 'presentation/widgets/custom_bottom_nav.dart';
 import 'presentation/widgets/offline_indicator.dart';
+import 'presentation/widgets/double_back_exit.dart';
 import 'presentation/widgets/app_toast.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/widgets/background_pattern.dart';
@@ -46,22 +47,14 @@ void main() async {
     }
   }
 
-  // Initialize local notifications
+  // Register the FCM background handler early (cheap, local).
+  FCMService().setup();
+
+  // Fast, local-only initialization required before the first frame.
   final notificationService = NotificationService();
   await notificationService.initialize();
 
-  // Initialize FCM for push notifications
-  final fcmService = FCMService();
-  await fcmService.initialize();
-
-  // Initialize default areas if none exist
-  await AreaService().initializeDefaultAreas();
-
-  // Initialize default sale & expense categories if none exist
-  await IncomeService().initializeDefaultSaleCategories();
-  await ExpenseService().initializeDefaultExpenseCategories();
-
-  // Initialize offline services
+  // Initialize local caches (Hive) so the UI can read cached data immediately.
   final offlineSyncService = OfflineSyncService();
   await offlineSyncService.initialize();
 
@@ -69,6 +62,26 @@ void main() async {
     notificationService: notificationService,
     offlineSyncService: offlineSyncService,
   ));
+
+  // Network-dependent initialization is deferred until after the first
+  // frame so a slow connection doesn't hold up app startup. All calls run
+  // in parallel.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeNetworkServices();
+  });
+}
+
+Future<void> _initializeNetworkServices() async {
+  try {
+    await Future.wait([
+      FCMService().initialize(),
+      AreaService().initializeDefaultAreas(),
+      IncomeService().initializeDefaultSaleCategories(),
+      ExpenseService().initializeDefaultExpenseCategories(),
+    ]);
+  } catch (e) {
+    debugPrint('Background service initialization failed: $e');
+  }
 }
 
 class StitchWorkerApp extends StatelessWidget {
@@ -117,7 +130,10 @@ class StitchWorkerApp extends StatelessWidget {
               Locale('en'),
               Locale('am'),
             ],
-            builder: (context, child) => AppToastHost(child: child!),
+            builder: (context, child) => ColoredBox(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: AppToastHost(child: child!),
+            ),
             home: const AuthGate(),
           );
         },
@@ -287,35 +303,37 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          const BackgroundPattern(),
-          PageView(
-            controller: _pageController,
-            onPageChanged: _onPageChanged,
-            children: _screens,
-          ),
-
-          // Offline Indicator
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: OfflineIndicator(),
-          ),
-
-          // Fixed Bottom Nav
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: CustomBottomNav(
-              currentIndex: _currentIndex,
-              onTap: _onNavTap,
+    return DoubleBackExit(
+      child: Scaffold(
+        body: Stack(
+          children: [
+            const BackgroundPattern(),
+            PageView(
+              controller: _pageController,
+              onPageChanged: _onPageChanged,
+              children: _screens,
             ),
-          ),
-        ],
+
+            // Offline Indicator
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: OfflineIndicator(),
+            ),
+
+            // Fixed Bottom Nav
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: CustomBottomNav(
+                currentIndex: _currentIndex,
+                onTap: _onNavTap,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

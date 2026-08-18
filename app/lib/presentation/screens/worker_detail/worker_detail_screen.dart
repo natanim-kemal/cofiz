@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/worker_model.dart';
 import '../../../core/providers/worker_provider.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/audit_provider.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/number_formatter.dart';
@@ -24,9 +25,6 @@ class WorkerDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
       // backgroundColor: AppColors.backgroundLight, // Removed for theme support
       body: Stack(
@@ -46,8 +44,8 @@ class WorkerDetailScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline,
-                          size: 64, color: Colors.red.shade300),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: AppColors.primary),
                       const SizedBox(height: 16),
                       Text(AppLocalizations.of(context)!.workerNotFound),
                       const SizedBox(height: 16),
@@ -85,9 +83,12 @@ class WorkerDetailScreen extends StatelessWidget {
                             children: [
                               if (canEdit) ...[
                                 if (worker.userId != null)
-                                  IconButton(
-                                    icon: const Icon(Icons.notifications_active,
-                                        color: Colors.white),
+IconButton(
+                                    icon: Transform.rotate(
+                                      angle: -0.35, 
+                                      child: const Icon(Icons.send,
+                                          color: Colors.white),
+                                    ),
                                     tooltip: AppLocalizations.of(context)!
                                         .pingWorker,
                                     onPressed: () => _showPingDialog(
@@ -129,16 +130,36 @@ class WorkerDetailScreen extends StatelessWidget {
 
                                       if (context.mounted) {
                                         if (success) {
+                                          final authProvider =
+                                              Provider.of<AuthProvider>(
+                                            context,
+                                            listen: false,
+                                          );
+                                          final auditProvider =
+                                              Provider.of<AuditProvider>(
+                                            context,
+                                            listen: false,
+                                          );
+                                          await auditProvider.logWorkerDeleted(
+                                            userId: authProvider.user?.uid ??
+                                                'unknown',
+                                            userName: authProvider
+                                                    .appUser?.displayName ??
+                                                authProvider.user?.email ??
+                                                'admin',
+                                            workerId: worker.id,
+                                            workerName: worker.name,
+                                          );
                                           Navigator.pop(context);
                                           AppToast.show(
                                               AppLocalizations.of(context)!
                                                   .workerDeletedSuccessfully,
                                               success: true);
                                         } else {
-                                          AppToast.show(workerProvider
-                                                  .errorMessage ??
-                                              AppLocalizations.of(context)!
-                                                  .failedToDeleteWorker);
+                                          AppToast.show(
+                                              workerProvider.errorMessage ??
+                                                  AppLocalizations.of(context)!
+                                                      .failedToDeleteWorker);
                                         }
                                       }
                                     }
@@ -193,25 +214,9 @@ class WorkerDetailScreen extends StatelessWidget {
                           // Action Buttons
                           _buildActionButtons(context, worker),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 40),
 
-                          // Transaction History Header
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                AppLocalizations.of(context)!
-                                    .transactionHistory,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          // Worker Transactions List
+                          // Worker Transactions List (renders its own header + filter)
                           WorkerTransactionsList(
                             workerId: workerId,
                             worker: worker,
@@ -247,107 +252,59 @@ class WorkerDetailScreen extends StatelessWidget {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withOpacity(0.1),
-            ),
-            child: worker.photoUrl != null && worker.photoUrl!.isNotEmpty
-                ? ClipOval(
-                    child: Image.network(
-                      worker.photoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildAvatarInitials(worker.name);
-                      },
-                    ),
-                  )
-                : _buildAvatarInitials(worker.name),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Name
           Text(
-            worker.name,
+            AppLocalizations.of(context)!.contactDetails,
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Theme.of(context).textTheme.bodyLarge?.color,
             ),
           ),
-
-          const SizedBox(height: 4),
-
-          // Role
-          Text(
-            worker.roleDisplay,
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.textMutedDark
-                  : AppColors.textMutedLight,
-            ),
-          ),
-
           const SizedBox(height: 16),
 
-          // Status Badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: _getStatusColor(worker.status).withOpacity(
-                  Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(worker.status),
-                    shape: BoxShape.circle,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (worker.phone.isNotEmpty)
+                      _buildInfoRow(context, Icons.phone, worker.phone),
+                    if (worker.email != null && worker.email!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _buildInfoRow(context, Icons.email, worker.email!),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  worker.statusDisplay,
-                  style: TextStyle(
-                    color: _getStatusColor(worker.status),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(
+                      context,
+                      Icons.work_history,
+                      AppLocalizations.of(context)!
+                          .yearsExperience('${worker.yearsOfExperience}'),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      context,
+                      Icons.paid,
+                      AppLocalizations.of(context)!.commissionRateInfo(
+                        AppLocalizations.of(context)?.currency ?? 'ETB',
+                        worker.commissionRate.toStringAsFixed(2),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 20),
-
-          // Contact Info
-          Divider(color: Colors.grey.shade200),
-          const SizedBox(height: 12),
-
-          if (worker.phone.isNotEmpty)
-            _buildInfoRow(context, Icons.phone, worker.phone),
-
-          if (worker.email != null && worker.email!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(context, Icons.email, worker.email!),
-          ],
-
-          const SizedBox(height: 12),
-          _buildInfoRow(
-              context,
-              Icons.work_history,
-              AppLocalizations.of(context)!
-                  .yearsExperience('${worker.yearsOfExperience}')),
 
           // Call/SMS Actions
           if (worker.phone.isNotEmpty) ...[
@@ -417,7 +374,7 @@ class WorkerDetailScreen extends StatelessWidget {
     return Center(
       child: Text(
         name.substring(0, 2).toUpperCase(),
-        style: TextStyle(
+        style: const TextStyle(
           color: AppColors.primary,
           fontWeight: FontWeight.bold,
           fontSize: 32,
@@ -429,11 +386,7 @@ class WorkerDetailScreen extends StatelessWidget {
   Widget _buildInfoRow(BuildContext context, IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon,
-            size: 18,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppColors.textMutedDark
-                : AppColors.textMutedLight),
+        Icon(icon, size: 18, color: AppColors.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -527,7 +480,7 @@ class WorkerDetailScreen extends StatelessWidget {
                 child: _buildBalanceItem(
                   AppLocalizations.of(context)!.purchased,
                   '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${worker.totalCoffeePurchased.formatted}',
-                  Icons.local_cafe,
+                  Icons.shopping_cart,
                 ),
               ),
               Container(
@@ -610,7 +563,7 @@ class WorkerDetailScreen extends StatelessWidget {
             Expanded(
               child: _buildActionButton(
                 context,
-                AppLocalizations.of(context)!.recordPurchase,
+                AppLocalizations.of(context)!.purchase,
                 Icons.shopping_cart,
                 () async {
                   final result = await showDialog<bool>(
@@ -675,7 +628,7 @@ class WorkerDetailScreen extends StatelessWidget {
     IconData icon,
     VoidCallback onPressed,
   ) {
-    const warmOrange = Color(0xFFF0A04B);
+    const warmOrange = AppColors.primary;
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(

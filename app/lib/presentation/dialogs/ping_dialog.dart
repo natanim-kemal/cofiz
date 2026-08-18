@@ -103,7 +103,8 @@ class _PingDialogState extends State<PingDialog> {
                   alignLabelWithHint: true,
                   prefixIcon: const Padding(
                     padding: EdgeInsets.only(bottom: 44),
-                    child: Icon(Icons.chat_bubble_outline),
+                    child: Icon(Icons.chat_bubble_outline,
+                        color: AppColors.primary),
                   ),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),

@@ -20,12 +20,10 @@ class CompanyIncomeScreen extends StatefulWidget {
 }
 
 class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
-  int _itemsToShow = 20;
-  static const int _itemsPerLoad = 20;
   DateTime? _selectedDate;
 
-  void _loadMore() {
-    setState(() => _itemsToShow += _itemsPerLoad);
+  Future<void> _loadMore(IncomeProvider provider) async {
+    await provider.loadMore();
   }
 
   Future<void> _pickDate() async {
@@ -100,7 +98,7 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                         Expanded(
                           child: _buildBreakdown(
                             context,
-                            Icons.trending_up,
+                            Icons.account_balance,
                             l10n.investmentIncome,
                             provider.totalInvestments,
                           ),
@@ -109,7 +107,7 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                         Expanded(
                           child: _buildBreakdown(
                             context,
-                            Icons.storefront,
+                            Icons.point_of_sale,
                             l10n.salesIncome,
                             provider.totalSales,
                           ),
@@ -186,20 +184,24 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                       )
                     else ...[
                       ..._filteredRecords(provider.records)
-                          .take(_itemsToShow)
                           .map((r) => _buildRecordTile(context, r)),
-                      if (_filteredRecords(provider.records).length >
-                          _itemsToShow)
+                      if (provider.hasMoreRecords)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: OutlinedButton.icon(
-                            onPressed: _loadMore,
-                            icon: const Icon(Icons.expand_more),
-                            label: Text(
-                              l10n.loadMore(_filteredRecords(provider.records)
-                                      .length -
-                                  _itemsToShow),
-                            ),
+                            onPressed: provider.isLoadingMore
+                                ? null
+                                : () => _loadMore(provider),
+                            icon: provider.isLoadingMore
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primary),
+                                  )
+                                : const Icon(Icons.expand_more),
+                            label: Text(l10n.loadMore),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: BorderSide(
@@ -212,13 +214,12 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                             ),
                           ),
                         )
-                      else if (_filteredRecords(provider.records).length >
-                          _itemsPerLoad)
+                      else if (provider.totalRecordCount > 20)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Text(
                             l10n.showingAllTransactions(
-                                _filteredRecords(provider.records).length),
+                                provider.totalRecordCount),
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark
@@ -273,11 +274,9 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
         children: [
           Text(
             l10n.totalIncome,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
-              color: isDark
-                  ? AppColors.textMutedDark
-                  : AppColors.textMutedLight,
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 8),
@@ -304,14 +303,14 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.primary, Color(0xFFF0A04B)],
+          colors: [AppColors.primary, AppColors.primary],
         ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 22),
+          Icon(icon, color: Colors.white, size: 24),
           const SizedBox(height: 8),
           Text(
             '${l10n.currency ?? 'ETB'} ${value.formattedCompact}',
@@ -347,17 +346,13 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     final title = record.kind == IncomeKind.sale
         ? (record.saleCategory ?? l10n.manualSales)
-        : (l10n.viewerInvestment);
-    final subtitle = record.kind == IncomeKind.investment &&
-            record.viewerName != null
-        ? '${record.viewerName} · ${DateFormat('MMM d, yyyy h:mm a').format(record.createdAt)}'
-        : DateFormat('MMM d, yyyy h:mm a').format(record.createdAt);
+        : '${l10n.viewerInvestment} · ${record.viewerName ?? '-'}';
+    final subtitle = DateFormat('MMM d, yyyy h:mm a').format(record.createdAt);
 
     return Consumer<AuthProvider>(
       builder: (context, auth, _) => GestureDetector(
-        onLongPress: auth.isAdmin
-            ? () => _showRecordActions(context, record)
-            : null,
+        onLongPress:
+            auth.isAdmin ? () => _showRecordActions(context, record) : null,
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
@@ -367,20 +362,12 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withOpacity(0.1),
-                ),
-                child: Icon(
-                  record.kind == IncomeKind.sale
-                      ? Icons.storefront
-                      : Icons.trending_up,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
+              Icon(
+                record.kind == IncomeKind.sale
+                    ? Icons.point_of_sale
+                    : Icons.account_balance,
+                color: AppColors.primary,
+                size: 24,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -408,13 +395,32 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                   ],
                 ),
               ),
-              Text(
-                '+${l10n.currency ?? 'ETB'} ${record.amount.formatted}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '+${l10n.currency ?? 'ETB'} ${record.amount.formatted}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  if (record.description != null &&
+                      record.description!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      record.description!,
+                      textAlign: TextAlign.end,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.textMutedDark
+                            : AppColors.textMutedLight,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -437,8 +443,7 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
     );
   }
 
-  Future<void> _deleteRecord(
-      BuildContext context, IncomeRecord record) async {
+  Future<void> _deleteRecord(BuildContext context, IncomeRecord record) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -453,8 +458,7 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child:
-                Text(l10n.delete, style: const TextStyle(color: Colors.red)),
+            child: Text(l10n.delete, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -501,14 +505,14 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                 _buildActionChip(
                   icon: Icons.edit_outlined,
                   label: l10n.edit,
-                  color: const Color(0xFFF0A04B),
+                  color: AppColors.primary,
                   value: 'edit',
                 ),
                 const SizedBox(width: 12),
                 _buildActionChip(
                   icon: Icons.delete_outline,
                   label: l10n.delete,
-                  color: const Color(0xFFF0A04B),
+                  color: AppColors.primary,
                   value: 'delete',
                 ),
               ],

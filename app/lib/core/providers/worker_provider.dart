@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/worker_model.dart';
 import '../services/worker_service.dart';
 import '../services/notification_service.dart';
+import '../services/offline_cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class WorkerProvider with ChangeNotifier {
@@ -31,7 +32,22 @@ class WorkerProvider with ChangeNotifier {
   double get totalRevenue => _totalRevenue;
 
   WorkerProvider() {
+    _seedWorkersFromCache();
     _initializeWorkers();
+  }
+
+  void _seedWorkersFromCache() {
+    try {
+      final cached = OfflineCacheService().getCachedWorkers();
+      if (cached != null) {
+        _workers = cached;
+        _applyFilters();
+        _updateStatistics();
+        notifyListeners();
+      }
+    } catch (_) {
+      // Cache read failure is non-fatal: fall through to network stream.
+    }
   }
 
   /// Initialize workers stream
@@ -41,6 +57,7 @@ class WorkerProvider with ChangeNotifier {
 
     _workerService.getWorkersStream().listen(
       (workersList) {
+        OfflineCacheService().cacheWorkers(workersList).catchError((_) {});
         _checkLowBalances(workersList);
         _workers = workersList;
         _applyFilters();

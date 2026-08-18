@@ -8,10 +8,13 @@ import '../../core/utils/number_formatter.dart';
 import '../screens/expense/expenses_screen.dart';
 import '../screens/income/company_income_screen.dart';
 import '../screens/worker_detail/worker_detail_screen.dart';
+import 'transfer_pair_card.dart';
 import '../../l10n/app_localizations.dart';
 
 enum FeedFilter { none, in_, out_ }
+
 enum _FeedKind { transaction, income, expense }
+
 enum _FeedDirection { in_, out_, neutral }
 
 class _FeedItem {
@@ -57,16 +60,16 @@ class ActivityFeedList extends StatelessWidget {
     ];
 
     final entries = switch (filter) {
-      FeedFilter.in_ => allEntries
-          .where((e) => _directionOf(e) == _FeedDirection.in_)
-          .toList(),
+      FeedFilter.in_ =>
+        allEntries.where((e) => _directionOf(e) == _FeedDirection.in_).toList(),
       FeedFilter.out_ => allEntries
           .where((e) => _directionOf(e) == _FeedDirection.out_)
           .toList(),
       FeedFilter.none => allEntries,
-    }..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    final shown = entries.take(limit).toList();
+    final shown = _takeWithPairs(entries, limit);
 
     if (shown.isEmpty) {
       return Center(
@@ -89,16 +92,64 @@ class ActivityFeedList extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        for (final item in shown) _buildRow(context, item),
-        if (onViewAll != null)
-          TextButton(
-            onPressed: onViewAll,
-            child: Text(l10n?.viewAll ?? 'View All'),
-          ),
-      ],
+    final children = <Widget>[];
+    var i = 0;
+    while (i < shown.length) {
+      if (i + 1 < shown.length && _isTransferPair(shown[i], shown[i + 1])) {
+        children.add(_buildLinkedPair(context, shown[i], shown[i + 1]));
+        i += 2;
+      } else {
+        children.add(_buildRow(context, shown[i]));
+        i += 1;
+      }
+    }
+    if (onViewAll != null) {
+      children.add(
+        TextButton(
+          onPressed: onViewAll,
+          child: Text(l10n?.viewAll ?? 'View All'),
+        ),
+      );
+    }
+
+    return Column(children: children);
+  }
+
+  Widget _buildLinkedPair(BuildContext context, _FeedItem a, _FeedItem b) {
+    return TransferPairCard<_FeedItem>(
+      first: a,
+      second: b,
+      buildRow: (item,
+              {double bottomMargin = 12, VoidCallback? onTapOverride}) =>
+          _buildRow(context, item,
+              bottomMargin: bottomMargin, onTapOverride: onTapOverride),
     );
+  }
+
+  List<_FeedItem> _takeWithPairs(List<_FeedItem> entries, int limit) {
+    final chosen = <_FeedItem>[];
+    for (var i = 0; i < entries.length && chosen.length < limit; i++) {
+      chosen.add(entries[i]);
+      if (chosen.length >= limit) break;
+      if (i + 1 < entries.length &&
+          _isTransferPair(entries[i], entries[i + 1])) {
+        chosen.add(entries[i + 1]);
+        i++;
+      }
+    }
+    return chosen;
+  }
+
+  bool _isTransferPair(_FeedItem a, _FeedItem b) {
+    if (a.kind != _FeedKind.transaction || b.kind != _FeedKind.transaction) {
+      return false;
+    }
+    final ta = a.payload as MoneyTransaction;
+    final tb = b.payload as MoneyTransaction;
+    return ta.isTransfer &&
+        tb.isTransfer &&
+        ta.transferId != null &&
+        ta.transferId == tb.transferId;
   }
 
   _FeedDirection _directionOf(_FeedItem item) {
@@ -110,13 +161,15 @@ class ActivityFeedList extends StatelessWidget {
       case _FeedKind.transaction:
         final t = item.payload as MoneyTransaction;
         if (t.isTransfer) return _FeedDirection.neutral;
-        return t.increasesBalance
-            ? _FeedDirection.out_
-            : _FeedDirection.in_;
+        if (t.type.toLowerCase() == 'purchase') {
+          return _FeedDirection.neutral;
+        }
+        return t.increasesBalance ? _FeedDirection.out_ : _FeedDirection.in_;
     }
   }
 
-  Widget _buildRow(BuildContext context, _FeedItem item) {
+  Widget _buildRow(BuildContext context, _FeedItem item,
+      {double bottomMargin = 12, VoidCallback? onTapOverride}) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
@@ -150,20 +203,27 @@ class ActivityFeedList extends StatelessWidget {
             break;
           case 'transfer':
             icon = Icons.swap_horiz;
-            title = t.isTransferSender
-                ? '${l10n?.transferredOut ?? 'Transferred Out'} · ${t.workerName}'
-                : '${l10n?.receivedFrom ?? 'Received From'} · ${t.workerName}';
-            amountColor = const Color(0xFFF0A04B);
+            final fromName = t.fromWorkerName;
+            final toName = t.toWorkerName;
+            title = fromName != null && toName != null
+                ? (t.isTransferSender
+                    ? l10n?.transferredTo(fromName, toName) ??
+                        '$fromName transferred to $toName'
+                    : l10n?.receivedFromName(toName, fromName) ??
+                        '$toName received from $fromName')
+                : (t.isTransferSender
+                    ? l10n?.transferredOut ?? 'Transferred Out'
+                    : l10n?.receivedFrom ?? 'Received From');
+            amountColor = AppColors.primary;
             amount = '${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
             break;
           default:
-            icon = Icons.local_cafe;
+            icon = Icons.shopping_cart;
             title = l10n?.purchased ?? 'Purchased';
             amountColor = Colors.orange;
-            amount = '+${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
+            amount = '${l10n?.currency ?? 'ETB'} ${t.amount.formatted}';
             if (t.coffeeWeight != null) {
-              weightLabel =
-                  '${t.coffeeWeight!.formatted} ${l10n?.kg ?? 'kg'}'
+              weightLabel = '${t.coffeeWeight!.formatted} ${l10n?.kg ?? 'kg'}'
                   ' • '
                   '${l10n?.currency ?? 'ETB'} ${(t.pricePerKg ?? 0).formatted}';
             }
@@ -183,7 +243,9 @@ class ActivityFeedList extends StatelessWidget {
         break;
       case _FeedKind.income:
         final r = item.payload as IncomeRecord;
-        icon = Icons.trending_up;
+        icon = r.kind == IncomeKind.sale
+            ? Icons.point_of_sale
+            : Icons.account_balance;
         amountColor = AppColors.success;
         final kindLabel = r.kind == IncomeKind.sale
             ? (r.saleCategory ?? (l10n?.manualSales ?? 'Manual Sales'))
@@ -218,7 +280,7 @@ class ActivityFeedList extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: bottomMargin),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -232,19 +294,11 @@ class ActivityFeedList extends StatelessWidget {
         ],
       ),
       child: InkWell(
-        onTap: onTap,
+        onTap: onTapOverride ?? onTap,
         borderRadius: BorderRadius.circular(12),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.1),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 20),
-            ),
+            Icon(icon, color: AppColors.primary, size: 24),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -282,7 +336,7 @@ class ActivityFeedList extends StatelessWidget {
                 ),
                 if (weightLabel != null)
                   Text(
-                    weightLabel!,
+                    weightLabel,
                     style: TextStyle(fontSize: 10, color: mutedColor),
                   ),
               ],
