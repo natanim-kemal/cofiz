@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/transaction_model.dart';
-import 'worker_service.dart';
 import 'notification_trigger_service.dart';
 import '../config/cloudinary_config.dart';
 import '../utils/receipt_image_utils.dart';
@@ -23,11 +22,10 @@ class TransactionPage {
 }
 
 class TransactionService {
-  FirebaseFirestore _firestore;
+  final FirebaseFirestore _firestore;
 
   TransactionService({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
-  late final WorkerService _workerService = WorkerService();
   late final NotificationTriggerService _notificationService =
       NotificationTriggerService();
   static const String _transactionsCollection = 'transactions';

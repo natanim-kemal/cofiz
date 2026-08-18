@@ -184,6 +184,12 @@ class OfflineCacheService {
     }
   }
 
+  Future<void> replacePendingOperations(
+      List<Map<String, dynamic>> operations) async {
+    final box = Hive.box(_pendingBox);
+    await box.put('queue', operations);
+  }
+
   // Clear all cache
   Future<void> clearAllCache() async {
     await Hive.box(_workersBox).clear();

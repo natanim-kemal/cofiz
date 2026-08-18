@@ -44,19 +44,18 @@ class OfflineSyncService {
       final pendingOps = _cache.getPendingOperations();
       debugPrint('📡 Found ${pendingOps.length} pending operations');
 
-      for (int i = 0; i < pendingOps.length; i++) {
-        final operation = pendingOps[i];
-
+      final remaining = <Map<String, dynamic>>[];
+      for (final operation in pendingOps) {
         try {
           await _executeOperation(operation);
-          await _cache.removePendingOperation(i);
           debugPrint('✅ Synced operation: ${operation['type']}');
         } catch (e) {
           debugPrint('❌ Failed to sync operation: $e');
-          // Keep in queue for next sync attempt
+          remaining.add(operation);
         }
       }
 
+      await _cache.replacePendingOperations(remaining);
       debugPrint('📡 Sync completed!');
     } catch (e) {
       debugPrint('❌ Sync failed: $e');
