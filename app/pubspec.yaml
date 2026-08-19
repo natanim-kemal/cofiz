@@ -45,6 +45,7 @@ dependencies:
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
   cloud_firestore: ^5.4.4
+  cloud_functions: ^5.0.0
   firebase_messaging: ^15.2.0
   
   # State Management
@@ -146,6 +147,6 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon.png"
-  adaptive_icon_background: "#221910"
-  adaptive_icon_foreground: "assets/icon.png"
+  image_path: "assets/icon-bg.jpg"
+  adaptive_icon_background: "#F7F7F7"
+  adaptive_icon_foreground: "assets/icon-bgless.png"
