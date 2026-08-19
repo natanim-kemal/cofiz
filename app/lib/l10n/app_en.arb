@@ -269,6 +269,23 @@
   "receiveUpdatesViaEmail": "Receive updates via email",
   "pushNotifications": "Push Notifications",
   "receiveInstantAlerts": "Receive instant alerts on your device",
+  "verifyEmail": "Verify email",
+  "emailVerified": "Verified",
+  "verify": "Verify",
+  "resendCode": "Resend code",
+  "enterVerificationCode": "Enter verification code",
+  "codeSentToEmail": "Verification code sent to your email",
+  "emailVerifiedSuccess": "Email verified",
+  "codeSendFailed": "Could not send code. Try again.",
+  "invalidCode": "Invalid code. Try again.",
+  "codeExpired": "Code expired. Please resend a new code.",
+  "tooManyAttempts": "Too many attempts - resend code",
+  "attemptsRemaining": "{count} attempts remaining",
+  "@attemptsRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
 
   "businessSettings": "Business Settings",
   "businessSettingsSaved": "Business settings saved successfully",

@@ -724,6 +724,44 @@ class AppLocalizationsAm extends AppLocalizations {
   String get receiveInstantAlerts => 'ፈጣን ማንቂያዎችን በመሳሪያዎ ላይ ይቀበሉ';
 
   @override
+  String get verifyEmail => 'ኢሜይል አረጋግጥ';
+
+  @override
+  String get emailVerified => 'የተረጋገጠ';
+
+  @override
+  String get verify => 'አረጋግጥ';
+
+  @override
+  String get resendCode => 'ኮድ እንደገና ላክ';
+
+  @override
+  String get enterVerificationCode => 'የማረጋገጫ ኮድ ያስገቡ';
+
+  @override
+  String get codeSentToEmail => 'የማረጋገጫ ኮድ ወደ ኢሜይልዎ ተልኳል';
+
+  @override
+  String get emailVerifiedSuccess => 'ኢሜይል በተሳካ ሁኔታ ተረጋግጧል';
+
+  @override
+  String get codeSendFailed => 'ኮድ መላክ አልተቻለም። እንደገና ይሞክሩ';
+
+  @override
+  String get invalidCode => 'የተሳሳተ ኮድ። እንደገና ይሞክሩ';
+
+  @override
+  String get codeExpired => 'ኮድ ጊዜው አልፏል። እባክዎ አዲስ ኮድ ይላኩ';
+
+  @override
+  String get tooManyAttempts => 'በጣም ብዙ ሙከራዎች - ኮድ እንደገና ይላኩ';
+
+  @override
+  String attemptsRemaining(Object count) {
+    return '$count የቀሩ ሙከራዎች';
+  }
+
+  @override
   String get businessSettingsSaved => 'የንግድ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል';
 
   @override

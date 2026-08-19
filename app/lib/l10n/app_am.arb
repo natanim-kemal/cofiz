@@ -269,6 +269,23 @@
   "receiveUpdatesViaEmail": "ዝመናዎችን በኢሜይል ይቀበሉ",
   "pushNotifications": "የግፊት ማሳወቂያዎች",
   "receiveInstantAlerts": "ፈጣን ማንቂያዎችን በመሳሪያዎ ላይ ይቀበሉ",
+  "verifyEmail": "ኢሜይል አረጋግጥ",
+  "emailVerified": "የተረጋገጠ",
+  "verify": "አረጋግጥ",
+  "resendCode": "ኮድ እንደገና ላክ",
+  "enterVerificationCode": "የማረጋገጫ ኮድ ያስገቡ",
+  "codeSentToEmail": "የማረጋገጫ ኮድ ወደ ኢሜይልዎ ተልኳል",
+  "emailVerifiedSuccess": "ኢሜይል በተሳካ ሁኔታ ተረጋግጧል",
+  "codeSendFailed": "ኮድ መላክ አልተቻለም። እንደገና ይሞክሩ",
+  "invalidCode": "የተሳሳተ ኮድ። እንደገና ይሞክሩ",
+  "codeExpired": "ኮድ ጊዜው አልፏል። እባክዎ አዲስ ኮድ ይላኩ",
+  "tooManyAttempts": "በጣም ብዙ ሙከራዎች - ኮድ እንደገና ይላኩ",
+  "attemptsRemaining": "{count} የቀሩ ሙከራዎች",
+  "@attemptsRemaining": {
+    "placeholders": {
+      "count": {}
+    }
+  },
 
   "businessSettings": "የንግድ ቅንብሮች",
   "businessSettingsSaved": "የንግድ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል",

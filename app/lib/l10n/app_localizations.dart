@@ -1460,6 +1460,78 @@ abstract class AppLocalizations {
   /// **'Receive instant alerts on your device'**
   String get receiveInstantAlerts;
 
+  /// No description provided for @verifyEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify email'**
+  String get verifyEmail;
+
+  /// No description provided for @emailVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get emailVerified;
+
+  /// No description provided for @verify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get verify;
+
+  /// No description provided for @resendCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code'**
+  String get resendCode;
+
+  /// No description provided for @enterVerificationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter verification code'**
+  String get enterVerificationCode;
+
+  /// No description provided for @codeSentToEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification code sent to your email'**
+  String get codeSentToEmail;
+
+  /// No description provided for @emailVerifiedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified'**
+  String get emailVerifiedSuccess;
+
+  /// No description provided for @codeSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send code. Try again.'**
+  String get codeSendFailed;
+
+  /// No description provided for @invalidCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid code. Try again.'**
+  String get invalidCode;
+
+  /// No description provided for @codeExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Code expired. Please resend a new code.'**
+  String get codeExpired;
+
+  /// No description provided for @tooManyAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts - resend code'**
+  String get tooManyAttempts;
+
+  /// No description provided for @attemptsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attempts remaining'**
+  String attemptsRemaining(Object count);
+
   /// No description provided for @businessSettingsSaved.
   ///
   /// In en, this message translates to:
