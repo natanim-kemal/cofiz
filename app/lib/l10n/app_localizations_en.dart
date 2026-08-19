@@ -728,12 +728,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receiveInstantAlerts => 'Receive instant alerts on your device';
 
   @override
-  String get smsNotifications => 'SMS Notifications';
-
-  @override
-  String get receiveTextAlerts => 'Receive text message alerts';
-
-  @override
   String get businessSettingsSaved => 'Business settings saved successfully';
 
   @override

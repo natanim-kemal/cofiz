@@ -1460,18 +1460,6 @@ abstract class AppLocalizations {
   /// **'Receive instant alerts on your device'**
   String get receiveInstantAlerts;
 
-  /// No description provided for @smsNotifications.
-  ///
-  /// In en, this message translates to:
-  /// **'SMS Notifications'**
-  String get smsNotifications;
-
-  /// No description provided for @receiveTextAlerts.
-  ///
-  /// In en, this message translates to:
-  /// **'Receive text message alerts'**
-  String get receiveTextAlerts;
-
   /// No description provided for @businessSettingsSaved.
   ///
   /// In en, this message translates to:

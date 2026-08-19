@@ -269,8 +269,6 @@
   "receiveUpdatesViaEmail": "ዝመናዎችን በኢሜይል ይቀበሉ",
   "pushNotifications": "የግፊት ማሳወቂያዎች",
   "receiveInstantAlerts": "ፈጣን ማንቂያዎችን በመሳሪያዎ ላይ ይቀበሉ",
-  "smsNotifications": "የኤስኤምኤስ ማሳወቂያዎች",
-  "receiveTextAlerts": "የጽሑፍ መልእክት ማንቂያዎችን ይቀበሉ",
 
   "businessSettings": "የንግድ ቅንብሮች",
   "businessSettingsSaved": "የንግድ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል",

@@ -724,12 +724,6 @@ class AppLocalizationsAm extends AppLocalizations {
   String get receiveInstantAlerts => 'ፈጣን ማንቂያዎችን በመሳሪያዎ ላይ ይቀበሉ';
 
   @override
-  String get smsNotifications => 'የኤስኤምኤስ ማሳወቂያዎች';
-
-  @override
-  String get receiveTextAlerts => 'የጽሑፍ መልእክት ማንቂያዎችን ይቀበሉ';
-
-  @override
   String get businessSettingsSaved => 'የንግድ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል';
 
   @override

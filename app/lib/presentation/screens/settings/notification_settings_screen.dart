@@ -38,13 +38,6 @@ class NotificationSettingsScreen extends StatelessWidget {
                 value: settings.pushNotifications,
                 onChanged: (val) => settings.togglePushNotifications(val),
               ),
-              _buildSwitchTile(
-                context,
-                title: AppLocalizations.of(context)!.smsNotifications,
-                subtitle: AppLocalizations.of(context)!.receiveTextAlerts,
-                value: settings.smsNotifications,
-                onChanged: (val) => settings.toggleSmsNotifications(val),
-              ),
             ],
           );
         },
