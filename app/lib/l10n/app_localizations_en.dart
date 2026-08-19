@@ -728,6 +728,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receiveInstantAlerts => 'Receive instant alerts on your device';
 
   @override
+  String get verifyEmail => 'Verify email';
+
+  @override
+  String get emailVerified => 'Verified';
+
+  @override
+  String get verify => 'Verify';
+
+  @override
+  String get resendCode => 'Resend code';
+
+  @override
+  String get enterVerificationCode => 'Enter verification code';
+
+  @override
+  String get codeSentToEmail => 'Verification code sent to your email';
+
+  @override
+  String get emailVerifiedSuccess => 'Email verified';
+
+  @override
+  String get codeSendFailed => 'Could not send code. Try again.';
+
+  @override
+  String get invalidCode => 'Invalid code. Try again.';
+
+  @override
+  String get codeExpired => 'Code expired. Please resend a new code.';
+
+  @override
+  String get tooManyAttempts => 'Too many attempts - resend code';
+
+  @override
+  String attemptsRemaining(Object count) {
+    return '$count attempts remaining';
+  }
+
+  @override
   String get businessSettingsSaved => 'Business settings saved successfully';
 
   @override
