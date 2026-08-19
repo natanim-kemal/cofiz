@@ -47,6 +47,7 @@ class AppUser {
   final DateTime createdAt;
   final DateTime? lastLoginAt;
   final bool isActive;
+  final bool emailVerified;
   final String? createdBy; // Admin who created this user
   final String? workerId; // Link to Worker profile (for Manager role)
 
@@ -59,6 +60,7 @@ class AppUser {
     required this.createdAt,
     this.lastLoginAt,
     this.isActive = true,
+    this.emailVerified = false,
     this.createdBy,
     this.workerId,
   });
@@ -90,6 +92,7 @@ class AppUser {
           ? DateTime.fromMillisecondsSinceEpoch(data['lastLoginAt'])
           : null,
       isActive: data['isActive'] ?? true,
+      emailVerified: data['emailVerified'] ?? false,
       createdBy: data['createdBy'],
       workerId: data['workerId'],
     );
@@ -105,6 +108,7 @@ class AppUser {
       'createdAt': createdAt.millisecondsSinceEpoch,
       'lastLoginAt': lastLoginAt?.millisecondsSinceEpoch,
       'isActive': isActive,
+      'emailVerified': emailVerified,
       'createdBy': createdBy,
       'workerId': workerId,
     };
@@ -136,6 +140,7 @@ class AppUser {
           ? DateTime.fromMillisecondsSinceEpoch(json['lastLoginAt'])
           : null,
       isActive: json['isActive'] ?? true,
+      emailVerified: json['emailVerified'] ?? false,
       createdBy: json['createdBy'],
       workerId: json['workerId'],
     );
@@ -150,6 +155,7 @@ class AppUser {
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isActive,
+    bool? emailVerified,
     String? createdBy,
     String? workerId,
   }) {
@@ -162,6 +168,7 @@ class AppUser {
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       isActive: isActive ?? this.isActive,
+      emailVerified: emailVerified ?? this.emailVerified,
       createdBy: createdBy ?? this.createdBy,
       workerId: workerId ?? this.workerId,
     );
