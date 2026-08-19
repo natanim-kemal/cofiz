@@ -269,8 +269,6 @@
   "receiveUpdatesViaEmail": "Receive updates via email",
   "pushNotifications": "Push Notifications",
   "receiveInstantAlerts": "Receive instant alerts on your device",
-  "smsNotifications": "SMS Notifications",
-  "receiveTextAlerts": "Receive text message alerts",
 
   "businessSettings": "Business Settings",
   "businessSettingsSaved": "Business settings saved successfully",

@@ -5,7 +5,6 @@ import '../services/notification_service.dart';
 class SettingsProvider with ChangeNotifier {
   bool _emailNotifications = true;
   bool _pushNotifications = true;
-  bool _smsNotifications = false;
   Locale _locale = const Locale('en');
 
   // Business Settings
@@ -16,7 +15,6 @@ class SettingsProvider with ChangeNotifier {
 
   bool get emailNotifications => _emailNotifications;
   bool get pushNotifications => _pushNotifications;
-  bool get smsNotifications => _smsNotifications;
   Locale get locale => _locale;
 
   // Business Getters
@@ -33,7 +31,6 @@ class SettingsProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _emailNotifications = prefs.getBool('email_notifications') ?? true;
     _pushNotifications = prefs.getBool('push_notifications') ?? true;
-    _smsNotifications = prefs.getBool('sms_notifications') ?? false;
     final languageCode = prefs.getString('language_code');
     if (languageCode != null) {
       _locale = Locale(languageCode);
@@ -74,13 +71,6 @@ class SettingsProvider with ChangeNotifier {
     } else {
       await NotificationService().cancelAll();
     }
-  }
-
-  Future<void> toggleSmsNotifications(bool value) async {
-    _smsNotifications = value;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('sms_notifications', value);
   }
 
   Future<void> updateCompanyInfo({
