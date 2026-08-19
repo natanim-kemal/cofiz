@@ -30,19 +30,16 @@ class _VerifyEmailTileState extends State<VerifyEmailTile> {
   }
 
   Future<void> _verify() async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      final ok = await widget.onVerify();
-      if (!mounted) return;
-      if (ok) {
-        setState(() => _verified = true);
-        AppToast.show(l10n.emailVerifiedSuccess, success: true);
-      } else {
-        AppToast.show(l10n.invalidCode);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      AppToast.show(l10n.codeSendFailed);
+    final ok = await widget.onVerify();
+    if (!mounted) return;
+    if (ok) setState(() => _verified = true);
+  }
+
+  @override
+  void didUpdateWidget(VerifyEmailTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.verified != widget.verified) {
+      _verified = widget.verified;
     }
   }
 
