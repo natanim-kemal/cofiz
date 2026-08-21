@@ -4,6 +4,15 @@ import '../models/transaction_model.dart';
 import '../models/income_record_model.dart';
 import '../models/expense_record_model.dart';
 
+/// Local persistence layer (Hive).
+///
+/// Storage layout:
+/// - Collection caches (workers/transactions/income/expenses) store one
+///   document per Hive key (the doc id), so partial reads/writes stay cheap.
+/// - A legacy single-key snapshot from older app versions is migrated to
+///   per-id keys on first read or write.
+/// - [metaBoxName] stores per-dataset `fetchedAt` timestamps used to detect
+///   staleness.
 class OfflineCacheService {
   static final OfflineCacheService _instance = OfflineCacheService._internal();
   factory OfflineCacheService() => _instance;
@@ -11,17 +20,45 @@ class OfflineCacheService {
 
   static const String _workersBox = 'workers_cache';
   static const String _transactionsBox = 'transactions_cache';
+  static const String _workerTxsBox = 'worker_transactions_cache';
   static const String _pendingBox = 'pending_operations';
   static const String _deliveredBox = 'delivered_operations';
   static const String _incomeBox = 'income_cache';
   static const String _expensesBox = 'expenses_cache';
   static const String _totalsBox = 'totals_cache';
+  static const String metaBoxName = 'cache_meta';
+
+  /// Legacy single-key snapshots written by older versions of this service.
+  static const String _legacyWorkersKey = 'all_workers';
+  static const String _legacyTransactionsKey = 'all_transactions';
+  static const String _legacyIncomeKey = 'all_income';
+  static const String _legacyExpensesKey = 'all_expenses';
+
+  /// Keys with this prefix in the workers box are single cached profiles and
+  /// must survive collection-wide replacements.
+  static const String _profilePrefix = 'profile_';
+
+  /// Keys in the worker-transactions box are `wt_<workerId>:<txId>`.
+  static const String _wtPrefix = 'wt_';
+
+  static const String _fetchedAtPrefix = 'fetchedAt_';
+
+  /// Dataset names used with [getFetchedAt] / [isStale].
+  static const String dsWorkers = 'workers';
+  static const String dsTransactions = 'transactions';
+  static const String dsIncome = 'income';
+  static const String dsExpenses = 'expenses';
+  static const String dsIncomeTotals = 'income_totals';
+  static const String dsExpenseTotals = 'expense_totals';
+  static const String dsTodayTotals = 'today_totals';
+  static const String dsWorkerProfile = 'worker_profile';
+  static const String dsWorkerTransactions = 'worker_transactions';
 
   /// Records older than this are evicted on write, bounding the cache
   /// regardless of how much history the backend accumulates.
-  static const Duration _retentionWindow = Duration(days: 365);
+  static const Duration retentionWindow = Duration(days: 365);
 
-  static DateTime get _cutoff => DateTime.now().subtract(_retentionWindow);
+  static DateTime get _cutoff => DateTime.now().subtract(retentionWindow);
 
   Future<void> initialize({String? path}) async {
     if (path != null) {
@@ -32,99 +69,318 @@ class OfflineCacheService {
 
     await Hive.openBox(_workersBox);
     await Hive.openBox(_transactionsBox);
+    await Hive.openBox(_workerTxsBox);
     await Hive.openBox(_pendingBox);
     await Hive.openBox(_deliveredBox);
     await Hive.openBox(_incomeBox);
     await Hive.openBox(_expensesBox);
     await Hive.openBox(_totalsBox);
+    await Hive.openBox(metaBoxName);
   }
 
+  // ---------------------------------------------------------------------------
+  // Generic per-document helpers
+  // ---------------------------------------------------------------------------
+
+  /// Migrates a legacy single-key snapshot to per-id entries. Returns the
+  /// legacy map if one was found (and starts the write-back), else null.
+  ///
+  /// The putAll is issued BEFORE the delete: Hive serializes writes per box
+  /// in call order, so a crash mid-migration leaves either both applied or
+  /// only the putAll - never a deleted snapshot without its replacement.
+  /// Worst case the migration re-runs idempotently on next launch.
+  Map<String, dynamic>? _takeLegacySnapshot(
+    Box box,
+    String legacyKey,
+  ) {
+    final legacy = box.get(legacyKey);
+    if (legacy is! Map) return null;
+    final snapshot = <String, dynamic>{
+      for (final e in legacy.entries) e.key.toString(): e.value,
+    };
+    box.putAll(snapshot);
+    box.delete(legacyKey);
+    return snapshot;
+  }
+
+  /// Replaces a box's contents with [entries] keyed by document id,
+  /// migrating a legacy snapshot if present and removing keys that are no
+  /// longer part of the set. Keys starting with [preservePrefix] are kept.
+  Future<void> _replaceEntries(
+    Box box,
+    Map<String, dynamic> entries,
+    String legacyKey, {
+    String? preservePrefix,
+  }) async {
+    _takeLegacySnapshot(box, legacyKey);
+    final staleKeys = box.keys.whereType<String>().where((k) {
+      if (entries.containsKey(k)) return false;
+      if (preservePrefix != null && k.startsWith(preservePrefix)) return false;
+      return true;
+    }).toList();
+    await box.putAll(entries);
+    for (final k in staleKeys) {
+      await box.delete(k);
+    }
+  }
+
+  List<T>? _readEntries<T>(
+    Box box,
+    T Function(Map<String, dynamic>) fromJson,
+    String legacyKey, {
+    String? excludePrefix,
+  }) {
+    var source = _takeLegacySnapshot(box, legacyKey);
+    if (source == null) {
+      source = <String, dynamic>{};
+      for (final k in box.keys.whereType<String>()) {
+        if (excludePrefix != null && k.startsWith(excludePrefix)) continue;
+        final v = box.get(k);
+        if (v is Map) {
+          source[k] = v;
+        }
+      }
+    }
+    // Empty means "never cached" (null), distinct from an explicitly cached
+    // empty collection. A box holding only excluded keys (e.g. worker
+    // profiles alongside the workers collection) still counts as never
+    // cached for this dataset.
+    if (source.isEmpty) return null;
+    return source.values
+        .map((v) => fromJson(Map<String, dynamic>.from(v as Map)))
+        .toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fetched-at metadata / staleness
+  // ---------------------------------------------------------------------------
+
+  Future<void> markFetched(String dataset) async {
+    await Hive.box(metaBoxName)
+        .put('$_fetchedAtPrefix$dataset', DateTime.now().millisecondsSinceEpoch);
+  }
+
+  DateTime? getFetchedAt(String dataset) {
+    final v =
+        Hive.box(metaBoxName).get('$_fetchedAtPrefix$dataset') as int?;
+    if (v == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(v);
+  }
+
+  /// True when the dataset has never been fetched or its last fetch is older
+  /// than [maxAge].
+  bool isStale(
+    String dataset, {
+    Duration maxAge = const Duration(minutes: 5),
+  }) {
+    final t = getFetchedAt(dataset);
+    if (t == null) return true;
+    return DateTime.now().difference(t) > maxAge;
+  }
+
+  /// Most recent fetch time across [datasets], or null when none was ever
+  /// fetched. Used by UI (e.g. the offline banner) to report the age of
+  /// whatever data is actually on screen.
+  DateTime? newestFetchedAt(Iterable<String> datasets) {
+    DateTime? newest;
+    for (final d in datasets) {
+      final t = getFetchedAt(d);
+      if (t != null && (newest == null || t.isAfter(newest))) newest = t;
+    }
+    return newest;
+  }
+
+  /// Per-worker dataset name for [getFetchedAt]/[isStale] - worker fetch
+  /// times must never share one global timestamp.
+  static String workerTxDataset(String workerId) =>
+      '$dsWorkerTransactions:$workerId';
+
+  // ---------------------------------------------------------------------------
   // Workers cache
+  // ---------------------------------------------------------------------------
+
   Future<void> cacheWorkers(List<Worker> workers) async {
-    final box = Hive.box(_workersBox);
-    final workersMap = {for (var w in workers) w.id: w.toJson()};
-    await box.put('all_workers', workersMap);
+    await _replaceEntries(
+      Hive.box(_workersBox),
+      {for (var w in workers) w.id: w.toJson()},
+      _legacyWorkersKey,
+      preservePrefix: _profilePrefix,
+    );
+    await markFetched(dsWorkers);
   }
 
-  List<Worker>? getCachedWorkers() {
-    final box = Hive.box(_workersBox);
-    final cached = box.get('all_workers') as Map<dynamic, dynamic>?;
-    if (cached == null) return null;
+  List<Worker>? getCachedWorkers() => _readEntries<Worker>(
+        Hive.box(_workersBox),
+        Worker.fromJson,
+        _legacyWorkersKey,
+        excludePrefix: _profilePrefix,
+      );
 
-    return cached.values
-        .map((json) => Worker.fromJson(Map<String, dynamic>.from(json as Map)))
-        .toList();
+  /// Caches a single worker profile (used by the collector app for instant
+  /// cold start). Keyed by id so multiple accounts on one device coexist.
+  Future<void> cacheWorkerProfile(Worker worker) async {
+    await Hive.box(_workersBox)
+        .put('$_profilePrefix${worker.id}', worker.toJson());
+    await markFetched(dsWorkerProfile);
   }
 
-  // Transactions cache (kept within the retention window)
+  /// Returns the cached profile for [expectedId], or - only when exactly one
+  /// profile is stored - the profile itself when [expectedId] is null.
+  /// Multiple stored profiles with a null [expectedId] is ambiguous on a
+  /// multi-account device, so null is returned rather than an arbitrary
+  /// account's data. Returns null when absent/mismatched.
+  Worker? getCachedWorkerProfile({String? expectedId}) {
+    final box = Hive.box(_workersBox);
+    Worker? parse(Object? raw) {
+      if (raw is! Map) return null;
+      try {
+        return Worker.fromJson(Map<String, dynamic>.from(raw));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    if (expectedId != null) {
+      final direct = parse(box.get('$_profilePrefix$expectedId'));
+      if (direct != null) return direct;
+    }
+    Worker? single;
+    for (final k in box.keys.whereType<String>()) {
+      if (!k.startsWith(_profilePrefix)) continue;
+      final w = parse(box.get(k));
+      if (w == null) continue;
+      if (expectedId == null) {
+        if (single != null) return null; // ambiguous: >1 profile
+        single = w;
+      } else if (w.id == expectedId) {
+        return w;
+      }
+    }
+    return single;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Transactions cache
+  // ---------------------------------------------------------------------------
+
   Future<void> cacheTransactions(List<MoneyTransaction> transactions) async {
-    final box = Hive.box(_transactionsBox);
     final cutoff = _cutoff;
-    final transactionsMap = {
+    await _replaceEntries(
+      Hive.box(_transactionsBox),
+      {
+        for (final t in transactions)
+          if (t.createdAt.isAfter(cutoff)) t.id: t.toJson(),
+      },
+      _legacyTransactionsKey,
+    );
+    await markFetched(dsTransactions);
+  }
+
+  List<MoneyTransaction>? getCachedTransactions() =>
+      _readEntries<MoneyTransaction>(
+        Hive.box(_transactionsBox),
+        MoneyTransaction.fromJson,
+        _legacyTransactionsKey,
+      );
+
+  // ---------------------------------------------------------------------------
+  // Per-worker transactions cache (collector device cold start)
+  // ---------------------------------------------------------------------------
+
+  /// Replaces the cached set for [workerId] with [transactions].
+  Future<void> cacheWorkerTransactions(
+    String workerId,
+    List<MoneyTransaction> transactions,
+  ) async {
+    final box = Hive.box(_workerTxsBox);
+    final keyPrefix = '$_wtPrefix$workerId:';
+    final staleKeys = box.keys
+        .whereType<String>()
+        .where((k) => k.startsWith(keyPrefix))
+        .toList();
+    for (final k in staleKeys) {
+      await box.delete(k);
+    }
+    final cutoff = _cutoff;
+    await box.putAll({
       for (final t in transactions)
-        if (t.createdAt.isAfter(cutoff)) t.id: t.toJson(),
-    };
-    await box.put('all_transactions', transactionsMap);
+        if (t.createdAt.isAfter(cutoff)) '$keyPrefix${t.id}': t.toJson(),
+    });
+    await markFetched(workerTxDataset(workerId));
   }
 
-  List<MoneyTransaction>? getCachedTransactions() {
-    final box = Hive.box(_transactionsBox);
-    final cached = box.get('all_transactions') as Map<dynamic, dynamic>?;
-    if (cached == null) return null;
-
-    return cached.values
-        .map((json) =>
-            MoneyTransaction.fromJson(Map<String, dynamic>.from(json as Map)))
-        .toList();
+  /// Cached transactions for [workerId], unordered. Empty list when none —
+  /// callers seed the UI directly and sort as needed.
+  List<MoneyTransaction> getCachedWorkerTransactions(String workerId) {
+    final box = Hive.box(_workerTxsBox);
+    final keyPrefix = '$_wtPrefix$workerId:';
+    final result = <MoneyTransaction>[];
+    for (final k in box.keys.whereType<String>()) {
+      if (!k.startsWith(keyPrefix)) continue;
+      final v = box.get(k);
+      if (v is! Map) continue;
+      try {
+        result.add(MoneyTransaction.fromJson(Map<String, dynamic>.from(v)));
+      } catch (_) {
+        // Skip corrupt entries rather than failing the whole read.
+      }
+    }
+    return result;
   }
 
-  // Income cache (kept within the retention window)
+  // ---------------------------------------------------------------------------
+  // Income cache
+  // ---------------------------------------------------------------------------
+
   Future<void> cacheIncome(List<IncomeRecord> records) async {
-    final box = Hive.box(_incomeBox);
     final cutoff = _cutoff;
-    final recordsMap = {
-      for (final r in records)
-        if (r.createdAt.isAfter(cutoff)) r.id: r.toJson(),
-    };
-    await box.put('all_income', recordsMap);
+    await _replaceEntries(
+      Hive.box(_incomeBox),
+      {
+        for (final r in records)
+          if (r.createdAt.isAfter(cutoff)) r.id: r.toJson(),
+      },
+      _legacyIncomeKey,
+    );
+    await markFetched(dsIncome);
   }
 
-  List<IncomeRecord>? getCachedIncome() {
-    final box = Hive.box(_incomeBox);
-    final cached = box.get('all_income') as Map<dynamic, dynamic>?;
-    if (cached == null) return null;
+  List<IncomeRecord>? getCachedIncome() => _readEntries<IncomeRecord>(
+        Hive.box(_incomeBox),
+        IncomeRecord.fromJson,
+        _legacyIncomeKey,
+      );
 
-    return cached.values
-        .map((json) =>
-            IncomeRecord.fromJson(Map<String, dynamic>.from(json as Map)))
-        .toList();
-  }
+  // ---------------------------------------------------------------------------
+  // Expenses cache
+  // ---------------------------------------------------------------------------
 
-  // Expenses cache (kept within the retention window)
   Future<void> cacheExpenses(List<ExpenseRecord> records) async {
-    final box = Hive.box(_expensesBox);
     final cutoff = _cutoff;
-    final recordsMap = {
-      for (final r in records)
-        if (r.createdAt.isAfter(cutoff)) r.id: r.toJson(),
-    };
-    await box.put('all_expenses', recordsMap);
+    await _replaceEntries(
+      Hive.box(_expensesBox),
+      {
+        for (final r in records)
+          if (r.createdAt.isAfter(cutoff)) r.id: r.toJson(),
+      },
+      _legacyExpensesKey,
+    );
+    await markFetched(dsExpenses);
   }
 
-  List<ExpenseRecord>? getCachedExpenses() {
-    final box = Hive.box(_expensesBox);
-    final cached = box.get('all_expenses') as Map<dynamic, dynamic>?;
-    if (cached == null) return null;
+  List<ExpenseRecord>? getCachedExpenses() => _readEntries<ExpenseRecord>(
+        Hive.box(_expensesBox),
+        ExpenseRecord.fromJson,
+        _legacyExpensesKey,
+      );
 
-    return cached.values
-        .map((json) =>
-            ExpenseRecord.fromJson(Map<String, dynamic>.from(json as Map)))
-        .toList();
-  }
+  // ---------------------------------------------------------------------------
+  // Totals caches
+  // ---------------------------------------------------------------------------
 
-  // Income totals cache (last-known server-side aggregates)
   Future<void> cacheIncomeTotals(Map<String, double> totals) async {
     await Hive.box(_totalsBox).put('income_totals', totals);
+    await markFetched(dsIncomeTotals);
   }
 
   Map<String, double>? getCachedIncomeTotals() {
@@ -134,9 +390,9 @@ class OfflineCacheService {
     return cached.map((k, v) => MapEntry(k as String, (v as num).toDouble()));
   }
 
-  // Expenses totals cache (last-known server-side aggregates)
   Future<void> cacheExpenseTotals(Map<String, double> totals) async {
     await Hive.box(_totalsBox).put('expense_totals', totals);
+    await markFetched(dsExpenseTotals);
   }
 
   Map<String, double>? getCachedExpenseTotals() {
@@ -146,9 +402,9 @@ class OfflineCacheService {
     return cached.map((k, v) => MapEntry(k as String, (v as num).toDouble()));
   }
 
-  // Today totals cache (transactions)
   Future<void> cacheTodayTotals(Map<String, double> totals) async {
     await Hive.box(_totalsBox).put('today_totals', totals);
+    await markFetched(dsTodayTotals);
   }
 
   Map<String, double>? getCachedTodayTotals() {
@@ -158,7 +414,10 @@ class OfflineCacheService {
     return cached.map((k, v) => MapEntry(k as String, (v as num).toDouble()));
   }
 
+  // ---------------------------------------------------------------------------
   // Pending operations queue
+  // ---------------------------------------------------------------------------
+
   Future<void> queueOperation(Map<String, dynamic> operation) async {
     assert(operation.containsKey('opId'),
         'queueOperation requires opId for idempotent drain');
@@ -229,10 +488,12 @@ class OfflineCacheService {
   Future<void> clearAllCache() async {
     await Hive.box(_workersBox).clear();
     await Hive.box(_transactionsBox).clear();
+    await Hive.box(_workerTxsBox).clear();
     await Hive.box(_incomeBox).clear();
     await Hive.box(_expensesBox).clear();
     await Hive.box(_pendingBox).clear();
     await Hive.box(_deliveredBox).clear();
     await Hive.box(_totalsBox).clear();
+    await Hive.box(metaBoxName).clear();
   }
 }
