@@ -35,6 +35,11 @@ import 'presentation/screens/worker_list/worker_list_screen.dart';
 import 'presentation/screens/worker/worker_dashboard_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+/// Bottom-nav taps between adjacent tabs slide smoothly; taps that skip over
+/// a tab jump directly instead of scrolling across the intermediate pages
+/// (which are built lazily and cause the janky, sticky feel).
+bool shouldAnimateTabSwitch(int from, int to) => (to - from).abs() == 1;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -314,11 +319,15 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   void _onNavTap(int index) {
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    if (shouldAnimateTabSwitch(_currentIndex, index)) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _pageController.jumpToPage(index);
+    }
   }
 
   @override
