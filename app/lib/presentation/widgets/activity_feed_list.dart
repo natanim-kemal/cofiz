@@ -279,6 +279,16 @@ class ActivityFeedList extends StatelessWidget {
         break;
     }
 
+    final isPurchase = item.kind == _FeedKind.transaction &&
+        ((item.payload as MoneyTransaction).type.toLowerCase() == 'purchase');
+    final String? note = switch (item.kind) {
+      _FeedKind.transaction => (item.payload as MoneyTransaction).notes,
+      _FeedKind.income => (item.payload as IncomeRecord).description,
+      _FeedKind.expense => (item.payload as ExpenseRecord).description,
+    };
+    final rightNote =
+        (note == null || note.isEmpty || isPurchase) ? null : note;
+
     return Container(
       margin: EdgeInsets.only(bottom: bottomMargin),
       padding: const EdgeInsets.all(16),
@@ -315,9 +325,24 @@ class ActivityFeedList extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: mutedColor),
+                  Row(
+                    children: [
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 12, color: mutedColor),
+                      ),
+                      if (isPurchase && note != null && note.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '· $note',
+                            style: TextStyle(fontSize: 12, color: mutedColor),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -338,6 +363,14 @@ class ActivityFeedList extends StatelessWidget {
                   Text(
                     weightLabel,
                     style: TextStyle(fontSize: 10, color: mutedColor),
+                  )
+                else if (rightNote != null)
+                  Text(
+                    rightNote,
+                    style: TextStyle(fontSize: 10, color: mutedColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
                   ),
               ],
             ),
