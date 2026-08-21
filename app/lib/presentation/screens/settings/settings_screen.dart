@@ -5,6 +5,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/audit_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/theme_provider.dart';
+import '../../../core/providers/density_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/custom_header.dart';
 import 'profile_edit_screen.dart';
@@ -24,6 +25,7 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
+    final densityProvider = Provider.of<DensityProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final localizations = AppLocalizations.of(context)!;
 
@@ -156,6 +158,18 @@ class SettingsScreen extends StatelessWidget {
                         await themeProvider.toggleTheme(val);
                       },
                       activeThumbColor: AppColors.primary),
+                ),
+                _buildSettingsTile(
+                  context,
+                  icon: Icons.format_size_outlined,
+                  title: 'Display Size',
+                  subtitle: switch (densityProvider.density) {
+                    DisplayDensity.veryCompact => 'Very Compact',
+                    DisplayDensity.compact => 'Compact',
+                    DisplayDensity.normal => 'Normal',
+                    DisplayDensity.large => 'Large',
+                  },
+                  onTap: () => _showDensityBottomSheet(context),
                 ),
                 _buildSettingsTile(
                   context,
@@ -397,6 +411,59 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showDensityBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Display Size',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                _buildDensityOption(
+                    context,
+                    'Very Compact',
+                    'Densest layout - smallest text',
+                    DisplayDensity.veryCompact),
+                _buildDensityOption(
+                    context, 'Compact', 'Smaller text, more on screen',
+                    DisplayDensity.compact),
+                _buildDensityOption(
+                    context, 'Normal', 'Default sizing', DisplayDensity.normal),
+                _buildDensityOption(context, 'Large',
+                    'Bigger text, easier to read', DisplayDensity.large),
+              ],
+            ),
+          );
+        });
+  }
+
+  Widget _buildDensityOption(
+      BuildContext context, String name, String subtitle, DisplayDensity d) {
+    final density = Provider.of<DensityProvider>(context, listen: false);
+    final isSelected = density.density == d;
+
+    return ListTile(
+      title: Text(name),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      onTap: () {
+        density.setDensity(d);
+        Navigator.pop(context);
+      },
     );
   }
 

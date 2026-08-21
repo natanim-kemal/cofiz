@@ -9,6 +9,7 @@ import 'core/services/fcm_service.dart';
 import 'core/services/area_service.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/theme_provider.dart';
+import 'core/providers/density_provider.dart';
 import 'core/providers/audit_provider.dart';
 import 'core/providers/worker_provider.dart';
 import 'core/providers/settings_provider.dart';
@@ -112,19 +113,22 @@ class StitchWorkerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => IncomeProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => DensityProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AuditProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
-      child: Consumer2<ThemeProvider, SettingsProvider>(
-        builder: (context, themeProvider, settingsProvider, _) {
+      child: Consumer3<ThemeProvider, SettingsProvider, DensityProvider>(
+        builder: (context, themeProvider, settingsProvider, densityProvider, _) {
           return MaterialApp(
             title: 'Cofiz',
             // Locale
             locale: settingsProvider.locale,
 
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: AppTheme.lightTheme
+                .copyWith(visualDensity: densityProvider.visualDensity),
+            darkTheme: AppTheme.darkTheme
+                .copyWith(visualDensity: densityProvider.visualDensity),
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
             localizationsDelegates: const [
@@ -137,10 +141,25 @@ class StitchWorkerApp extends StatelessWidget {
               Locale('en'),
               Locale('am'),
             ],
-            builder: (context, child) => ColoredBox(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: AppToastHost(child: child!),
-            ),
+            builder: (context, child) {
+              final mq = MediaQuery.of(context);
+              // Scale text on top of whatever the OS font scale is, so the
+              // density preset behaves identically on every device.
+              final systemScale = mq.textScaler.scale(14) / 14;
+              return ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: AppToastHost(
+                  child: MediaQuery(
+                    data: mq.copyWith(
+                      textScaler: TextScaler.linear(
+                        systemScale * densityProvider.textScaleFactor,
+                      ),
+                    ),
+                    child: child!,
+                  ),
+                ),
+              );
+            },
             home: const AuthGate(),
           );
         },
