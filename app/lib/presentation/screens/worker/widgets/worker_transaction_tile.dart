@@ -106,7 +106,7 @@ class WorkerTransactionTile extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      DateFormat('h:mm a').format(transaction.createdAt),
+                      DateFormat('MMM d, h:mm a').format(transaction.createdAt),
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark

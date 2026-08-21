@@ -27,6 +27,7 @@ class WorkerDashboardScreen extends StatefulWidget {
 class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   int _currentIndex = 0;
   Future<Worker?>? _workerFuture;
+  Worker? _cachedWorker;
 
   @override
   void initState() {
@@ -53,13 +54,15 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     return FutureBuilder<Worker?>(
       future: _workerFuture ??= workerProvider.getWorkerById(widget.workerId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            _cachedWorker == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        if (!snapshot.hasData || snapshot.data == null) {
+        if ((!snapshot.hasData || snapshot.data == null) &&
+            _cachedWorker == null) {
           return Scaffold(
             body: Center(
               child: Column(
@@ -79,7 +82,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           );
         }
 
-        final worker = snapshot.data!;
+        final worker = snapshot.data ?? _cachedWorker!;
 
         return DoubleBackExit(
           child: Scaffold(
@@ -93,12 +96,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       worker: worker,
                       isDark: isDark,
                       onRefresh: () async {
-                        setState(() {
-                          _workerFuture =
-                              workerProvider.getWorkerById(widget.workerId);
-                        });
                         Provider.of<TransactionProvider>(context, listen: false)
                             .loadWorkerTransactions(widget.workerId);
+                        final refreshed =
+                            await workerProvider.getWorkerById(widget.workerId);
+                        if (mounted) {
+                          setState(() => _cachedWorker = refreshed);
+                        }
                       },
                       onViewHistory: () => _onNavTap(1),
                     ),

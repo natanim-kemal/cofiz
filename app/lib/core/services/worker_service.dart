@@ -2,8 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/worker_model.dart';
 
 class WorkerService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
   static const String _workersCollection = 'workers';
+
+  WorkerService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   /// Get all workers stream
   Stream<List<Worker>> getWorkersStream() {
