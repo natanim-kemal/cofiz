@@ -46,32 +46,62 @@ class TransactionProvider with ChangeNotifier {
   double get todayPurchased => _todayPurchased;
   double get todayNet => _todayDistributed - _todayReturned - _todayPurchased;
 
-  /// Load worker transactions - bounded live stream (first page) + cursor pages
+  /// Load worker transactions - bounded live stream (first page) + cursor pages.
+  /// Seeds from the local Hive cache first so cold start or offline shows
+  /// data immediately instead of a blank list.
   void loadWorkerTransactions(String workerId) {
     _currentWorkerId = workerId;
     _workerSub?.cancel();
-    _workerTransactions = [];
     _workerLastDoc = null;
     _workerHasMore = false;
     _workerLoadedExtraPages = false;
     _workerTotalCount = 0;
+
+    // Seed from cache (newest first). Cache failure is non-fatal: fall
+    // through to the live stream with an empty list, like before.
+    try {
+      final cached =
+          OfflineCacheService().getCachedWorkerTransactions(workerId);
+      if (cached.isNotEmpty) {
+        cached.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _workerTransactions = cached;
+      } else {
+        _workerTransactions = [];
+      }
+    } catch (_) {
+      _workerTransactions = [];
+    }
     notifyListeners();
 
-    _workerSub = _transactionService
-        .getWorkerTransactionsStream(workerId, limit: _workerPageSize)
-        .listen(
-      (transactions) {
-        _mergeFirstPage(transactions);
-        notifyListeners();
-      },
-      onError: (error) {
-        print('Error loading worker transactions: $error');
-        _errorMessage = _parseError(error);
-        notifyListeners();
-      },
-    );
+    try {
+      _workerSub = _transactionService
+          .getWorkerTransactionsStream(workerId, limit: _workerPageSize)
+          .listen(
+        (transactions) {
+          if (_currentWorkerId != workerId) return;
+          _mergeFirstPage(transactions);
+          notifyListeners();
+          _persistWorkerCache(workerId);
+        },
+        onError: (error) {
+          print('Error loading worker transactions: $error');
+          _errorMessage = _parseError(error);
+          notifyListeners();
+        },
+      );
 
-    _loadWorkerCount(workerId);
+      _loadWorkerCount(workerId);
+    } catch (_) {
+      // Firestore unreachable (e.g. offline cold start): cached data stays.
+    }
+  }
+
+  /// Persist the currently accumulated worker transactions so the next cold
+  /// start can seed from them. Fire-and-forget; failures are non-fatal.
+  void _persistWorkerCache(String workerId) {
+    OfflineCacheService()
+        .cacheWorkerTransactions(workerId, _workerTransactions)
+        .catchError((_) {});
   }
 
   /// Test seam: seed the in-memory worker transaction list directly.
@@ -132,6 +162,9 @@ class TransactionProvider with ChangeNotifier {
     ];
     _workerLastDoc = page.lastDoc;
     _workerHasMore = page.hasMore;
+    if (_currentWorkerId != null) {
+      _persistWorkerCache(_currentWorkerId!);
+    }
     _workerLoadedExtraPages = true;
     _isLoadingMoreWorker = false;
     notifyListeners();

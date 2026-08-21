@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/worker_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
+import '../../../core/services/offline_cache_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/worker_model.dart';
 import '../settings/settings_screen.dart';
@@ -11,6 +12,7 @@ import 'tabs/worker_home_tab.dart';
 import 'tabs/worker_history_tab.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/double_back_exit.dart';
+import '../../widgets/offline_indicator.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
   final String workerId;
@@ -32,6 +34,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Seed the profile from Hive so the first build already has data (no
+    // loading spinner) even after process death.
+    _cachedWorker = Provider.of<WorkerProvider>(context, listen: false)
+        .getCachedWorkerById(widget.workerId);
     // Load worker's transactions
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<TransactionProvider>(context, listen: false)
@@ -116,6 +122,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         }),
                     const SettingsScreen(),
                   ],
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: OfflineIndicator(
+                    datasets: [
+                      OfflineCacheService.workerTxDataset(widget.workerId),
+                      OfflineCacheService.dsWorkerProfile,
+                    ],
+                  ),
                 ),
               ],
             ),
