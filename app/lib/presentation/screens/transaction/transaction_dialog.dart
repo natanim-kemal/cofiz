@@ -17,11 +17,15 @@ class TransactionDialog extends StatefulWidget {
   final String type; // 'distribution', 'return', 'purchase'
   final MoneyTransaction? existing;
 
+  /// Required admin reason when editing a transaction past the immutability window.
+  final String? overrideReason;
+
   const TransactionDialog({
     super.key,
     required this.worker,
     required this.type,
     this.existing,
+    this.overrideReason,
   });
 
   @override
@@ -211,7 +215,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
         commissionAmount:
             widget.type == 'purchase' ? commission : existing.commissionAmount,
       );
-      success = await transactionProvider.updateTransaction(updated);
+      success = await transactionProvider.updateTransaction(updated,
+          overrideReason: widget.overrideReason);
     } else {
       switch (widget.type) {
         case 'distribution':
@@ -265,7 +270,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
       if (success) {
         Navigator.pop(context, true);
         AppToast.show(
-          AppLocalizations.of(context)!.transactionCompleted,
+          widget.existing != null
+              ? AppLocalizations.of(context)!.transactionUpdated
+              : AppLocalizations.of(context)!.transactionCompleted,
           success: true,
         );
       } else {

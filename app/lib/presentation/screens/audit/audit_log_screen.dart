@@ -356,6 +356,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         return Icons.attach_money;
       case AuditAction.transactionDeleted:
         return Icons.delete_forever;
+      case AuditAction.transactionUpdated:
+        return Icons.edit;
       case AuditAction.incomeRecorded:
         return Icons.trending_up;
       case AuditAction.expenseRecorded:

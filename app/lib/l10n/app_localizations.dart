@@ -2791,6 +2791,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap back again to exit'**
   String get tapAgainToExit;
+
+  /// No description provided for @lockedEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get lockedEntry;
+
+  /// No description provided for @lockedReasonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin override required'**
+  String get lockedReasonTitle;
+
+  /// No description provided for @lockedReasonMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This entry is older than 7 days and is locked. Enter a reason to {action} it.'**
+  String lockedReasonMessage(Object action);
+
+  /// No description provided for @reasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get reasonLabel;
+
+  /// No description provided for @reasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you changing this entry?'**
+  String get reasonHint;
+
+  /// No description provided for @reasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A reason is required to override a locked entry.'**
+  String get reasonRequired;
+
+  /// No description provided for @transactionUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction updated'**
+  String get transactionUpdated;
 }
 
 class _AppLocalizationsDelegate

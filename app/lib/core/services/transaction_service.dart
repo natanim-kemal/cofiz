@@ -24,6 +24,15 @@ class TransactionPage {
   });
 }
 
+/// Thrown when an edit/delete is attempted on a transaction past the
+/// immutability window without an admin override reason.
+class TransactionLockedException implements Exception {
+  final String message;
+  TransactionLockedException(this.message);
+  @override
+  String toString() => message;
+}
+
 class TransactionService {
   final FirebaseFirestore _firestore;
 
@@ -362,7 +371,12 @@ class TransactionService {
   }
 
   /// Delete both records of a transfer by shared transferId, reversing balances.
-  Future<void> deleteTransfer(String transferId) async {
+  /// If the transfer is past the immutability window, [overrideReason] must be
+  /// provided by an admin.
+  Future<void> deleteTransfer(
+    String transferId, {
+    String? overrideReason,
+  }) async {
     final snapshot = await _firestore
         .collection(_transactionsCollection)
         .where('transferId', isEqualTo: transferId)
@@ -376,6 +390,7 @@ class TransactionService {
       final batch = _firestore.batch();
       for (final doc in snapshot.docs) {
         final tx = MoneyTransaction.fromFirestore(doc.data(), doc.id);
+        _enforceLock(tx, overrideReason: overrideReason, action: 'delete');
         final workerRef = _firestore.collection('workers').doc(tx.workerId);
         final updates = _balanceUpdates(tx, -1);
         if (updates.isNotEmpty) {
@@ -388,6 +403,8 @@ class TransactionService {
     } on FirebaseException catch (e) {
       print('Firestore error deleting transfer: ${e.code} - ${e.message}');
       throw _handleFirestoreError(e);
+    } on TransactionLockedException {
+      rethrow;
     } catch (e) {
       print('Error deleting transfer: $e');
       throw 'Failed to delete transfer. Please try again.';
@@ -395,7 +412,12 @@ class TransactionService {
   }
 
   /// Edit an existing transaction, reversing the old balance effect and applying the new one
-  Future<void> updateTransaction(MoneyTransaction transaction) async {
+  /// If the transaction is past the immutability window, [overrideReason] must be
+  /// provided by an admin.
+  Future<void> updateTransaction(
+    MoneyTransaction transaction, {
+    String? overrideReason,
+  }) async {
     try {
       final doc = await _firestore
           .collection(_transactionsCollection)
@@ -411,6 +433,8 @@ class TransactionService {
       if (old.isTransfer || transaction.isTransfer) {
         throw 'Transfers cannot be edited.';
       }
+
+      _enforceLock(old, overrideReason: overrideReason, action: 'edit');
 
       // Validate balance for money-out types, accounting for the reversed old effect
       if (transaction.type.toLowerCase() == 'purchase' ||
@@ -462,6 +486,8 @@ class TransactionService {
     } on FirebaseException catch (e) {
       print('Firestore error updating transaction: ${e.code} - ${e.message}');
       throw _handleFirestoreError(e);
+    } on TransactionLockedException {
+      rethrow;
     } catch (e) {
       print('Error updating transaction: $e');
       throw 'Failed to update transaction. Please try again.';
@@ -469,7 +495,12 @@ class TransactionService {
   }
 
   /// Delete an existing transaction, reversing its balance effect
-  Future<void> deleteTransaction(String transactionId) async {
+  /// If the transaction is past the immutability window, [overrideReason] must be
+  /// provided by an admin.
+  Future<void> deleteTransaction(
+    String transactionId, {
+    String? overrideReason,
+  }) async {
     try {
       final doc = await _firestore
           .collection(_transactionsCollection)
@@ -486,6 +517,9 @@ class TransactionService {
       if (transaction.isTransfer) {
         throw 'Use transfer delete for transfers.';
       }
+
+      _enforceLock(transaction,
+          overrideReason: overrideReason, action: 'delete');
 
       // Reversing a distribution removes money from the balance - validate it
       if (transaction.type.toLowerCase() == 'distribution') {
@@ -524,9 +558,25 @@ class TransactionService {
     } on FirebaseException catch (e) {
       print('Firestore error deleting transaction: ${e.code} - ${e.message}');
       throw _handleFirestoreError(e);
+    } on TransactionLockedException {
+      rethrow;
     } catch (e) {
       print('Error deleting transaction: $e');
       throw 'Failed to delete transaction. Please try again.';
+    }
+  }
+
+  /// Throws if the transaction is past the immutability window and no admin
+  /// override reason was provided.
+  void _enforceLock(
+    MoneyTransaction transaction, {
+    required String? overrideReason,
+    required String action,
+  }) {
+    if (transaction.isLocked &&
+        (overrideReason == null || overrideReason.trim().isEmpty)) {
+      throw TransactionLockedException(
+          'This transaction is locked. Please provide a reason to $action it.');
     }
   }
 
@@ -555,9 +605,15 @@ class TransactionService {
         return updates;
       case 'transfer':
         final effect = t.isTransferSender ? -1.0 : 1.0;
-        return {
+        final updates = <String, dynamic>{
           'currentBalance': FieldValue.increment(t.amount * mult * effect),
         };
+        if (t.isTransferSender) {
+          updates['totalReturned'] = FieldValue.increment(t.amount * mult);
+        } else {
+          updates['totalDistributed'] = FieldValue.increment(t.amount * mult);
+        }
+        return updates;
       default:
         return {};
     }

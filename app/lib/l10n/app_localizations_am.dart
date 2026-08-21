@@ -1448,4 +1448,27 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get tapAgainToExit => 'ለመውጣት እንደገና ይጫኑ';
+
+  @override
+  String get lockedEntry => 'ተቆልፏል';
+
+  @override
+  String get lockedReasonTitle => 'የአስተዳዳሪ ውሳኔ ያስፈልጋል';
+
+  @override
+  String lockedReasonMessage(Object action) {
+    return 'ይህ ግብይት ከ7 ቀናት በላይ የሆነው ሲሆን ተቆልፏል። ለማርትዕ/ለመሰረዝ ምክንያት ያስገቡ።';
+  }
+
+  @override
+  String get reasonLabel => 'ምክንያት';
+
+  @override
+  String get reasonHint => 'ይህን ግብይት የሚያስተካክሉበት ምክንያት ምንድን ነው?';
+
+  @override
+  String get reasonRequired => 'የተቆለፈ ግብይትን ለማስተካከል ምክንያት ያስፈልጋል።';
+
+  @override
+  String get transactionUpdated => 'ግብይት ተሻሽሏል';
 }

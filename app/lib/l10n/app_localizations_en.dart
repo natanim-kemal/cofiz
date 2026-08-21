@@ -1459,4 +1459,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tapAgainToExit => 'Tap back again to exit';
+
+  @override
+  String get lockedEntry => 'Locked';
+
+  @override
+  String get lockedReasonTitle => 'Admin override required';
+
+  @override
+  String lockedReasonMessage(Object action) {
+    return 'This entry is older than 7 days and is locked. Enter a reason to $action it.';
+  }
+
+  @override
+  String get reasonLabel => 'Reason';
+
+  @override
+  String get reasonHint => 'Why are you changing this entry?';
+
+  @override
+  String get reasonRequired =>
+      'A reason is required to override a locked entry.';
+
+  @override
+  String get transactionUpdated => 'Transaction updated';
 }

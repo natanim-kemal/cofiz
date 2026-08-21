@@ -574,9 +574,15 @@ class TransactionProvider with ChangeNotifier {
   }
 
   /// Edit an existing transaction (reverses old balance effect, applies new)
-  Future<bool> updateTransaction(MoneyTransaction transaction) async {
+  /// [overrideReason] is required when the transaction is past the
+  /// immutability window.
+  Future<bool> updateTransaction(
+    MoneyTransaction transaction, {
+    String? overrideReason,
+  }) async {
     try {
-      await _transactionService.updateTransaction(transaction);
+      await _transactionService.updateTransaction(transaction,
+          overrideReason: overrideReason);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -586,9 +592,15 @@ class TransactionProvider with ChangeNotifier {
   }
 
   /// Delete a transaction (reverses its balance effect)
-  Future<bool> deleteTransaction(String transactionId) async {
+  /// [overrideReason] is required when the transaction is past the
+  /// immutability window.
+  Future<bool> deleteTransaction(
+    String transactionId, {
+    String? overrideReason,
+  }) async {
     try {
-      await _transactionService.deleteTransaction(transactionId);
+      await _transactionService.deleteTransaction(transactionId,
+          overrideReason: overrideReason);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -598,9 +610,15 @@ class TransactionProvider with ChangeNotifier {
   }
 
   /// Delete both records of a transfer
-  Future<bool> deleteTransfer(String transferId) async {
+  /// [overrideReason] is required when the transfer is past the
+  /// immutability window.
+  Future<bool> deleteTransfer(
+    String transferId, {
+    String? overrideReason,
+  }) async {
     try {
-      await _transactionService.deleteTransfer(transferId);
+      await _transactionService.deleteTransfer(transferId,
+          overrideReason: overrideReason);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
