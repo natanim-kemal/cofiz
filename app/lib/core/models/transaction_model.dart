@@ -1,4 +1,8 @@
 class MoneyTransaction {
+  /// Transactions older than this window are locked against edit/delete
+  /// unless an admin provides a reason (override).
+  static const Duration immutabilityWindow = Duration(days: 7);
+
   final String id;
   final String workerId;
   final String workerName;
@@ -211,4 +215,9 @@ class MoneyTransaction {
   bool get isTransfer => type.toLowerCase() == 'transfer';
   bool get isTransferSender => isTransfer && transferRole == 'sender';
   bool get isTransferReceiver => isTransfer && transferRole == 'receiver';
+
+  /// Whether this transaction is past the immutability window and requires
+  /// an admin override reason to be edited or deleted.
+  bool get isLocked =>
+      DateTime.now().difference(createdAt) > immutabilityWindow;
 }

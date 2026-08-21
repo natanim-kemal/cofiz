@@ -114,6 +114,7 @@ class AuditProvider with ChangeNotifier {
     required double amount,
     required String workerName,
     bool wasUnconfirmed = false,
+    String? reason,
   }) async {
     await _auditService.log(
       userId: userId,
@@ -125,6 +126,33 @@ class AuditProvider with ChangeNotifier {
         'type': transactionType,
         'amount': amount,
         'wasUnconfirmed': wasUnconfirmed,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      },
+    );
+  }
+
+  /// Log transaction update
+  Future<void> logTransactionUpdated({
+    required String userId,
+    required String userName,
+    required String transactionId,
+    required String transactionType,
+    required double amount,
+    required String workerName,
+    String? reason,
+    Map<String, dynamic>? changes,
+  }) async {
+    await _auditService.log(
+      userId: userId,
+      userName: userName,
+      action: AuditAction.transactionUpdated,
+      targetId: transactionId,
+      targetName: workerName,
+      metadata: {
+        'type': transactionType,
+        'amount': amount,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+        if (changes != null) 'changes': changes,
       },
     );
   }

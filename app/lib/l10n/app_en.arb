@@ -563,5 +563,12 @@
   "filterByDate": "Filter by date",
   "cashFlow": "Cash flow",
   "neutral": "Neutral",
-  "tapAgainToExit": "Tap back again to exit"
+  "tapAgainToExit": "Tap back again to exit",
+  "lockedEntry": "Locked",
+  "lockedReasonTitle": "Admin override required",
+  "lockedReasonMessage": "This entry is older than 7 days and is locked. Enter a reason to {action} it.",
+  "reasonLabel": "Reason",
+  "reasonHint": "Why are you changing this entry?",
+  "reasonRequired": "A reason is required to override a locked entry.",
+  "transactionUpdated": "Transaction updated"
 }

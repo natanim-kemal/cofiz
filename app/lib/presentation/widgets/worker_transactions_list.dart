@@ -91,12 +91,19 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
   }
 
   Future<void> _editTransaction(MoneyTransaction transaction) async {
+    String? overrideReason;
+    if (transaction.isLocked) {
+      overrideReason = await _promptOverrideReason(action: 'edit');
+      if (overrideReason == null || !mounted) return;
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => TransactionDialog(
         worker: widget.worker,
         type: transaction.type,
         existing: transaction,
+        overrideReason: overrideReason,
       ),
     );
     if (result == true) {
@@ -104,8 +111,68 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
     }
   }
 
+  /// Ask the admin for a reason when editing/deleting a locked transaction.
+  /// Returns null if the admin cancels.
+  Future<String?> _promptOverrideReason({required String action}) async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.lockedReasonTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.lockedReasonMessage(action)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 3,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: l10n.reasonLabel,
+                hintText: l10n.reasonHint,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) {
+                AppToast.show(l10n.reasonRequired);
+                return;
+              }
+              Navigator.pop(context, text);
+            },
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return reason;
+  }
+
   Future<void> _deleteTransaction(MoneyTransaction transaction) async {
     final l10n = AppLocalizations.of(context)!;
+
+    String? overrideReason;
+    if (transaction.isLocked) {
+      overrideReason = await _promptOverrideReason(action: 'delete');
+      if (overrideReason == null || !mounted) return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -130,8 +197,14 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
     final transactionProvider =
         Provider.of<TransactionProvider>(context, listen: false);
     final success = transaction.isTransfer
-        ? await transactionProvider.deleteTransfer(transaction.transferId!)
-        : await transactionProvider.deleteTransaction(transaction.id);
+        ? await transactionProvider.deleteTransfer(
+            transaction.transferId!,
+            overrideReason: overrideReason,
+          )
+        : await transactionProvider.deleteTransaction(
+            transaction.id,
+            overrideReason: overrideReason,
+          );
 
     if (!mounted) return;
     if (success) {
@@ -147,6 +220,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
         amount: transaction.amount,
         workerName: transaction.workerName,
         wasUnconfirmed: !transaction.approved,
+        reason: overrideReason,
       );
       _reload();
       AppToast.show(l10n.transactionDeleted, success: true);
@@ -352,13 +426,40 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _getTypeDisplay(context, transaction),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _getTypeDisplay(context, transaction),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.color,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (transaction.isLocked) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.lock_outline,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              AppLocalizations.of(context)!.lockedEntry,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(

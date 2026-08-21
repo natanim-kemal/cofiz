@@ -563,5 +563,12 @@
   "filterByDate": "በቀን አጣራ",
   "cashFlow": "የገንዘብ ፍሰት",
   "neutral": "ገለልተኛ",
-  "tapAgainToExit": "ለመውጣት እንደገና ይጫኑ"
+  "tapAgainToExit": "ለመውጣት እንደገና ይጫኑ",
+  "lockedEntry": "ተቆልፏል",
+  "lockedReasonTitle": "የአስተዳዳሪ ውሳኔ ያስፈልጋል",
+  "lockedReasonMessage": "ይህ ግብይት ከ7 ቀናት በላይ የሆነው ሲሆን ተቆልፏል። ለማርትዕ/ለመሰረዝ ምክንያት ያስገቡ።",
+  "reasonLabel": "ምክንያት",
+  "reasonHint": "ይህን ግብይት የሚያስተካክሉበት ምክንያት ምንድን ነው?",
+  "reasonRequired": "የተቆለፈ ግብይትን ለማስተካከል ምክንያት ያስፈልጋል።",
+  "transactionUpdated": "ግብይት ተሻሽሏል"
 }
