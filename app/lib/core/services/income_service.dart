@@ -145,6 +145,27 @@ class IncomeService {
     }
   }
 
+  /// Fetch all income records for a specific calendar day (newest first).
+  Future<List<IncomeRecord>> getIncomeForDay(DateTime day) async {
+    final startOfDay = DateTime(day.year, day.month, day.day);
+    final startTimestamp = startOfDay.millisecondsSinceEpoch;
+    final endTimestamp =
+        startOfDay.add(const Duration(days: 1)).millisecondsSinceEpoch;
+    try {
+      final snap = await _firestore
+          .collection(_collectionName)
+          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('createdAt', isLessThan: endTimestamp)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs
+          .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// Fetch all income records (newest first) - for reports/export.
   Future<List<IncomeRecord>> getAllIncome() async {
     try {

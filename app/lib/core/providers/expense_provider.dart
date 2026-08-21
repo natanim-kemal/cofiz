@@ -24,6 +24,10 @@ class ExpenseProvider extends ChangeNotifier {
   bool _loadedExtraPages = false;
   StreamSubscription<List<ExpenseRecord>>? _subscription;
 
+  // Day-filter state: when non-null, _records holds that day's full list.
+  DateTime? _activeDay;
+  int _loadGeneration = 0;
+
   // Full dataset (used by reports/export, loaded on demand)
   List<ExpenseRecord> _fullRecords = [];
 
@@ -37,9 +41,10 @@ class ExpenseProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  bool get hasMoreRecords => _hasMore;
+  bool get hasMoreRecords => _hasMore && _activeDay == null;
   bool get isLoadingMore => _isLoadingMore;
   int get totalRecordCount => _totalCount;
+  DateTime? get activeDay => _activeDay;
 
   double get totalExpenses => _totalExpenses;
   double get todayExpenses => _todayExpenses;
@@ -62,7 +67,47 @@ class ExpenseProvider extends ChangeNotifier {
     _refreshTotals();
   }
 
+  /// Restore the live first-page stream after a day filter is cleared.
+  void restoreStream() {
+    _subscription?.cancel();
+    _subscription = null;
+    _activeDay = null;
+    _loadGeneration++;
+    _records = [];
+    _lastDoc = null;
+    _hasMore = false;
+    _isLoadingMore = false;
+    _loadedExtraPages = false;
+    _isLoading = true;
+    notifyListeners();
+    initialize();
+  }
+
+  /// Load all expense records for a specific calendar day from the server.
+  /// Replaces the live first-page stream while a date filter is active.
+  Future<void> loadExpensesForDay(DateTime day) async {
+    final generation = ++_loadGeneration;
+    _subscription?.cancel();
+    _subscription = null;
+    _activeDay = day;
+    _records = [];
+    _lastDoc = null;
+    _hasMore = false;
+    _isLoadingMore = false;
+    _loadedExtraPages = false;
+    _isLoading = true;
+    notifyListeners();
+
+    final items = await _service.getExpensesForDay(day);
+    if (generation != _loadGeneration) return;
+    _records = items;
+    _totalCount = items.length;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> loadMore() async {
+    if (_activeDay != null) return;
     if (_isLoadingMore || !_hasMore) return;
     _isLoadingMore = true;
     notifyListeners();
@@ -92,6 +137,7 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   void _mergeFirstPage(List<ExpenseRecord> freshHead) {
+    if (_activeDay != null) return;
     if (!_loadedExtraPages) {
       _records = freshHead;
       return;
