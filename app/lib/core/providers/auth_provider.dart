@@ -127,7 +127,8 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       _status = AuthStatus.unauthenticated;
-      _errorMessage = e.toString();
+      _errorMessage =
+          e is String ? e : 'Login failed. Please check your connection.';
       notifyListeners();
       return false;
     }
@@ -214,7 +215,8 @@ class AuthProvider with ChangeNotifier {
       await _authService.resetPassword(email: email);
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage =
+          e is String ? e : 'Failed to send reset link. Please try again.';
       notifyListeners();
       return false;
     }
@@ -252,7 +254,7 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e is String ? e : 'Update failed. Please try again.';
       _status = AuthStatus.authenticated;
       notifyListeners();
       return false;

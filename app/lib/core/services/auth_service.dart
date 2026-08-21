@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,8 +40,12 @@ class AuthService {
       return credential;
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
+    } on SocketException {
+      throw 'Network error. Please check your connection.';
+    } on TimeoutException {
+      throw 'Network error. Please check your connection.';
     } catch (e) {
-      throw 'Unexpected error: $e';
+      throw 'Login failed. Please try again.';
     }
   }
 
