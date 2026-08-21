@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/notification_service.dart';
 
 class SettingsProvider with ChangeNotifier {
@@ -46,11 +47,23 @@ class SettingsProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleEmailNotifications(bool value) async {
+  Future<void> toggleEmailNotifications(bool value, {String? uid}) async {
     _emailNotifications = value;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('email_notifications', value);
+
+    // Sync the opt-in so verified-gated email delivery can respect it.
+    if (uid != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .set({'emailNotificationsEnabled': value}, SetOptions(merge: true));
+      } catch (_) {
+        // Best-effort: local preference already saved.
+      }
+    }
   }
 
   Future<void> togglePushNotifications(bool value) async {

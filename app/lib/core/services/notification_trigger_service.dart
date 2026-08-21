@@ -4,7 +4,10 @@ import '../models/notification_model.dart';
 
 /// Service for triggering automated notifications based on app events
 class NotificationTriggerService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+
+  NotificationTriggerService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   // Thresholds for notifications
   static const double lowBalanceThreshold = 500.0;
@@ -33,8 +36,48 @@ class NotificationTriggerService {
         'metadata': metadata,
       });
       debugPrint('Notification sent: $title to $targetUserId');
+      await _maybeQueueEmail(
+        targetUserId: targetUserId,
+        title: title,
+        body: body,
+      );
     } catch (e) {
       debugPrint('Error sending notification: $e');
+    }
+  }
+
+  /// Queue an email for the target user via the Trigger Email extension,
+  /// but only when the user has verified their address AND opted in to
+  /// email notifications (users/{uid}.emailNotificationsEnabled, synced
+  /// from SettingsProvider). Push delivery is unaffected.
+  Future<void> _maybeQueueEmail({
+    required String targetUserId,
+    required String title,
+    required String body,
+  }) async {
+    try {
+      final userDoc =
+          await _firestore.collection('users').doc(targetUserId).get();
+      final data = userDoc.data();
+      if (data == null) return;
+      final verified = data['emailVerified'] == true;
+      final optedIn = data['emailNotificationsEnabled'] == true;
+      if (!verified || !optedIn) return;
+
+      final email = data['email'];
+      if (email is! String || email.isEmpty) return;
+
+      await _firestore.collection('mail').add({
+        'to': email,
+        'template': {
+          'name': 'notification',
+          'data': {'title': title, 'body': body},
+        },
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+      });
+      debugPrint('Email queued: $title to $email');
+    } catch (e) {
+      debugPrint('Error queueing notification email: $e');
     }
   }
 

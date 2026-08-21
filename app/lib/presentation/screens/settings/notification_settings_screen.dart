@@ -34,7 +34,12 @@ class NotificationSettingsScreen extends StatelessWidget {
                 title: AppLocalizations.of(context)!.emailNotifications,
                 subtitle: AppLocalizations.of(context)!.receiveUpdatesViaEmail,
                 value: settings.emailNotifications,
-                onChanged: (val) => settings.toggleEmailNotifications(val),
+                onChanged: (val) => settings.toggleEmailNotifications(
+                  val,
+                  uid: Provider.of<AuthProvider>(context, listen: false)
+                      .appUser
+                      ?.uid,
+                ),
               ),
               if (settings.emailNotifications)
                 Container(
