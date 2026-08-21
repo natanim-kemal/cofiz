@@ -2,6 +2,7 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
 import 'core/models/user_model.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/services/fcm_service.dart';
@@ -24,6 +25,7 @@ import 'presentation/widgets/custom_bottom_nav.dart';
 import 'presentation/widgets/offline_indicator.dart';
 import 'presentation/widgets/double_back_exit.dart';
 import 'presentation/widgets/app_toast.dart';
+import 'presentation/widgets/animated_splash_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/widgets/background_pattern.dart';
 import 'presentation/screens/reports/reports_screen.dart';
@@ -143,8 +145,27 @@ class StitchWorkerApp extends StatelessWidget {
 }
 
 /// Auth gate to check if user is logged in
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  static const Duration _minSplashDuration = Duration(milliseconds: 1400);
+
+  bool _splashElapsed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ensure the branded splash animation plays fully even when the auth
+    // check resolves instantly.
+    Timer(_minSplashDuration, () {
+      if (mounted) setState(() => _splashElapsed = true);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,13 +182,12 @@ class AuthGate extends StatelessWidget {
                 .disposeListener();
           });
         }
-        // Show loading while checking auth state
-        if (authProvider.status == AuthStatus.uninitialized) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
+        // Show the branded animated splash while checking auth state, and
+        // for at least the minimum splash duration so the logo animation
+        // is always visible on startup.
+        if (authProvider.status == AuthStatus.uninitialized ||
+            !_splashElapsed) {
+          return const AnimatedSplashScreen();
         }
 
         // Navigate based on auth status AND user role
