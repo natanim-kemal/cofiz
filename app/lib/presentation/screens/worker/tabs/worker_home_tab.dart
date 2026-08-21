@@ -3,6 +3,7 @@ import '../../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/providers/transaction_provider.dart';
+import '../../../../core/providers/auth_provider.dart';
 import '../../../../../core/utils/number_formatter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/worker_model.dart';
@@ -87,6 +88,10 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final displayName = (authProvider.appUser?.displayName?.isNotEmpty ?? false)
+        ? authProvider.appUser!.displayName!
+        : widget.worker.name;
     return Column(
       children: [
         CustomHeader(
@@ -109,7 +114,7 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.worker.name,
+                        displayName,
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,

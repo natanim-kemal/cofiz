@@ -83,9 +83,9 @@ class WorkerDetailScreen extends StatelessWidget {
                             children: [
                               if (canEdit) ...[
                                 if (worker.userId != null)
-IconButton(
+                                  IconButton(
                                     icon: Transform.rotate(
-                                      angle: -0.35, 
+                                      angle: -0.35,
                                       child: const Icon(Icons.send,
                                           color: Colors.white),
                                     ),
@@ -317,18 +317,18 @@ IconButton(
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       try {
-                        await WorkerActions.makePhoneCall(worker.phone);
+                        await WorkerActions.sendSMS(worker.phone);
                       } catch (e) {
                         if (context.mounted) {
                           AppToast.show(AppLocalizations.of(context)!
-                              .couldNotMakeCall(e.toString()));
+                              .couldNotSendSMS(e.toString()));
                         }
                       }
                     },
-                    icon: const Icon(Icons.phone, size: 18),
-                    label: Text(AppLocalizations.of(context)!.call),
+                    icon: const Icon(Icons.message, size: 18),
+                    label: Text(AppLocalizations.of(context)!.message),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -342,18 +342,18 @@ IconButton(
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       try {
-                        await WorkerActions.sendSMS(worker.phone);
+                        await WorkerActions.makePhoneCall(worker.phone);
                       } catch (e) {
                         if (context.mounted) {
                           AppToast.show(AppLocalizations.of(context)!
-                              .couldNotSendSMS(e.toString()));
+                              .couldNotMakeCall(e.toString()));
                         }
                       }
                     },
-                    icon: const Icon(Icons.message, size: 18),
-                    label: Text(AppLocalizations.of(context)!.message),
+                    icon: const Icon(Icons.phone, size: 18),
+                    label: Text(AppLocalizations.of(context)!.call),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
