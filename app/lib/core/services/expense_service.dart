@@ -93,6 +93,27 @@ class ExpenseService {
     }
   }
 
+  /// Fetch all expense records for a specific calendar day (newest first).
+  Future<List<ExpenseRecord>> getExpensesForDay(DateTime day) async {
+    final startOfDay = DateTime(day.year, day.month, day.day);
+    final startTimestamp = startOfDay.millisecondsSinceEpoch;
+    final endTimestamp =
+        startOfDay.add(const Duration(days: 1)).millisecondsSinceEpoch;
+    try {
+      final snap = await _firestore
+          .collection(_collectionName)
+          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('createdAt', isLessThan: endTimestamp)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snap.docs
+          .map((doc) => ExpenseRecord.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// Fetch all expense records (newest first) - for reports/export.
   Future<List<ExpenseRecord>> getAllExpenses() async {
     try {

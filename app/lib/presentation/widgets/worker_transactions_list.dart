@@ -46,8 +46,12 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
   }
 
   void _reload() {
-    Provider.of<TransactionProvider>(context, listen: false)
-        .loadWorkerTransactions(widget.workerId);
+    final provider = Provider.of<TransactionProvider>(context, listen: false);
+    if (_selectedDate != null) {
+      provider.loadWorkerTransactionsForDay(widget.workerId, _selectedDate!);
+    } else {
+      provider.loadWorkerTransactions(widget.workerId);
+    }
   }
 
   Future<void> _loadMore(TransactionProvider provider) async {
@@ -57,6 +61,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final provider = Provider.of<TransactionProvider>(context, listen: false);
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? now,
@@ -65,7 +70,13 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
+      provider.loadWorkerTransactionsForDay(widget.workerId, picked);
     }
+  }
+
+  void _clearDate() {
+    setState(() => _selectedDate = null);
+    _reload();
   }
 
   List<MoneyTransaction> _filteredTransactions(
@@ -171,9 +182,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                 ),
                 if (_selectedDate != null)
                   TextButton.icon(
-                    onPressed: () {
-                      setState(() => _selectedDate = null);
-                    },
+                    onPressed: _clearDate,
                     icon: const Icon(Icons.close, size: 16),
                     label: Text(
                       DateFormat('MMM d, yyyy').format(_selectedDate!),
@@ -195,40 +204,47 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
             if (filtered.isEmpty)
               _buildEmptyState()
             else ...[
-              for (final transaction in filtered.take(_itemsToShow))
-                _buildTransactionItem(transaction),
-              if (filtered.length > _itemsToShow ||
-                  transactionProvider.hasMoreWorkerTransactions)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Center(
-                    child: OutlinedButton.icon(
-                      onPressed:
-                          transactionProvider.isLoadingMoreWorkerTransactions
-                              ? null
-                              : () => _loadMore(transactionProvider),
-                      icon: transactionProvider.isLoadingMoreWorkerTransactions
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: AppColors.primary),
-                            )
-                          : const Icon(Icons.expand_more),
-                      label: Text(AppLocalizations.of(context)!.loadMore),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: BorderSide(
-                            color: AppColors.primary.withValues(alpha: 0.5)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+              if (_selectedDate != null)
+                for (final transaction in filtered)
+                  _buildTransactionItem(transaction)
+              else ...[
+                for (final transaction in filtered.take(_itemsToShow))
+                  _buildTransactionItem(transaction),
+                if (filtered.length > _itemsToShow ||
+                    transactionProvider.hasMoreWorkerTransactions)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Center(
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            transactionProvider.isLoadingMoreWorkerTransactions
+                                ? null
+                                : () => _loadMore(transactionProvider),
+                        icon:
+                            transactionProvider.isLoadingMoreWorkerTransactions
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primary),
+                                  )
+                                : const Icon(Icons.expand_more),
+                        label: Text(AppLocalizations.of(context)!.loadMore),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(
+                              color: AppColors.primary.withValues(alpha: 0.5)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+              ],
             ],
           ],
         );

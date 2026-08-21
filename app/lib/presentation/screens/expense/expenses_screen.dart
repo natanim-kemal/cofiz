@@ -28,6 +28,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final provider = Provider.of<ExpenseProvider>(context, listen: false);
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? now,
@@ -36,7 +37,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
+      provider.loadExpensesForDay(picked);
     }
+  }
+
+  void _clearDate() {
+    setState(() => _selectedDate = null);
+    Provider.of<ExpenseProvider>(context, listen: false).restoreStream();
   }
 
   @override
@@ -160,9 +167,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         ),
                         if (_selectedDate != null)
                           TextButton.icon(
-                            onPressed: () {
-                              setState(() => _selectedDate = null);
-                            },
+                            onPressed: _clearDate,
                             icon: const Icon(Icons.close, size: 16),
                             label: Text(
                               DateFormat('MMM d, yyyy').format(_selectedDate!),

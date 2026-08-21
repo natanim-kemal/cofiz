@@ -145,4 +145,62 @@ void main() {
     expect((await fake.collection('income_records').get()).docs.length, 1);
     expect(OfflineCacheService().getPendingOperations(), isEmpty);
   });
+
+  test('getExpensesForDay returns only records in that calendar day', () async {
+    final fake = FakeFirebaseFirestore();
+    final svc = ExpenseService(firestore: fake);
+    final day = DateTime(2026, 2, 10);
+    final nextDay = day.add(const Duration(days: 1));
+    for (var i = 0; i < 3; i++) {
+      await fake.collection('expenses').doc('exp-$i').set({
+        'amount': 10.0 + i,
+        'expenseCategory': 'Transport',
+        'createdAt':
+            day.millisecondsSinceEpoch + Duration(hours: 1 + i).inMilliseconds,
+        'createdBy': 'u1',
+        'createdByName': 'Tester',
+      });
+    }
+    await fake.collection('expenses').doc('exp-next-day').set({
+      'amount': 99.0,
+      'expenseCategory': 'Food',
+      'createdAt': nextDay.millisecondsSinceEpoch,
+      'createdBy': 'u1',
+      'createdByName': 'Tester',
+    });
+    final items = await svc.getExpensesForDay(day);
+    expect(items.length, 3);
+    expect(items.map((r) => r.id).toSet(), {'exp-0', 'exp-1', 'exp-2'});
+    expect(items.first.createdAt.isAfter(items.last.createdAt), true);
+  });
+
+  test('getIncomeForDay returns only records in that calendar day', () async {
+    final fake = FakeFirebaseFirestore();
+    final svc = IncomeService(firestore: fake);
+    final day = DateTime(2026, 2, 10);
+    final nextDay = day.add(const Duration(days: 1));
+    for (var i = 0; i < 2; i++) {
+      await fake.collection('income_records').doc('inc-$i').set({
+        'kind': 'sale',
+        'amount': 20.0 + i,
+        'saleCategory': 'Coffee Beans',
+        'createdAt':
+            day.millisecondsSinceEpoch + Duration(hours: 1 + i).inMilliseconds,
+        'createdBy': 'u1',
+        'createdByName': 'Tester',
+      });
+    }
+    await fake.collection('income_records').doc('inc-next-day').set({
+      'kind': 'sale',
+      'amount': 50.0,
+      'saleCategory': 'Coffee Beans',
+      'createdAt': nextDay.millisecondsSinceEpoch,
+      'createdBy': 'u1',
+      'createdByName': 'Tester',
+    });
+    final items = await svc.getIncomeForDay(day);
+    expect(items.length, 2);
+    expect(items.map((r) => r.id).toSet(), {'inc-0', 'inc-1'});
+    expect(items.first.createdAt.isAfter(items.last.createdAt), true);
+  });
 }

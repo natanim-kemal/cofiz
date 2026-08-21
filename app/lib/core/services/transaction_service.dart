@@ -82,6 +82,34 @@ class TransactionService {
     }
   }
 
+  /// Fetch all transactions for a worker on a specific calendar day (local time).
+  /// Used by the date filter on the worker detail page so that old dates can be
+  /// viewed without paginating through the full history.
+  Future<List<MoneyTransaction>> getWorkerTransactionsForDay(
+    String workerId,
+    DateTime day,
+  ) async {
+    final startOfDay = DateTime(day.year, day.month, day.day);
+    final startTimestamp = startOfDay.millisecondsSinceEpoch;
+    final endTimestamp =
+        startOfDay.add(const Duration(days: 1)).millisecondsSinceEpoch;
+
+    try {
+      final snapshot = await _firestore
+          .collection(_transactionsCollection)
+          .where('workerId', isEqualTo: workerId)
+          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('createdAt', isLessThan: endTimestamp)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs
+          .map((doc) => MoneyTransaction.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      return const [];
+    }
+  }
+
   /// Total count of transactions for a worker (server-side count).
   Future<int> getWorkerTransactionCount(String workerId) async {
     try {

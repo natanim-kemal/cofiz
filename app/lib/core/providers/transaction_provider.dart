@@ -80,6 +80,32 @@ class TransactionProvider with ChangeNotifier {
     _workerTransactions = List.of(transactions);
   }
 
+  /// Load a specific calendar day of a worker's transactions from the server.
+  /// Replaces the live first-page stream while a date filter is active.
+  Future<void> loadWorkerTransactionsForDay(
+    String workerId,
+    DateTime day,
+  ) async {
+    _currentWorkerId = workerId;
+    _workerSub?.cancel();
+    _workerSub = null;
+    _workerTransactions = [];
+    _workerLastDoc = null;
+    _workerHasMore = false;
+    _workerLoadedExtraPages = false;
+    _workerTotalCount = 0;
+    notifyListeners();
+
+    final items = await _transactionService.getWorkerTransactionsForDay(
+      workerId,
+      day,
+    );
+    if (_currentWorkerId != workerId) return;
+    _workerTransactions = items;
+    _workerTotalCount = items.length;
+    notifyListeners();
+  }
+
   /// Load the next page of worker transactions from the backend cursor.
   Future<void> loadMoreWorkerTransactions(String workerId) async {
     if (_isLoadingMoreWorker || !_workerHasMore) return;

@@ -24,6 +24,10 @@ class IncomeProvider extends ChangeNotifier {
   bool _loadedExtraPages = false;
   StreamSubscription<List<IncomeRecord>>? _subscription;
 
+  // Day-filter state: when non-null, _records holds that day's full list.
+  DateTime? _activeDay;
+  int _loadGeneration = 0;
+
   // Full dataset (used by reports/export, loaded on demand)
   List<IncomeRecord> _fullRecords = [];
 
@@ -41,9 +45,10 @@ class IncomeProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  bool get hasMoreRecords => _hasMore;
+  bool get hasMoreRecords => _hasMore && _activeDay == null;
   bool get isLoadingMore => _isLoadingMore;
   int get totalRecordCount => _totalCount;
+  DateTime? get activeDay => _activeDay;
 
   List<IncomeRecord> get investments =>
       _records.where((r) => r.kind == IncomeKind.investment).toList();
@@ -78,8 +83,48 @@ class IncomeProvider extends ChangeNotifier {
     _refreshTotals();
   }
 
+  /// Restore the live first-page stream after a day filter is cleared.
+  void restoreStream() {
+    _subscription?.cancel();
+    _subscription = null;
+    _activeDay = null;
+    _loadGeneration++;
+    _records = [];
+    _lastDoc = null;
+    _hasMore = false;
+    _isLoadingMore = false;
+    _loadedExtraPages = false;
+    _isLoading = true;
+    notifyListeners();
+    initialize();
+  }
+
+  /// Load all income records for a specific calendar day from the server.
+  /// Replaces the live first-page stream while a date filter is active.
+  Future<void> loadIncomesForDay(DateTime day) async {
+    final generation = ++_loadGeneration;
+    _subscription?.cancel();
+    _subscription = null;
+    _activeDay = day;
+    _records = [];
+    _lastDoc = null;
+    _hasMore = false;
+    _isLoadingMore = false;
+    _loadedExtraPages = false;
+    _isLoading = true;
+    notifyListeners();
+
+    final items = await _service.getIncomeForDay(day);
+    if (generation != _loadGeneration) return;
+    _records = items;
+    _totalCount = items.length;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   /// Load the next page from the backend cursor.
   Future<void> loadMore() async {
+    if (_activeDay != null) return;
     if (_isLoadingMore || !_hasMore) return;
     _isLoadingMore = true;
     notifyListeners();
@@ -109,6 +154,7 @@ class IncomeProvider extends ChangeNotifier {
   }
 
   void _mergeFirstPage(List<IncomeRecord> freshHead) {
+    if (_activeDay != null) return;
     if (!_loadedExtraPages) {
       _records = freshHead;
       return;
