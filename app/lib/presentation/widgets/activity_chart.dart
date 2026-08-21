@@ -50,8 +50,8 @@ class ActivityChart extends StatelessWidget {
               ),
               Row(
                 children: [
-                  _buildLegend(Colors.red,
-                      localizations?.distributed ?? 'Distributed'),
+                  _buildLegend(
+                      Colors.red, localizations?.distributed ?? 'Distributed'),
                   const SizedBox(width: 12),
                   _buildLegend(
                       Colors.green, localizations?.returned ?? 'Returned'),

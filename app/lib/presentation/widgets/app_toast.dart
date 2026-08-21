@@ -168,7 +168,7 @@ class _AppToastHostState extends State<AppToastHost>
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 6),
             Flexible(
               child: Text(
                 toast.message,
@@ -181,7 +181,7 @@ class _AppToastHostState extends State<AppToastHost>
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 20),
             Icon(Icons.close, color: fg.withOpacity(0.6), size: 16),
           ],
         ),

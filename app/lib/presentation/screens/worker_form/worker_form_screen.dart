@@ -71,8 +71,7 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
 
     // Validate email is provided if creating login account
     if (_createLoginAccount && _emailController.text.trim().isEmpty) {
-      AppToast.show(
-          AppLocalizations.of(context)!.emailRequiredForLogin,
+      AppToast.show(AppLocalizations.of(context)!.emailRequiredForLogin,
           success: true);
       return;
     }
@@ -119,8 +118,7 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
 
     if (mounted) {
       if (success) {
-        final authProvider =
-            Provider.of<AuthProvider>(context, listen: false);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final auditProvider =
             Provider.of<AuditProvider>(context, listen: false);
         final adminName =
@@ -197,9 +195,8 @@ class _WorkerFormScreenState extends State<WorkerFormScreen> {
             }
           } else {
             // Account creation failed, show error but worker was still created
-            AppToast.show(
-                AppLocalizations.of(context)!.workerSavedAccountFailed(
-                    result['error']));
+            AppToast.show(AppLocalizations.of(context)!
+                .workerSavedAccountFailed(result['error']));
           }
         } else {
           setState(() => _isLoading = false);
