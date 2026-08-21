@@ -242,6 +242,7 @@ class OfflineSyncService {
               'createdBy': createdBy,
               'notes': notes,
               'approved': false,
+              'transferTotalsBackfilled': true,
             };
 
             txn.set(senderRef, {
@@ -268,9 +269,14 @@ class OfflineSyncService {
 
             final fromRef = firestore.collection('workers').doc(fromWorkerId);
             final toRef = firestore.collection('workers').doc(toWorkerId);
-            txn.update(
-                fromRef, {'currentBalance': FieldValue.increment(-amount)});
-            txn.update(toRef, {'currentBalance': FieldValue.increment(amount)});
+            txn.update(fromRef, {
+              'currentBalance': FieldValue.increment(-amount),
+              'totalReturned': FieldValue.increment(amount),
+            });
+            txn.update(toRef, {
+              'currentBalance': FieldValue.increment(amount),
+              'totalDistributed': FieldValue.increment(amount),
+            });
           });
         }
         break;

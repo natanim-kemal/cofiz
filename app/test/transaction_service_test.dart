@@ -128,5 +128,17 @@ void main() {
         (await fake.collection('workers').doc('w1').get())
             .data()!['currentBalance'],
         400);
+    expect(
+        (await fake.collection('workers').doc('w1').get())
+            .data()!['totalReturned'],
+        100);
+    expect(
+        (await fake.collection('workers').doc('w2').get())
+            .data()!['currentBalance'],
+        100);
+    expect(
+        (await fake.collection('workers').doc('w2').get())
+            .data()!['totalDistributed'],
+        100);
   });
 }
