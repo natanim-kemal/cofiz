@@ -98,6 +98,9 @@ class OfflineCacheService {
     final snapshot = <String, dynamic>{
       for (final e in legacy.entries) e.key.toString(): e.value,
     };
+    // Enqueue the migrated entries BEFORE the legacy-key deletion: Hive
+    // applies box writes in call order, so if the app dies mid-migration
+    // the worst case is a redundant re-migration, not a lost cache.
     box.putAll(snapshot);
     box.delete(legacyKey);
     return snapshot;
@@ -156,13 +159,12 @@ class OfflineCacheService {
   // ---------------------------------------------------------------------------
 
   Future<void> markFetched(String dataset) async {
-    await Hive.box(metaBoxName)
-        .put('$_fetchedAtPrefix$dataset', DateTime.now().millisecondsSinceEpoch);
+    await Hive.box(metaBoxName).put(
+        '$_fetchedAtPrefix$dataset', DateTime.now().millisecondsSinceEpoch);
   }
 
   DateTime? getFetchedAt(String dataset) {
-    final v =
-        Hive.box(metaBoxName).get('$_fetchedAtPrefix$dataset') as int?;
+    final v = Hive.box(metaBoxName).get('$_fetchedAtPrefix$dataset') as int?;
     if (v == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(v);
   }
