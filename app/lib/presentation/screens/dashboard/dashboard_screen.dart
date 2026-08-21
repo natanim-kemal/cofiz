@@ -16,7 +16,6 @@ import '../../widgets/activity_feed_list.dart';
 import '../../widgets/notification_badge.dart';
 import '../notifications/notifications_screen.dart';
 import '../income/company_income_screen.dart';
-import '../income/my_investments_screen.dart';
 import '../expense/expenses_screen.dart';
 import '../transaction/transfer_dialog.dart';
 import '../../widgets/custom_header.dart';
@@ -185,9 +184,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => authProvider.isViewer
-                                      ? const MyInvestmentsScreen()
-                                      : const CompanyIncomeScreen(),
+                                  builder: (context) => const CompanyIncomeScreen(),
                                 ),
                               );
                             },

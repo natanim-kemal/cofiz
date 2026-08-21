@@ -122,21 +122,26 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const SaleCategoriesScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.category, size: 18),
-                        label: Text(l10n.manageSaleCategories),
-                      ),
+                    Consumer<AuthProvider>(
+                      builder: (context, auth, _) {
+                        if (!auth.isAdmin) return const SizedBox.shrink();
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const SaleCategoriesScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.category, size: 18),
+                            label: Text(l10n.manageSaleCategories),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     Row(
