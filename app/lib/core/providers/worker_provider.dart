@@ -6,7 +6,13 @@ import '../services/offline_cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class WorkerProvider with ChangeNotifier {
-  final WorkerService _workerService = WorkerService();
+  final WorkerService _workerService;
+
+  WorkerProvider({WorkerService? service})
+      : _workerService = service ?? WorkerService() {
+    _seedWorkersFromCache();
+    _initializeWorkers();
+  }
 
   List<Worker> _workers = [];
   List<Worker> _filteredWorkers = [];
@@ -30,11 +36,6 @@ class WorkerProvider with ChangeNotifier {
   int get totalWorkers => _totalWorkers;
   int get activeToday => _activeToday;
   double get totalRevenue => _totalRevenue;
-
-  WorkerProvider() {
-    _seedWorkersFromCache();
-    _initializeWorkers();
-  }
 
   void _seedWorkersFromCache() {
     try {
@@ -136,9 +137,25 @@ class WorkerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Get worker by ID from service (async)
+  /// Cached profile for [id] (sync, from Hive). Non-null means the UI can
+  /// render instantly without waiting on the network.
+  Worker? getCachedWorkerById(String id) =>
+      OfflineCacheService().getCachedWorkerProfile(expectedId: id);
+
+  /// Get worker by ID. Network-first: a fresh fetch updates the Hive profile
+  /// cache; when the network fails, falls back to the cached profile so the
+  /// collector app still works offline.
   Future<Worker?> getWorkerById(String id) async {
-    return await _workerService.getWorkerById(id);
+    try {
+      final fresh = await _workerService.getWorkerById(id);
+      if (fresh != null) {
+        await OfflineCacheService().cacheWorkerProfile(fresh);
+        return fresh;
+      }
+    } catch (_) {
+      // Network/Firestore unavailable - fall through to cached profile.
+    }
+    return OfflineCacheService().getCachedWorkerProfile(expectedId: id);
   }
 
   /// Find worker in local list by ID (sync, ignores filters)
