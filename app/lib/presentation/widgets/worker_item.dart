@@ -155,8 +155,7 @@ class WorkerItem extends StatelessWidget {
         if (dailyCommission != null && dailyCommission! > 0) ...[
           const SizedBox(height: 2),
           Text(
-            '${AppLocalizations.of(context)?.commission ?? 'Commission'}: '
-            '${AppLocalizations.of(context)?.currency ?? 'ETB'} ${dailyCommission!.formatted}',
+            'Com: ${AppLocalizations.of(context)?.currency ?? 'ETB'} ${dailyCommission!.formatted}',
             style: TextStyle(
               fontSize: 11,
               color:

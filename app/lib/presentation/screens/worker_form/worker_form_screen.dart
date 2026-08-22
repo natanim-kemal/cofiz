@@ -7,9 +7,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/audit_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/worker_account_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../dialogs/worker_credentials_dialog.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/app_toast.dart';
 

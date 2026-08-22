@@ -40,7 +40,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.lock_outline,
                     size: 64,
                     color: AppColors.primary,
@@ -154,7 +154,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.error_outline,
+                            const Icon(Icons.error_outline,
                                 size: 48, color: AppColors.primary),
                             const SizedBox(height: 16),
                             Text(
@@ -182,7 +182,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.history,
                               size: 64,
                               color: AppColors.primary,
