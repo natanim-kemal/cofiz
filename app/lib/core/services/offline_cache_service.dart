@@ -24,6 +24,7 @@ class OfflineCacheService {
   static const String _workerTxsBox = 'worker_transactions_cache';
   static const String _pendingBox = 'pending_operations';
   static const String _deliveredBox = 'delivered_operations';
+  static const String _failedBox = 'failed_operations';
   static const String _incomeBox = 'income_cache';
   static const String _expensesBox = 'expenses_cache';
   static const String _totalsBox = 'totals_cache';
@@ -73,6 +74,7 @@ class OfflineCacheService {
     await Hive.openBox(_workerTxsBox);
     await Hive.openBox(_pendingBox);
     await Hive.openBox(_deliveredBox);
+    await Hive.openBox(_failedBox);
     await Hive.openBox(_incomeBox);
     await Hive.openBox(_expensesBox);
     await Hive.openBox(_totalsBox);
@@ -157,13 +159,12 @@ class OfflineCacheService {
   // ---------------------------------------------------------------------------
 
   Future<void> markFetched(String dataset) async {
-    await Hive.box(metaBoxName)
-        .put('$_fetchedAtPrefix$dataset', DateTime.now().millisecondsSinceEpoch);
+    await Hive.box(metaBoxName).put(
+        '$_fetchedAtPrefix$dataset', DateTime.now().millisecondsSinceEpoch);
   }
 
   DateTime? getFetchedAt(String dataset) {
-    final v =
-        Hive.box(metaBoxName).get('$_fetchedAtPrefix$dataset') as int?;
+    final v = Hive.box(metaBoxName).get('$_fetchedAtPrefix$dataset') as int?;
     if (v == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(v);
   }
@@ -359,7 +360,8 @@ class OfflineCacheService {
     if (cached == null) return;
     final kept = cached.where((r) => r.id != id).toList();
     if (kept.length == cached.length) return;
-    debugPrint('[Cache] removeCachedIncome id=$id cache ${cached.length}->${kept.length}');
+    debugPrint(
+        '[Cache] removeCachedIncome id=$id cache ${cached.length}->${kept.length}');
     await cacheIncome(kept);
   }
 
@@ -392,7 +394,8 @@ class OfflineCacheService {
     if (cached == null) return;
     final kept = cached.where((r) => r.id != id).toList();
     if (kept.length == cached.length) return;
-    debugPrint('[Cache] removeCachedExpense id=$id cache ${cached.length}->${kept.length}');
+    debugPrint(
+        '[Cache] removeCachedExpense id=$id cache ${cached.length}->${kept.length}');
     await cacheExpenses(kept);
   }
 
@@ -455,6 +458,106 @@ class OfflineCacheService {
     final pending = box.get('queue', defaultValue: <Map>[]) as List;
     debugPrint(
         '[Cache] queueOperation opId=${operation['opId']} type=${operation['type']} before=${pending.length}');
+
+    // Coalesce with existing queued op sharing the same opId.
+    final opId = operation['opId'] as String;
+    final newType = (operation['type'] as String?) ?? '';
+    final existingIdx = pending.indexWhere((e) => (e as Map)['opId'] == opId);
+    if (existingIdx != -1) {
+      final existing = Map<String, dynamic>.from(pending[existingIdx] as Map);
+      final existingType = (existing['type'] as String?) ?? '';
+
+      bool isCreate(String t) => t.startsWith('create');
+      bool isUpdate(String t) => t.startsWith('update');
+      bool isDelete(String t) => t.startsWith('delete');
+
+      final existingIsCreate = isCreate(existingType);
+      final existingIsUpdate = isUpdate(existingType);
+      final existingIsDelete = isDelete(existingType);
+      final newIsCreate = isCreate(newType);
+      final newIsUpdate = isUpdate(newType);
+      final newIsDelete = isDelete(newType);
+
+      // create+delete -> drop both with tombstone
+      if (existingIsCreate && newIsDelete) {
+        pending.removeAt(existingIdx);
+        _cancelledOpIds.add(opId);
+        await box.put('queue', pending);
+        debugPrint('[Cache] coalesce create+delete drop opId=$opId');
+        return;
+      }
+
+      // create+update -> single create with merged payload
+      if (existingIsCreate && newIsUpdate) {
+        final merged = <String, dynamic>{};
+        if (existing['payload'] is Map) {
+          merged.addAll(Map<String, dynamic>.from(existing['payload'] as Map));
+        }
+        if (operation['payload'] is Map) {
+          merged.addAll(Map<String, dynamic>.from(operation['payload'] as Map));
+        }
+        if (merged.isNotEmpty) existing['payload'] = merged;
+        // keep create type and original opId/docId
+        pending[existingIdx] = existing;
+        await box.put('queue', pending);
+        debugPrint('[Cache] coalesce create+update merge opId=$opId');
+        return;
+      }
+
+      // update+update -> last (merged payload)
+      if (existingIsUpdate && newIsUpdate) {
+        final merged = <String, dynamic>{};
+        if (existing['payload'] is Map) {
+          merged.addAll(Map<String, dynamic>.from(existing['payload'] as Map));
+        }
+        if (operation['payload'] is Map) {
+          merged.addAll(Map<String, dynamic>.from(operation['payload'] as Map));
+        }
+        final updated = Map<String, dynamic>.from(operation);
+        if (merged.isNotEmpty) updated['payload'] = merged;
+        pending[existingIdx] = updated;
+        await box.put('queue', pending);
+        debugPrint('[Cache] coalesce update+update last opId=$opId');
+        return;
+      }
+
+      // update+delete -> delete
+      if (existingIsUpdate && newIsDelete) {
+        pending[existingIdx] = Map<String, dynamic>.from(operation);
+        await box.put('queue', pending);
+        debugPrint('[Cache] coalesce update+delete -> delete opId=$opId');
+        return;
+      }
+
+      // delete+create -> keep both in order (fall through to add)
+
+      // Other duplicates (e.g. create+create) -> replace with newest
+      if (!existingIsDelete || !newIsCreate) {
+        // If not the keep-both case, check if still duplicate
+        if (existingIdx != -1 && !(existingIsDelete && newIsCreate)) {
+          // For any other same-opId collision not handled above,
+          // default is to replace existing with new (covers
+          // delete+delete, create+create, etc.)
+          final handled = (existingIsCreate && newIsDelete) ||
+              (existingIsCreate && newIsUpdate) ||
+              (existingIsUpdate && newIsUpdate) ||
+              (existingIsUpdate && newIsDelete);
+          if (!handled) {
+            // Only replace if not already handled and not keep-both
+            if (existingIsDelete && newIsCreate) {
+              // keep both - do nothing here
+            } else {
+              pending[existingIdx] = Map<String, dynamic>.from(operation);
+              await box.put('queue', pending);
+              debugPrint(
+                  '[Cache] coalesce replace opId=$opId $existingType -> $newType');
+              return;
+            }
+          }
+        }
+      }
+    }
+
     pending.add(operation);
     await box.put('queue', pending);
     debugPrint('[Cache] queueOperation done now=${pending.length}');
@@ -544,6 +647,57 @@ class OfflineCacheService {
 
   Future<void> clearDelivered() async => Hive.box(_deliveredBox).clear();
 
+  // ---------------------------------------------------------------------------
+  // Failed operations box
+  // ---------------------------------------------------------------------------
+
+  List<Map<String, dynamic>> getFailedOperations() {
+    if (!Hive.isBoxOpen(_failedBox)) return [];
+    final box = Hive.box(_failedBox);
+    final failed = box.get('queue', defaultValue: <Map>[]) as List;
+    return failed.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> markFailed(Map<String, dynamic> operation, String reason) async {
+    final box = Hive.box(_failedBox);
+    final failed = box.get('queue', defaultValue: <Map>[]) as List;
+    final entry = Map<String, dynamic>.from(operation);
+    entry['failedReason'] = reason;
+    entry['failedAt'] = DateTime.now().toIso8601String();
+    failed.add(entry);
+    await box.put('queue', failed);
+    debugPrint('[Cache] markFailed opId=${operation['opId']} reason=$reason');
+  }
+
+  Future<void> discardFailed(String opId) async {
+    if (!Hive.isBoxOpen(_failedBox)) return;
+    final box = Hive.box(_failedBox);
+    final failed = box.get('queue', defaultValue: <Map>[]) as List;
+    final kept = failed.where((e) => (e as Map)['opId'] != opId).toList();
+    await box.put('queue', kept);
+    debugPrint('[Cache] discardFailed opId=$opId kept=${kept.length}');
+  }
+
+  Future<void> clearFailed() async {
+    if (Hive.isBoxOpen(_failedBox)) {
+      await Hive.box(_failedBox).clear();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Transaction cache helpers (remove by id / transferId)
+  // ---------------------------------------------------------------------------
+
+  Future<void> removeCachedTransaction(String id) async {
+    final cached = getCachedTransactions();
+    if (cached == null) return;
+    final kept = cached.where((t) => t.id != id && t.transferId != id).toList();
+    if (kept.length == cached.length) return;
+    debugPrint(
+        '[Cache] removeCachedTransaction id=$id cache ${cached.length}->${kept.length}');
+    await cacheTransactions(kept);
+  }
+
   // Clear all cache
   Future<void> clearAllCache() async {
     _cancelledOpIds.clear();
@@ -554,6 +708,9 @@ class OfflineCacheService {
     await Hive.box(_expensesBox).clear();
     await Hive.box(_pendingBox).clear();
     await Hive.box(_deliveredBox).clear();
+    if (Hive.isBoxOpen(_failedBox)) {
+      await Hive.box(_failedBox).clear();
+    }
     await Hive.box(_totalsBox).clear();
     await Hive.box(metaBoxName).clear();
   }
