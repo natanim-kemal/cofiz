@@ -229,6 +229,7 @@ class TransactionProvider with ChangeNotifier {
     required String createdBy,
     String? notes,
     String? receiptUrl,
+    String? localReceiptPath,
   }) async {
     if (amount <= 0) {
       _errorMessage = 'Amount must be greater than 0';
@@ -254,7 +255,8 @@ class TransactionProvider with ChangeNotifier {
         approved: false,
       );
 
-      final docId = await _transactionService.addTransaction(transaction);
+      final docId = await _transactionService.addTransaction(transaction,
+          localReceiptPath: localReceiptPath);
       if (docId != null) {
         _optimisticInsert(MoneyTransaction(
           id: docId,
@@ -299,6 +301,7 @@ class TransactionProvider with ChangeNotifier {
     required String createdBy,
     String? notes,
     String? receiptUrl,
+    String? localReceiptPath,
   }) async {
     if (amount <= 0) {
       _errorMessage = 'Amount must be greater than 0';
@@ -324,7 +327,8 @@ class TransactionProvider with ChangeNotifier {
         approved: false,
       );
 
-      final docId2 = await _transactionService.addTransaction(transaction);
+      final docId2 = await _transactionService.addTransaction(transaction,
+          localReceiptPath: localReceiptPath);
       if (docId2 != null) {
         _optimisticInsert(MoneyTransaction(
           id: docId2,
@@ -363,6 +367,7 @@ class TransactionProvider with ChangeNotifier {
     required String createdBy,
     String? notes,
     String? receiptUrl,
+    String? localReceiptPath,
     String? coffeeType,
     double? weight,
     double? pricePerKg,
@@ -396,7 +401,8 @@ class TransactionProvider with ChangeNotifier {
         commissionAmount: commission,
       );
 
-      final docId3 = await _transactionService.addTransaction(transaction);
+      final docId3 = await _transactionService.addTransaction(transaction,
+          localReceiptPath: localReceiptPath);
       if (docId3 != null) {
         _optimisticInsert(MoneyTransaction(
           id: docId3,
