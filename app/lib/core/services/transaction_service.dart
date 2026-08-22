@@ -6,6 +6,9 @@ import 'package:uuid/uuid.dart';
 import '../models/transaction_model.dart';
 import '../config/cloudinary_config.dart';
 import '../utils/receipt_image_utils.dart';
+import '../utils/transaction_balance.dart' as tb;
+import '../utils/transaction_balance.dart' show TransactionLockedException;
+export '../utils/transaction_balance.dart' show TransactionLockedException;
 import 'connectivity_service.dart';
 import 'notification_trigger_service.dart';
 import 'offline_cache_service.dart';
@@ -24,15 +27,7 @@ class TransactionPage {
   });
 }
 
-/// Thrown when an edit/delete is attempted on a transaction past the
-/// immutability window without an admin override reason.
-class TransactionLockedException implements Exception {
-  final String message;
-  TransactionLockedException(this.message);
-  @override
-  String toString() => message;
-}
-
+// TransactionLockedException is shared with OfflineSyncService — see transaction_balance.dart
 class TransactionService {
   final FirebaseFirestore _firestore;
 
@@ -567,57 +562,18 @@ class TransactionService {
   }
 
   /// Throws if the transaction is past the immutability window and no admin
-  /// override reason was provided.
+  // shared with OfflineSyncService — keep in sync (delegates to transaction_balance.dart)
   void _enforceLock(
     MoneyTransaction transaction, {
     required String? overrideReason,
     required String action,
-  }) {
-    if (transaction.isLocked &&
-        (overrideReason == null || overrideReason.trim().isEmpty)) {
-      throw TransactionLockedException(
-          'This transaction is locked. Please provide a reason to $action it.');
-    }
-  }
+  }) =>
+      tb.enforceTransactionLock(transaction,
+          overrideReason: overrideReason, action: action);
 
-  Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) {
-    final mult = direction.toDouble();
-    switch (t.type.toLowerCase()) {
-      case 'distribution':
-        return {
-          'currentBalance': FieldValue.increment(t.amount * mult),
-          'totalDistributed': FieldValue.increment(t.amount * mult),
-        };
-      case 'return':
-        return {
-          'currentBalance': FieldValue.increment(-t.amount * mult),
-          'totalReturned': FieldValue.increment(t.amount * mult),
-        };
-      case 'purchase':
-        final updates = <String, dynamic>{
-          'currentBalance': FieldValue.increment(-t.amount * mult),
-          'totalCoffeePurchased': FieldValue.increment(t.amount * mult),
-        };
-        if (t.commissionAmount != null && t.commissionAmount! > 0) {
-          updates['totalCommissionEarned'] =
-              FieldValue.increment(t.commissionAmount! * mult);
-        }
-        return updates;
-      case 'transfer':
-        final effect = t.isTransferSender ? -1.0 : 1.0;
-        final updates = <String, dynamic>{
-          'currentBalance': FieldValue.increment(t.amount * mult * effect),
-        };
-        if (t.isTransferSender) {
-          updates['totalReturned'] = FieldValue.increment(t.amount * mult);
-        } else {
-          updates['totalDistributed'] = FieldValue.increment(t.amount * mult);
-        }
-        return updates;
-      default:
-        return {};
-    }
-  }
+  // shared with OfflineSyncService — keep in sync
+  Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) =>
+      tb.transactionBalanceUpdates(t, direction);
 
   /// Trigger notifications based on transaction type
   Future<void> _triggerTransactionNotifications({

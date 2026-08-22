@@ -8,15 +8,13 @@ import 'package:http/http.dart' as http;
 import '../config/cloudinary_config.dart';
 import '../models/transaction_model.dart';
 import '../utils/receipt_image_utils.dart';
+import '../utils/transaction_balance.dart' as tb;
+import '../utils/transaction_balance.dart' show TransactionLockedException;
 import 'connectivity_service.dart';
 import 'offline_cache_service.dart';
 
-class OfflineSyncLockedException implements Exception {
-  final String message;
-  OfflineSyncLockedException(this.message);
-  @override
-  String toString() => message;
-}
+// shared with TransactionService — keep in sync (delegates to transaction_balance.dart)
+typedef OfflineSyncLockedException = TransactionLockedException;
 
 class OfflineSyncService {
   static final OfflineSyncService _instance = OfflineSyncService._internal();
@@ -162,56 +160,18 @@ class OfflineSyncService {
     return secureUrl;
   }
 
+  // shared with TransactionService — keep in sync
   void _enforceLock(
     MoneyTransaction transaction, {
     required String? overrideReason,
     required String action,
-  }) {
-    if (transaction.isLocked &&
-        (overrideReason == null || overrideReason.trim().isEmpty)) {
-      throw OfflineSyncLockedException(
-          'This transaction is locked. Please provide a reason to $action it.');
-    }
-  }
+  }) =>
+      tb.enforceTransactionLock(transaction,
+          overrideReason: overrideReason, action: action);
 
-  Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) {
-    final mult = direction.toDouble();
-    switch (t.type.toLowerCase()) {
-      case 'distribution':
-        return {
-          'currentBalance': FieldValue.increment(t.amount * mult),
-          'totalDistributed': FieldValue.increment(t.amount * mult),
-        };
-      case 'return':
-        return {
-          'currentBalance': FieldValue.increment(-t.amount * mult),
-          'totalReturned': FieldValue.increment(t.amount * mult),
-        };
-      case 'purchase':
-        final updates = <String, dynamic>{
-          'currentBalance': FieldValue.increment(-t.amount * mult),
-          'totalCoffeePurchased': FieldValue.increment(t.amount * mult),
-        };
-        if (t.commissionAmount != null && t.commissionAmount! > 0) {
-          updates['totalCommissionEarned'] =
-              FieldValue.increment(t.commissionAmount! * mult);
-        }
-        return updates;
-      case 'transfer':
-        final effect = t.isTransferSender ? -1.0 : 1.0;
-        final updates = <String, dynamic>{
-          'currentBalance': FieldValue.increment(t.amount * mult * effect),
-        };
-        if (t.isTransferSender) {
-          updates['totalReturned'] = FieldValue.increment(t.amount * mult);
-        } else {
-          updates['totalDistributed'] = FieldValue.increment(t.amount * mult);
-        }
-        return updates;
-      default:
-        return {};
-    }
-  }
+  // shared with TransactionService — keep in sync
+  Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) =>
+      tb.transactionBalanceUpdates(t, direction);
 
   Future<void> _executeOperation(Map<String, dynamic> operation) async {
     final type = operation['type'] as String;
@@ -257,9 +217,8 @@ class OfflineSyncService {
             final uploaded = await _uploadReceipt(localReceiptPath);
             if (uploaded != null) {
               receiptUrl = uploaded;
-            } else {
-              throw 'Failed to upload receipt image';
             }
+            // if upload returns null (file missing/compress fail) defer — keep receiptUrl as-is (no crash)
           }
           await firestore.runTransaction((txn) async {
             final ref = firestore.collection('transactions').doc(docId);
@@ -565,15 +524,79 @@ class OfflineSyncService {
           final transferId = (operation['transferId'] as String?) ??
               (operation['opId'] as String);
           final overrideReason = operation['overrideReason'] as String?;
+          final senderDocId = operation['senderDocId'] as String?;
+          final receiverDocId = operation['receiverDocId'] as String?;
+          // Prefer explicit docIds if present (stored at queue time), else fallback to query
+          // Firestore transactions require all reads before writes — collect snaps first.
+          if (senderDocId != null || receiverDocId != null) {
+            final docIds = <String>[
+              if (senderDocId != null) senderDocId,
+              if (receiverDocId != null) receiverDocId,
+            ];
+            await firestore.runTransaction((txn) async {
+              final snaps = <DocumentSnapshot<Map<String, dynamic>>>[];
+              for (final docId in docIds) {
+                final snap = await txn
+                    .get(firestore.collection('transactions').doc(docId));
+                snaps.add(snap as DocumentSnapshot<Map<String, dynamic>>);
+              }
+              for (final snap in snaps) {
+                if (!snap.exists) continue;
+                final tx = MoneyTransaction.fromFirestore(
+                    Map<String, dynamic>.from(snap.data() as Map), snap.id);
+                _enforceLock(tx,
+                    overrideReason: overrideReason, action: 'delete');
+                final workerRef =
+                    firestore.collection('workers').doc(tx.workerId);
+                final updates = _balanceUpdates(tx, -1);
+                if (updates.isNotEmpty) txn.update(workerRef, updates);
+                txn.delete(snap.reference);
+              }
+            });
+            // Also handle any additional docs matching transferId that weren't in explicit list (safety)
+            final snapshot = await firestore
+                .collection('transactions')
+                .where('transferId', isEqualTo: transferId)
+                .get();
+            final remaining =
+                snapshot.docs.where((d) => !docIds.contains(d.id)).toList();
+            if (remaining.isNotEmpty) {
+              await firestore.runTransaction((txn) async {
+                final snaps = <DocumentSnapshot<Map<String, dynamic>>>[];
+                for (final doc in remaining) {
+                  final snap = await txn
+                      .get(firestore.collection('transactions').doc(doc.id));
+                  snaps.add(snap as DocumentSnapshot<Map<String, dynamic>>);
+                }
+                for (final snap in snaps) {
+                  if (!snap.exists) continue;
+                  final tx = MoneyTransaction.fromFirestore(
+                      Map<String, dynamic>.from(snap.data() as Map), snap.id);
+                  _enforceLock(tx,
+                      overrideReason: overrideReason, action: 'delete');
+                  final workerRef =
+                      firestore.collection('workers').doc(tx.workerId);
+                  final updates = _balanceUpdates(tx, -1);
+                  if (updates.isNotEmpty) txn.update(workerRef, updates);
+                  txn.delete(snap.reference);
+                }
+              });
+            }
+            break;
+          }
           final snapshot = await firestore
               .collection('transactions')
               .where('transferId', isEqualTo: transferId)
               .get();
           if (snapshot.docs.isEmpty) return;
           await firestore.runTransaction((txn) async {
+            final snaps = <DocumentSnapshot<Map<String, dynamic>>>[];
             for (final doc in snapshot.docs) {
-              final ref = firestore.collection('transactions').doc(doc.id);
-              final snap = await txn.get(ref);
+              final snap = await txn
+                  .get(firestore.collection('transactions').doc(doc.id));
+              snaps.add(snap as DocumentSnapshot<Map<String, dynamic>>);
+            }
+            for (final snap in snaps) {
               if (!snap.exists) continue;
               final tx = MoneyTransaction.fromFirestore(
                   Map<String, dynamic>.from(snap.data() as Map), snap.id);
@@ -583,7 +606,7 @@ class OfflineSyncService {
                   firestore.collection('workers').doc(tx.workerId);
               final updates = _balanceUpdates(tx, -1);
               if (updates.isNotEmpty) txn.update(workerRef, updates);
-              txn.delete(ref);
+              txn.delete(snap.reference);
             }
           });
           break;
