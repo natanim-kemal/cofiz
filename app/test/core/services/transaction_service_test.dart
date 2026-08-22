@@ -22,7 +22,7 @@ void main() {
   });
 
   tearDown(() async {
-    await OfflineCacheService().clearPendingOperations();
+    await OfflineCacheService().clearAllCache();
     ConnectivityService().setOnlineForTest(true);
   });
 
@@ -183,13 +183,24 @@ void main() {
     return fake;
   }
 
+  /// Cache twin of the locked t1 doc seeded by [seededFirestore] — lock checks
+  /// are local-only now, so tests must seed the cache explicitly.
+  MoneyTransaction seededFirestoreTx(String id, String type, double amount) =>
+      oldTransaction(id: id, workerId: 'w1', type: type, amount: amount);
+
   test('deleteTransaction throws when locked and no reason given', () async {
     final fake = await seededFirestore();
     final service = TransactionService(firestore: fake);
-    ConnectivityService().setOnlineForTest(true);
+    ConnectivityService().setOnlineForTest(false);
+    await OfflineCacheService()
+        .cacheTransactions([seededFirestoreTx('t1', 'distribution', 100)]);
     await expectLater(
       service.deleteTransaction('t1'),
       throwsA(isA<TransactionLockedException>()),
+    );
+    expect(
+      OfflineCacheService().getPendingOperations(),
+      isEmpty,
     );
   });
 
@@ -197,26 +208,57 @@ void main() {
       () async {
     final fake = await seededFirestore();
     final service = TransactionService(firestore: fake);
-    ConnectivityService().setOnlineForTest(true);
+    ConnectivityService().setOnlineForTest(false);
+    await OfflineCacheService()
+        .cacheTransactions([seededFirestoreTx('t1', 'distribution', 100)]);
     await service.deleteTransaction('t1', overrideReason: 'Admin correction');
-    final remaining = await fake.collection('transactions').doc('t1').get();
-    expect(remaining.exists, false);
+    expect(
+      OfflineCacheService()
+          .getPendingOperations()
+          .any((o) => o['type'] == 'deleteTransaction' && o['opId'] == 't1'),
+      isTrue,
+    );
+    expect(
+      (OfflineCacheService().getCachedTransactions() ?? const [])
+          .any((t) => t.id == 't1'),
+      isFalse,
+    );
   });
 
   test('deleteTransaction succeeds for fresh transaction without reason',
       () async {
     final fake = await seededFirestore();
     final service = TransactionService(firestore: fake);
-    ConnectivityService().setOnlineForTest(true);
+    ConnectivityService().setOnlineForTest(false);
+    await OfflineCacheService().cacheTransactions([
+      oldTransaction(
+        id: 't2',
+        workerId: 'w1',
+        type: 'distribution',
+        amount: 50,
+        createdAt: DateTime.now(),
+      ),
+    ]);
     await service.deleteTransaction('t2');
-    final remaining = await fake.collection('transactions').doc('t2').get();
-    expect(remaining.exists, false);
+    expect(
+      OfflineCacheService()
+          .getPendingOperations()
+          .any((o) => o['type'] == 'deleteTransaction' && o['opId'] == 't2'),
+      isTrue,
+    );
+    expect(
+      (OfflineCacheService().getCachedTransactions() ?? const [])
+          .any((t) => t.id == 't2'),
+      isFalse,
+    );
   });
 
   test('updateTransaction throws when locked and no reason given', () async {
     final fake = await seededFirestore();
     final service = TransactionService(firestore: fake);
-    ConnectivityService().setOnlineForTest(true);
+    ConnectivityService().setOnlineForTest(false);
+    await OfflineCacheService()
+        .cacheTransactions([seededFirestoreTx('t1', 'distribution', 100)]);
     await expectLater(
       service.updateTransaction(
         oldTransaction(
@@ -228,13 +270,16 @@ void main() {
       ),
       throwsA(isA<TransactionLockedException>()),
     );
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
   });
 
   test('updateTransaction succeeds with reason for locked transaction',
       () async {
     final fake = await seededFirestore();
     final service = TransactionService(firestore: fake);
-    ConnectivityService().setOnlineForTest(true);
+    ConnectivityService().setOnlineForTest(false);
+    await OfflineCacheService()
+        .cacheTransactions([seededFirestoreTx('t1', 'distribution', 100)]);
     await service.updateTransaction(
       oldTransaction(
         id: 't1',
@@ -244,8 +289,19 @@ void main() {
       ),
       overrideReason: 'Fix amount',
     );
-    final updated = await fake.collection('transactions').doc('t1').get();
-    expect(updated.data()!['amount'], 200);
+    final ops = OfflineCacheService()
+        .getPendingOperations()
+        .where((o) => o['type'] == 'updateTransaction' && o['opId'] == 't1')
+        .toList();
+    expect(ops.length, 1);
+    expect((ops.first['payload'] as Map)['amount'], 200);
+    expect(
+      OfflineCacheService()
+          .getCachedTransactions()!
+          .firstWhere((t) => t.id == 't1')
+          .amount,
+      200,
+    );
   });
 
   test('getWorkerTransactionsForDay returns only that day for the worker',
@@ -294,65 +350,85 @@ void main() {
     final fake = FakeFirebaseFirestore();
     await fake.collection('workers').doc('w1').set({'currentBalance': 500});
     await fake.collection('workers').doc('w2').set({'currentBalance': 0});
-    await fake.collection('transactions').doc('tr1-a').set(
-          oldTransaction(
-            id: 'tr1-a',
-            workerId: 'w1',
-            type: 'transfer',
-            amount: 100,
-          ).toFirestore()
-            ..['transferId'] = 'tr1'
-            ..['transferRole'] = 'sender',
-        );
-    await fake.collection('transactions').doc('tr1-b').set(
-          oldTransaction(
-            id: 'tr1-b',
-            workerId: 'w2',
-            type: 'transfer',
-            amount: 100,
-          ).toFirestore()
-            ..['transferId'] = 'tr1'
-            ..['transferRole'] = 'receiver',
-        );
+    await OfflineCacheService().cacheTransactions([
+      MoneyTransaction(
+        id: 'tr1-a',
+        workerId: 'w1',
+        workerName: 'W',
+        type: 'transfer',
+        amount: 100,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+        createdBy: 'tester',
+        fromWorkerId: 'w1',
+        toWorkerId: 'w2',
+        transferId: 'tr1',
+        transferRole: 'sender',
+      ),
+      MoneyTransaction(
+        id: 'tr1-b',
+        workerId: 'w2',
+        workerName: 'W',
+        type: 'transfer',
+        amount: 100,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+        createdBy: 'tester',
+        fromWorkerId: 'w1',
+        toWorkerId: 'w2',
+        transferId: 'tr1',
+        transferRole: 'receiver',
+      ),
+    ]);
     final service = TransactionService(firestore: fake);
     ConnectivityService().setOnlineForTest(true);
     await expectLater(
       service.deleteTransfer('tr1'),
       throwsA(isA<TransactionLockedException>()),
     );
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
   });
 
   test('deleteTransfer succeeds with reason for locked transfer', () async {
     final fake = FakeFirebaseFirestore();
-    await fake.collection('workers').doc('w1').set({'currentBalance': 500});
-    await fake.collection('workers').doc('w2').set({'currentBalance': 0});
-    await fake.collection('transactions').doc('tr1-a').set(
-          oldTransaction(
-            id: 'tr1-a',
-            workerId: 'w1',
-            type: 'transfer',
-            amount: 100,
-          ).toFirestore()
-            ..['transferId'] = 'tr1'
-            ..['transferRole'] = 'sender',
-        );
-    await fake.collection('transactions').doc('tr1-b').set(
-          oldTransaction(
-            id: 'tr1-b',
-            workerId: 'w2',
-            type: 'transfer',
-            amount: 100,
-          ).toFirestore()
-            ..['transferId'] = 'tr1'
-            ..['transferRole'] = 'receiver',
-        );
+    await OfflineCacheService().cacheTransactions([
+      MoneyTransaction(
+        id: 'tr1-a',
+        workerId: 'w1',
+        workerName: 'W',
+        type: 'transfer',
+        amount: 100,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+        createdBy: 'tester',
+        fromWorkerId: 'w1',
+        toWorkerId: 'w2',
+        transferId: 'tr1',
+        transferRole: 'sender',
+      ),
+      MoneyTransaction(
+        id: 'tr1-b',
+        workerId: 'w2',
+        workerName: 'W',
+        type: 'transfer',
+        amount: 100,
+        createdAt: DateTime.now().subtract(const Duration(days: 10)),
+        createdBy: 'tester',
+        fromWorkerId: 'w1',
+        toWorkerId: 'w2',
+        transferId: 'tr1',
+        transferRole: 'receiver',
+      ),
+    ]);
     final service = TransactionService(firestore: fake);
-    ConnectivityService().setOnlineForTest(true);
+    ConnectivityService().setOnlineForTest(false);
     await service.deleteTransfer('tr1', overrideReason: 'Admin correction');
-    final remaining = await fake
-        .collection('transactions')
-        .where('transferId', isEqualTo: 'tr1')
-        .get();
-    expect(remaining.docs.length, 0);
+    expect(
+      OfflineCacheService().getPendingOperations().any(
+          (o) => o['type'] == 'deleteTransfer' && o['transferId'] == 'tr1'),
+      isTrue,
+    );
+    expect(
+      (OfflineCacheService().getCachedTransactions() ?? const [])
+          .any((t) => t.transferId == 'tr1'),
+      isFalse,
+    );
   });
 }

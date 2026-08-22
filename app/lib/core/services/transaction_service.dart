@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/transaction_model.dart';
+import '../models/worker_model.dart';
 import '../config/cloudinary_config.dart';
 import '../utils/receipt_image_utils.dart';
 import '../utils/transaction_balance.dart' as tb;
@@ -165,7 +166,6 @@ class TransactionService {
   /// Add transaction and update worker balance (queue-first)
   Future<String?> addTransaction(MoneyTransaction transaction) async {
     if (transaction.amount <= 0) throw 'Amount must be greater than 0';
-    // live balance check only when online (skip offline)
     if (ConnectivityService().isOnline &&
         (transaction.type.toLowerCase() == 'purchase' ||
             transaction.type.toLowerCase() == 'return')) {
@@ -183,6 +183,13 @@ class TransactionService {
 
       if (transaction.amount > currentBalance) {
         throw 'Insufficient balance. Available: ETB ${currentBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+      }
+    } else if (!ConnectivityService().isOnline &&
+        (transaction.type.toLowerCase() == 'purchase' ||
+            transaction.type.toLowerCase() == 'return')) {
+      final projected = _projectedBalance(transaction.workerId);
+      if (projected != null && transaction.amount > projected) {
+        throw 'Insufficient balance. Available: ETB ${projected.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
       }
     }
     final opId = const Uuid().v4();
@@ -249,7 +256,6 @@ class TransactionService {
       throw 'Amount must be greater than 0';
     }
 
-    // live balance check only when online (skip offline)
     if (ConnectivityService().isOnline) {
       final senderDoc =
           await _firestore.collection('workers').doc(fromWorkerId).get();
@@ -260,6 +266,11 @@ class TransactionService {
           (senderDoc.data()?['currentBalance'] ?? 0.0).toDouble();
       if (amount > senderBalance) {
         throw 'Insufficient balance. Available: ETB ${senderBalance.toStringAsFixed(2)}, Required: ETB ${amount.toStringAsFixed(2)}';
+      }
+    } else {
+      final projected = _projectedBalance(fromWorkerId);
+      if (projected != null && amount > projected) {
+        throw 'Insufficient balance. Available: ETB ${projected.toStringAsFixed(2)}, Required: ETB ${amount.toStringAsFixed(2)}';
       }
     }
 
@@ -372,38 +383,25 @@ class TransactionService {
     String transferId, {
     String? overrideReason,
   }) async {
-    final snapshot = await _firestore
-        .collection(_transactionsCollection)
-        .where('transferId', isEqualTo: transferId)
-        .get();
-
-    if (snapshot.docs.isEmpty) {
-      throw 'Transfer not found';
-    }
-
-    try {
-      final batch = _firestore.batch();
-      for (final doc in snapshot.docs) {
-        final tx = MoneyTransaction.fromFirestore(doc.data(), doc.id);
+    final cached = OfflineCacheService().getCachedTransactions();
+    if (cached != null) {
+      final matches = cached.where((t) => t.transferId == transferId).toList();
+      for (final tx in matches) {
         _enforceLock(tx, overrideReason: overrideReason, action: 'delete');
-        final workerRef = _firestore.collection('workers').doc(tx.workerId);
-        final updates = _balanceUpdates(tx, -1);
-        if (updates.isNotEmpty) {
-          batch.update(workerRef, updates);
-        }
-        batch.delete(doc.reference);
       }
-      await batch.commit();
-      print('Transfer deleted successfully: $transferId');
-    } on FirebaseException catch (e) {
-      print('Firestore error deleting transfer: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } on TransactionLockedException {
-      rethrow;
-    } catch (e) {
-      print('Error deleting transfer: $e');
-      throw 'Failed to delete transfer. Please try again.';
     }
+    await OfflineCacheService().queueOperation({
+      'opId': transferId,
+      'type': 'deleteTransfer',
+      'transferId': transferId,
+      'overrideReason': overrideReason,
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cachedList = OfflineCacheService().getCachedTransactions() ?? [];
+    await OfflineCacheService().cacheTransactions(
+        cachedList.where((t) => t.transferId != transferId).toList());
+    unawaited(OfflineSyncService().syncNow());
   }
 
   /// Edit an existing transaction, reversing the old balance effect and applying the new one
@@ -413,80 +411,77 @@ class TransactionService {
     MoneyTransaction transaction, {
     String? overrideReason,
   }) async {
-    try {
-      final doc = await _firestore
-          .collection(_transactionsCollection)
-          .doc(transaction.id)
-          .get();
-
-      if (!doc.exists) {
-        throw 'Transaction not found';
-      }
-
-      final old = MoneyTransaction.fromFirestore(doc.data()!, transaction.id);
-
+    final cached = OfflineCacheService().getCachedTransactions();
+    MoneyTransaction? old;
+    if (cached != null) {
+      try {
+        old = cached.firstWhere((t) => t.id == transaction.id);
+      } catch (_) {}
+    }
+    if (old != null) {
+      _enforceLock(old, overrideReason: overrideReason, action: 'edit');
       if (old.isTransfer || transaction.isTransfer) {
         throw 'Transfers cannot be edited.';
       }
-
-      _enforceLock(old, overrideReason: overrideReason, action: 'edit');
-
-      // Validate balance for money-out types, accounting for the reversed old effect
+    } else if (transaction.isTransfer) {
+      throw 'Transfers cannot be edited.';
+    }
+    if (!ConnectivityService().isOnline) {
       if (transaction.type.toLowerCase() == 'purchase' ||
           transaction.type.toLowerCase() == 'return') {
-        final workerDoc = await _firestore
-            .collection('workers')
-            .doc(transaction.workerId)
-            .get();
-
-        if (!workerDoc.exists) {
-          throw 'Collector not found';
-        }
-
-        final currentBalance =
-            (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
-
-        // Reversing the old transaction: money-out adds back, money-in subtracts
-        final oldDirection =
-            old.type.toLowerCase() == 'distribution' ? 1.0 : -1.0;
-        final projectedBalance =
-            currentBalance + oldDirection * old.amount - transaction.amount;
-        if (projectedBalance < 0) {
-          throw 'Insufficient balance. Available: ETB ${projectedBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+        final projected = _projectedBalance(transaction.workerId);
+        if (projected != null) {
+          double available = projected;
+          if (old != null && old.workerId == transaction.workerId) {
+            available -= _numericBalanceDelta(old, 1);
+          }
+          if (transaction.amount > available) {
+            throw 'Insufficient balance. Available: ETB ${available.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+          }
         }
       }
-
-      final batch = _firestore.batch();
-
-      final workerRef =
-          _firestore.collection('workers').doc(transaction.workerId);
-
-      final oldUpdates = _balanceUpdates(old, -1);
-      if (oldUpdates.isNotEmpty) {
-        batch.update(workerRef, oldUpdates);
+    } else {
+      // online: still enforce balance using projected (cached + pending) as fallback if worker doc unavailable
+      if (transaction.type.toLowerCase() == 'purchase' ||
+          transaction.type.toLowerCase() == 'return') {
+        // try live check via firestore if online; if fails fallback to projected
+        try {
+          final workerDoc = await _firestore
+              .collection('workers')
+              .doc(transaction.workerId)
+              .get();
+          if (workerDoc.exists && old != null) {
+            final currentBalance =
+                (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
+            final oldDirection =
+                old.type.toLowerCase() == 'distribution' ? 1.0 : -1.0;
+            final projectedBalance =
+                currentBalance + oldDirection * old.amount - transaction.amount;
+            if (projectedBalance < 0) {
+              throw 'Insufficient balance. Available: ETB ${projectedBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+            }
+          }
+        } catch (e) {
+          if (e is String && e.contains('Insufficient')) rethrow;
+        }
       }
-
-      final newUpdates = _balanceUpdates(transaction, 1);
-      if (newUpdates.isNotEmpty) {
-        batch.update(workerRef, newUpdates);
-      }
-
-      batch.update(
-        _firestore.collection(_transactionsCollection).doc(transaction.id),
-        transaction.toFirestore(),
-      );
-
-      await batch.commit();
-      print('Transaction updated successfully: ${transaction.id}');
-    } on FirebaseException catch (e) {
-      print('Firestore error updating transaction: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } on TransactionLockedException {
-      rethrow;
-    } catch (e) {
-      print('Error updating transaction: $e');
-      throw 'Failed to update transaction. Please try again.';
     }
+    await OfflineCacheService().queueOperation({
+      'opId': transaction.id,
+      'type': 'updateTransaction',
+      'docId': transaction.id,
+      'payload': transaction.toFirestore(),
+      'overrideReason': overrideReason,
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cachedList = OfflineCacheService().getCachedTransactions() ?? [];
+    await OfflineCacheService().cacheTransactions([
+      for (final t in cachedList)
+        if (t.id != transaction.id) t,
+      transaction,
+    ]);
+    unawaited(OfflineSyncService().syncNow());
   }
 
   /// Delete an existing transaction, reversing its balance effect
@@ -496,69 +491,38 @@ class TransactionService {
     String transactionId, {
     String? overrideReason,
   }) async {
-    try {
-      final doc = await _firestore
-          .collection(_transactionsCollection)
-          .doc(transactionId)
-          .get();
-
-      if (!doc.exists) {
-        throw 'Transaction not found';
-      }
-
-      final transaction =
-          MoneyTransaction.fromFirestore(doc.data()!, transactionId);
-
-      if (transaction.isTransfer) {
+    final cached = OfflineCacheService().getCachedTransactions();
+    MoneyTransaction? tx;
+    if (cached != null) {
+      try {
+        tx = cached.firstWhere((t) => t.id == transactionId);
+      } catch (_) {}
+    }
+    if (tx != null) {
+      _enforceLock(tx, overrideReason: overrideReason, action: 'delete');
+      if (tx.isTransfer) {
         throw 'Use transfer delete for transfers.';
       }
-
-      _enforceLock(transaction,
-          overrideReason: overrideReason, action: 'delete');
-
-      // Reversing a distribution removes money from the balance - validate it
-      if (transaction.type.toLowerCase() == 'distribution') {
-        final workerDoc = await _firestore
-            .collection('workers')
-            .doc(transaction.workerId)
-            .get();
-
-        if (!workerDoc.exists) {
-          throw 'Collector not found';
-        }
-
-        final currentBalance =
-            (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
-        if (transaction.amount > currentBalance) {
-          throw 'Insufficient balance. Available: ETB ${currentBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+      if (tx.type.toLowerCase() == 'distribution' &&
+          !ConnectivityService().isOnline) {
+        final projected = _projectedBalance(tx.workerId);
+        if (projected != null && tx.amount > projected) {
+          throw 'Insufficient balance. Available: ETB ${projected.toStringAsFixed(2)}, Required: ETB ${tx.amount.toStringAsFixed(2)}';
         }
       }
-
-      final batch = _firestore.batch();
-
-      final workerRef =
-          _firestore.collection('workers').doc(transaction.workerId);
-
-      final updates = _balanceUpdates(transaction, -1);
-      if (updates.isNotEmpty) {
-        batch.update(workerRef, updates);
-      }
-
-      batch.delete(
-        _firestore.collection(_transactionsCollection).doc(transactionId),
-      );
-
-      await batch.commit();
-      print('Transaction deleted successfully: $transactionId');
-    } on FirebaseException catch (e) {
-      print('Firestore error deleting transaction: ${e.code} - ${e.message}');
-      throw _handleFirestoreError(e);
-    } on TransactionLockedException {
-      rethrow;
-    } catch (e) {
-      print('Error deleting transaction: $e');
-      throw 'Failed to delete transaction. Please try again.';
     }
+    await OfflineCacheService().queueOperation({
+      'opId': transactionId,
+      'type': 'deleteTransaction',
+      'docId': transactionId,
+      'overrideReason': overrideReason,
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cachedList = OfflineCacheService().getCachedTransactions() ?? [];
+    await OfflineCacheService().cacheTransactions(
+        cachedList.where((t) => t.id != transactionId).toList());
+    unawaited(OfflineSyncService().syncNow());
   }
 
   /// Throws if the transaction is past the immutability window and no admin
@@ -574,6 +538,106 @@ class TransactionService {
   // shared with OfflineSyncService — keep in sync
   Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) =>
       tb.transactionBalanceUpdates(t, direction);
+
+  double _numericBalanceDelta(MoneyTransaction t, int direction) {
+    final mult = direction.toDouble();
+    switch (t.type.toLowerCase()) {
+      case 'distribution':
+        return t.amount * mult;
+      case 'return':
+        return -t.amount * mult;
+      case 'purchase':
+        return -t.amount * mult;
+      case 'transfer':
+        final eff = t.isTransferSender ? -1.0 : 1.0;
+        return t.amount * mult * eff;
+      default:
+        return 0;
+    }
+  }
+
+  /// Cached worker balance + pending op deltas, or null when the worker has no
+  /// cached baseline (local validation impossible — sync enforces authoritatively).
+  double? _projectedBalance(String workerId) {
+    double base = 0;
+    Worker? w =
+        OfflineCacheService().getCachedWorkerProfile(expectedId: workerId);
+    if (w == null) {
+      final workers = OfflineCacheService().getCachedWorkers();
+      if (workers != null) {
+        for (final worker in workers) {
+          if (worker.id == workerId) {
+            w = worker;
+            break;
+          }
+        }
+      }
+    }
+    if (w == null) return null;
+    base = w.currentBalance;
+    final pending = OfflineCacheService().getPendingOperations();
+    final cachedTxs = OfflineCacheService().getCachedTransactions() ?? [];
+    final txMap = {for (final t in cachedTxs) t.id: t};
+    for (final op in pending) {
+      final type = op['type'] as String? ?? '';
+      try {
+        if (type == 'createTransaction') {
+          if (op['workerId'] != workerId) continue;
+          final mt = MoneyTransaction(
+            id: op['docId'] as String? ?? op['opId'] as String,
+            workerId: op['workerId'] as String,
+            workerName: op['workerName'] as String? ?? '',
+            type: op['transactionType'] as String? ?? 'distribution',
+            amount: (op['amount'] as num).toDouble(),
+            createdAt: op['createdAt'] != null
+                ? DateTime.fromMillisecondsSinceEpoch(op['createdAt'] as int)
+                : DateTime.now(),
+            createdBy: op['createdBy'] as String? ?? '',
+            commissionAmount: (op['commissionAmount'] as num?)?.toDouble(),
+            transferId: op['transferId'] as String?,
+            transferRole: op['transferRole'] as String?,
+          );
+          base += _numericBalanceDelta(mt, 1);
+        } else if (type == 'deleteTransaction') {
+          final docId = op['docId'] as String?;
+          final tx = txMap[docId];
+          if (tx == null || tx.workerId != workerId) continue;
+          base += _numericBalanceDelta(tx, -1);
+        } else if (type == 'updateTransaction') {
+          final docId = op['docId'] as String?;
+          final old = txMap[docId];
+          final payload = op['payload'] as Map<String, dynamic>?;
+          if (payload == null) continue;
+          MoneyTransaction newTx;
+          try {
+            newTx = MoneyTransaction.fromFirestore(
+                Map<String, dynamic>.from(payload), docId!);
+          } catch (_) {
+            continue;
+          }
+          if (old != null && old.workerId == workerId)
+            base += _numericBalanceDelta(old, -1);
+          if (newTx.workerId == workerId)
+            base += _numericBalanceDelta(newTx, 1);
+          if (old == null && newTx.workerId == workerId) {
+            // if old not in cache, only new matters (handled)
+          }
+        } else if (type == 'createTransfer') {
+          final amt = (op['amount'] as num?)?.toDouble() ?? 0;
+          if (op['fromWorkerId'] == workerId) base -= amt;
+          if (op['toWorkerId'] == workerId) base += amt;
+        } else if (type == 'deleteTransfer') {
+          final tid = op['transferId'] as String? ?? op['opId'] as String?;
+          if (tid == null) continue;
+          for (final t in cachedTxs.where((t) => t.transferId == tid)) {
+            if (t.workerId != workerId) continue;
+            base += _numericBalanceDelta(t, -1);
+          }
+        }
+      } catch (_) {}
+    }
+    return base;
+  }
 
   /// Trigger notifications based on transaction type
   Future<void> _triggerTransactionNotifications({
