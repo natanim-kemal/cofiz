@@ -297,33 +297,42 @@ class IncomeService {
     final cached = OfflineCacheService().getCachedIncome() ?? [];
     await OfflineCacheService()
         .cacheIncome([...cached, record.copyWith(id: opId)]);
-    debugPrint('[IncomeService] addIncome opId=$opId queued+cached, syncing...');
+    debugPrint(
+        '[IncomeService] addIncome opId=$opId queued+cached, syncing...');
     unawaited(OfflineSyncService().syncNow());
     return opId;
   }
 
   Future<bool> updateIncome(IncomeRecord record) async {
-    try {
-      await _firestore
-          .collection(_collectionName)
-          .doc(record.id)
-          .update(record.toFirestore());
-      return true;
-    } catch (e) {
-      print('Error updating income: $e');
-      return false;
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': record.id,
+      'type': 'updateIncome',
+      'docId': record.id,
+      'payload': record.toFirestore(),
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cached = OfflineCacheService().getCachedIncome() ?? [];
+    await OfflineCacheService().cacheIncome([
+      for (final r in cached)
+        if (r.id != record.id) r,
+      record
+    ]);
+    unawaited(OfflineSyncService().syncNow());
+    return true;
   }
 
   Future<bool> deleteIncome(String id) async {
-    try {
-      await _firestore.collection(_collectionName).doc(id).delete();
-      debugPrint('[IncomeService] deleteIncome id=$id OK');
-      return true;
-    } catch (e) {
-      debugPrint('[IncomeService] deleteIncome id=$id FAILED: $e');
-      return false;
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': id,
+      'type': 'deleteIncome',
+      'docId': id,
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    await OfflineCacheService().removeCachedIncome(id);
+    unawaited(OfflineSyncService().syncNow());
+    return true;
   }
 
   Future<void> initializeDefaultSaleCategories() async {
