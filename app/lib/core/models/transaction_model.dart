@@ -116,22 +116,32 @@ class MoneyTransaction {
     };
   }
 
-  MoneyTransaction copyWith({bool? approved}) {
+  MoneyTransaction copyWith({
+    String? type,
+    double? amount,
+    String? notes,
+    String? receiptUrl,
+    bool? approved,
+    String? coffeeType,
+    double? coffeeWeight,
+    double? pricePerKg,
+    double? commissionAmount,
+  }) {
     return MoneyTransaction(
       id: id,
       workerId: workerId,
       workerName: workerName,
-      type: type,
-      amount: amount,
-      notes: notes,
-      receiptUrl: receiptUrl,
+      type: type ?? this.type,
+      amount: amount ?? this.amount,
+      notes: notes ?? this.notes,
+      receiptUrl: receiptUrl ?? this.receiptUrl,
       createdAt: createdAt,
       createdBy: createdBy,
       approved: approved ?? this.approved,
-      coffeeType: coffeeType,
-      coffeeWeight: coffeeWeight,
-      pricePerKg: pricePerKg,
-      commissionAmount: commissionAmount,
+      coffeeType: coffeeType ?? this.coffeeType,
+      coffeeWeight: coffeeWeight ?? this.coffeeWeight,
+      pricePerKg: pricePerKg ?? this.pricePerKg,
+      commissionAmount: commissionAmount ?? this.commissionAmount,
       fromWorkerId: fromWorkerId,
       toWorkerId: toWorkerId,
       fromWorkerName: fromWorkerName,

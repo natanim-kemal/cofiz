@@ -606,6 +606,39 @@ class TransactionProvider with ChangeNotifier {
     if (changed) notifyListeners();
   }
 
+  /// Optimistically replace a matching in-memory entry so the UI reflects
+  /// the edit immediately. The live stream reconciles once back online.
+  void _optimisticReplace(MoneyTransaction tx) {
+    var changed = false;
+    if (_allTransactions.any((t) => t.id == tx.id)) {
+      _allTransactions = [
+        for (final t in _allTransactions)
+          if (t.id == tx.id) tx else t,
+      ];
+      changed = true;
+    }
+    if (_workerTransactions.any((t) => t.id == tx.id)) {
+      _workerTransactions = [
+        for (final t in _workerTransactions)
+          if (t.id == tx.id) tx else t,
+      ];
+      changed = true;
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// Optimistically remove matching in-memory entries so the UI reflects the
+  /// delete immediately. The live stream reconciles once back online.
+  void _optimisticRemove(bool Function(MoneyTransaction) matches) {
+    final newAll = _allTransactions.where((t) => !matches(t)).toList();
+    final newWorker = _workerTransactions.where((t) => !matches(t)).toList();
+    final changed = newAll.length != _allTransactions.length ||
+        newWorker.length != _workerTransactions.length;
+    _allTransactions = newAll;
+    _workerTransactions = newWorker;
+    if (changed) notifyListeners();
+  }
+
   /// Edit an existing transaction (reverses old balance effect, applies new)
   /// [overrideReason] is required when the transaction is past the
   /// immutability window.
@@ -614,6 +647,7 @@ class TransactionProvider with ChangeNotifier {
     String? overrideReason,
   }) async {
     try {
+      _optimisticReplace(transaction);
       await _transactionService.updateTransaction(transaction,
           overrideReason: overrideReason);
       return true;
@@ -632,6 +666,7 @@ class TransactionProvider with ChangeNotifier {
     String? overrideReason,
   }) async {
     try {
+      _optimisticRemove((t) => t.id == transactionId);
       await _transactionService.deleteTransaction(transactionId,
           overrideReason: overrideReason);
       return true;
@@ -650,6 +685,10 @@ class TransactionProvider with ChangeNotifier {
     String? overrideReason,
   }) async {
     try {
+      _optimisticRemove((t) =>
+          t.transferId == transferId ||
+          t.id == transferId ||
+          t.id == '${transferId}_r');
       await _transactionService.deleteTransfer(transferId,
           overrideReason: overrideReason);
       return true;
