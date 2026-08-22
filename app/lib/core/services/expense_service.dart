@@ -193,33 +193,42 @@ class ExpenseService {
     final cached = OfflineCacheService().getCachedExpenses() ?? [];
     await OfflineCacheService()
         .cacheExpenses([...cached, record.copyWith(id: opId)]);
-    debugPrint('[ExpenseService] addExpense opId=$opId queued+cached, syncing...');
+    debugPrint(
+        '[ExpenseService] addExpense opId=$opId queued+cached, syncing...');
     unawaited(OfflineSyncService().syncNow());
     return opId;
   }
 
   Future<bool> updateExpense(ExpenseRecord record) async {
-    try {
-      await _firestore
-          .collection(_collectionName)
-          .doc(record.id)
-          .update(record.toFirestore());
-      return true;
-    } catch (e) {
-      print('Error updating expense: $e');
-      return false;
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': record.id,
+      'type': 'updateExpense',
+      'docId': record.id,
+      'payload': record.toFirestore(),
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    final cached = OfflineCacheService().getCachedExpenses() ?? [];
+    await OfflineCacheService().cacheExpenses([
+      for (final r in cached)
+        if (r.id != record.id) r,
+      record
+    ]);
+    unawaited(OfflineSyncService().syncNow());
+    return true;
   }
 
   Future<bool> deleteExpense(String id) async {
-    try {
-      await _firestore.collection(_collectionName).doc(id).delete();
-      debugPrint('[ExpenseService] deleteExpense id=$id OK');
-      return true;
-    } catch (e) {
-      debugPrint('[ExpenseService] deleteExpense id=$id FAILED: $e');
-      return false;
-    }
+    await OfflineCacheService().queueOperation({
+      'opId': id,
+      'type': 'deleteExpense',
+      'docId': id,
+      'attempts': 0,
+      'queuedAt': DateTime.now().toIso8601String(),
+    });
+    await OfflineCacheService().removeCachedExpense(id);
+    unawaited(OfflineSyncService().syncNow());
+    return true;
   }
 
   Future<void> initializeDefaultExpenseCategories() async {
