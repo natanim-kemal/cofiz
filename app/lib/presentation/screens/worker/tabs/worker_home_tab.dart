@@ -89,8 +89,8 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final displayName = (authProvider.appUser?.displayName?.isNotEmpty ?? false)
-        ? authProvider.appUser!.displayName!
+    final displayName = (authProvider.appUser?.displayName.isNotEmpty ?? false)
+        ? authProvider.appUser!.displayName
         : widget.worker.name;
     return Column(
       children: [

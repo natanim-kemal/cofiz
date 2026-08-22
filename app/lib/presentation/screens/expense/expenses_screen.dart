@@ -124,7 +124,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${l10n.currency ?? 'ETB'} ${provider.totalExpenses.formattedCompact}',
+                            '${l10n.currency ?? 'ETB'} ${provider.totalExpenses.formatted}',
                             style: TextStyle(
                               color: isDark ? Colors.white : Colors.black87,
                               fontSize: 30,

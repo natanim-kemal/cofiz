@@ -396,7 +396,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.swap_horiz,
                                   size: 22,
                                   color: AppColors.primary,
