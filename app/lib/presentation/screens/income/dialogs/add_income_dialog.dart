@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -96,21 +98,23 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        final auditProvider =
-            Provider.of<AuditProvider>(context, listen: false);
-        final userName = auth.user?.displayName ?? auth.user?.email ?? '';
-        await auditProvider.logIncomeRecorded(
-          userId: auth.user?.uid ?? 'unknown',
-          userName: userName,
-          incomeId: record.id,
-          kind: _kind.name,
-          amount: amount,
-        );
         Navigator.pop(context, true);
         AppToast.show(
           AppLocalizations.of(context)!.incomeRecorded,
           success: true,
         );
+        // Audit is best-effort and must never block closing the dialog
+        // offline (Firestore add hangs until network). Fire-and-forget.
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        final userName = auth.user?.displayName ?? auth.user?.email ?? '';
+        unawaited(auditProvider.logIncomeRecorded(
+          userId: auth.user?.uid ?? 'unknown',
+          userName: userName,
+          incomeId: record.id,
+          kind: _kind.name,
+          amount: amount,
+        ));
       } else {
         AppToast.show(provider.errorMessage ?? 'Failed to record income');
       }
