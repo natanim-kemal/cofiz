@@ -316,9 +316,18 @@ void main() {
       expect(
         OfflineCacheService()
             .getPendingOperations()
-            .any((op) => op['opId'] == id),
+            .any((op) =>
+                op['opId'] == id &&
+                (op['type'] == 'createIncome' ||
+                    op['type'] == 'createExpense')),
         isFalse,
         reason: 'deleting an unsynced record must cancel its queued create',
+      );
+      expect(
+        OfflineCacheService().getPendingOperations().any((op) =>
+            op['opId'] == id && op['type'].toString().startsWith('delete')),
+        isTrue,
+        reason: 'offline delete must be queued for sync',
       );
       // Optimistic decrement lands instantly; let the reconciling refresh
       // (fired fire-and-forget by deleteIncome) finish before asserting.
@@ -440,8 +449,18 @@ void main() {
       expect(
         OfflineCacheService()
             .getPendingOperations()
-            .any((op) => op['opId'] == id),
+            .any((op) =>
+                op['opId'] == id &&
+                (op['type'] == 'createIncome' ||
+                    op['type'] == 'createExpense')),
         isFalse,
+        reason: 'deleting an unsynced record must cancel its queued create',
+      );
+      expect(
+        OfflineCacheService().getPendingOperations().any((op) =>
+            op['opId'] == id && op['type'].toString().startsWith('delete')),
+        isTrue,
+        reason: 'offline delete must be queued for sync',
       );
       await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(provider.totalExpenses, 0.0);
