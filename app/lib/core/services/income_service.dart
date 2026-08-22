@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/income_record_model.dart';
 import 'offline_cache_service.dart';
@@ -296,6 +297,7 @@ class IncomeService {
     final cached = OfflineCacheService().getCachedIncome() ?? [];
     await OfflineCacheService()
         .cacheIncome([...cached, record.copyWith(id: opId)]);
+    debugPrint('[IncomeService] addIncome opId=$opId queued+cached, syncing...');
     unawaited(OfflineSyncService().syncNow());
     return opId;
   }
@@ -316,9 +318,10 @@ class IncomeService {
   Future<bool> deleteIncome(String id) async {
     try {
       await _firestore.collection(_collectionName).doc(id).delete();
+      debugPrint('[IncomeService] deleteIncome id=$id OK');
       return true;
     } catch (e) {
-      print('Error deleting income: $e');
+      debugPrint('[IncomeService] deleteIncome id=$id FAILED: $e');
       return false;
     }
   }
