@@ -33,6 +33,11 @@ class IncomeProvider extends ChangeNotifier {
   // (the "total went up then reverted" bug).
   int _totalsGeneration = 0;
 
+  // True once totals hold real session data (computed or seeded). Replaces
+  // the old "all zeros means cold start" heuristic, which misfired after an
+  // optimistic delete zeroed every total and re-seeded stale cache values.
+  bool _totalsHaveData = false;
+
   // Optimistic record ids (queued ops not yet confirmed by the server
   // stream). Protected from being dropped by _mergeFirstPage.
   final Set<String> _pendingIds = {};
@@ -170,8 +175,7 @@ class IncomeProvider extends ChangeNotifier {
     // reappear on the next emission - the "row flashed away" bug).
     final freshIds = freshHead.map((r) => r.id).toSet();
     final stillPending = _records
-        .where((r) =>
-            _pendingIds.contains(r.id) && !freshIds.contains(r.id))
+        .where((r) => _pendingIds.contains(r.id) && !freshIds.contains(r.id))
         .toList();
     for (final id in freshIds) {
       if (_pendingIds.remove(id)) {
@@ -199,8 +203,7 @@ class IncomeProvider extends ChangeNotifier {
       return;
     }
     final tailIds = merged.map((r) => r.id).toSet();
-    final tail =
-        _records.where((r) => !tailIds.contains(r.id)).toList();
+    final tail = _records.where((r) => !tailIds.contains(r.id)).toList();
     _records = [...merged, ...tail];
   }
 
@@ -295,6 +298,7 @@ class IncomeProvider extends ChangeNotifier {
     } else {
       anyFailed = true;
     }
+    _totalsHaveData = true;
 
     notifyListeners();
 
@@ -317,10 +321,10 @@ class IncomeProvider extends ChangeNotifier {
 
   void _seedTotalsFromCache() {
     try {
-      // Seed only on cold start (memory still empty). Mid-session seeding
-      // would flash stale cached totals over fresher in-memory values -
-      // the visible "total reverted" symptom.
-      if (_totalIncome != 0.0 || _totalCount > 0) return;
+      // Seed only before the session has any total data (cold start).
+      // Mid-session seeding would flash stale cached totals over fresher
+      // in-memory values - the visible "total reverted" symptom.
+      if (_totalsHaveData) return;
       final cached = OfflineCacheService().getCachedIncomeTotals();
       if (cached == null) return;
       _totalIncome = cached['totalIncome'] ?? 0.0;
@@ -330,6 +334,7 @@ class IncomeProvider extends ChangeNotifier {
       _todaySales = cached['todaySales'] ?? 0.0;
       _todayInvestments = cached['todayInvestments'] ?? 0.0;
       _totalCount = (cached['totalCount'] ?? 0).toInt();
+      _totalsHaveData = true;
       notifyListeners();
     } catch (_) {
       // Cache read failure is non-fatal: fall through to network path.
@@ -386,6 +391,9 @@ class IncomeProvider extends ChangeNotifier {
     }
     _todayIncome += optimistic.amount;
     _totalCount += 1;
+    // Optimistic mutations establish live session data: later refreshes
+    // must never seed stale cache values over them.
+    _totalsHaveData = true;
     _pendingIds.add(id);
     notifyListeners();
     // Bump the generation so the in-flight (stale) refresh triggered before
@@ -396,8 +404,32 @@ class IncomeProvider extends ChangeNotifier {
   }
 
   Future<bool> updateIncome(IncomeRecord record) async {
+    final idx = _records.indexWhere((r) => r.id == record.id);
+    final old = idx >= 0 ? _records[idx] : null;
+    final fullIdx = _fullRecords.indexWhere((r) => r.id == record.id);
+    final oldFull = fullIdx >= 0 ? _fullRecords[fullIdx] : null;
+
+    // Optimistic replace BEFORE awaiting the service: offline edits must
+    // show up instantly; the service queues the op and returns true.
+    _records = [for (final r in _records) r.id == record.id ? record : r];
+    _fullRecords = [
+      for (final r in _fullRecords) r.id == record.id ? record : r,
+    ];
+    notifyListeners();
+
     final success = await _service.updateIncome(record);
     if (!success) {
+      // Rollback the optimistic replace (queue failure path).
+      if (old != null) {
+        _records = [
+          for (final r in _records) r.id == old.id ? old : r,
+        ];
+      }
+      if (oldFull != null) {
+        _fullRecords = [
+          for (final r in _fullRecords) r.id == oldFull.id ? oldFull : r,
+        ];
+      }
       _errorMessage = 'Failed to update income';
       notifyListeners();
       return false;
@@ -414,39 +446,49 @@ class IncomeProvider extends ChangeNotifier {
     await OfflineCacheService().removePendingOperationByOpId(id);
     _pendingIds.remove(id);
 
-    final success = await _service.deleteIncome(id);
-    debugPrint('[Income] deleteIncome id=$id serverSuccess=$success');
-    if (!success) {
-      _errorMessage = 'Failed to delete income';
-      debugPrint('[Income] deleteIncome id=$id FAILED');
-      notifyListeners();
-      return false;
-    }
-    // Optimistically remove from totals; next refresh reconciles.
-    // Dedupe: the record typically lives in both _records and _fullRecords.
-    final removedIds = <String>{};
+    // Optimistic removal BEFORE the service call: offline deletes must
+    // drop the row instantly, and if the record never reached the server
+    // (pending create) no stream emission will ever arrive to remove it.
+    final removed = <String, IncomeRecord>{};
     for (final r in [..._records, ..._fullRecords]) {
-      if (r.id != id || !removedIds.add(r.id)) continue;
+      if (r.id != id || removed.containsKey(r.id)) continue;
+      removed[r.id] = r;
+    }
+    _records = _records.where((r) => r.id != id).toList();
+    _fullRecords = _fullRecords.where((r) => r.id != id).toList();
+    // Bump the generation BEFORE mutating totals so any in-flight refresh
+    // cannot clobber these values while we await the service call below.
+    _totalsGeneration++;
+    _totalsHaveData = true;
+    // Optimistically decrement totals by kind; next refresh reconciles
+    // with server truth.
+    for (final r in removed.values) {
       _totalIncome -= r.amount;
       if (r.kind == IncomeKind.investment) {
         _totalInvestments -= r.amount;
+        _todayInvestments -= r.amount;
       } else {
         _totalSales -= r.amount;
+        _todaySales -= r.amount;
       }
+      _todayIncome -= r.amount;
+      _totalCount -= 1;
     }
-    // Remove from the live lists and the cache immediately: if the record
-    // never reached the server (pending op) no stream emission will ever
-    // arrive to drop the row, so it would stay on screen forever.
-    _records = _records.where((r) => r.id != id).toList();
-    _fullRecords = _fullRecords.where((r) => r.id != id).toList();
+    debugPrint(
+        '[Income] deleteIncome id=$id remaining records=${_records.length} total=$_totalIncome');
+    notifyListeners();
+
+    final success = await _service.deleteIncome(id);
+    debugPrint('[Income] deleteIncome id=$id serverSuccess=$success');
+    if (!success) {
+      // Keep removed state (already tombstoned) — outbox will retry.
+      return false;
+    }
     try {
       await OfflineCacheService().removeCachedIncome(id);
     } catch (_) {
       // Cache write failure is non-fatal: next cache sync reconciles.
     }
-    debugPrint(
-        '[Income] deleteIncome id=$id remaining records=${_records.length} total=$_totalIncome');
-    notifyListeners();
     _totalsGeneration++;
     _refreshTotals();
     return true;

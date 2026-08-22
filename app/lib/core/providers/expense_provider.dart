@@ -32,6 +32,11 @@ class ExpenseProvider extends ChangeNotifier {
   // write results (prevents stale refresh clobbering fresh totals).
   int _totalsGeneration = 0;
 
+  // True once totals hold real session data (computed or seeded). Replaces
+  // the old "all zeros means cold start" heuristic, which misfired after an
+  // optimistic delete zeroed every total and re-seeded stale cache values.
+  bool _totalsHaveData = false;
+
   // Optimistic record ids (queued ops not yet confirmed by the server
   // stream). Protected from being dropped by _mergeFirstPage.
   final Set<String> _pendingIds = {};
@@ -150,8 +155,7 @@ class ExpenseProvider extends ChangeNotifier {
     // Optimistic records the server hasn't confirmed yet stay visible.
     final freshIds = freshHead.map((r) => r.id).toSet();
     final stillPending = _records
-        .where((r) =>
-            _pendingIds.contains(r.id) && !freshIds.contains(r.id))
+        .where((r) => _pendingIds.contains(r.id) && !freshIds.contains(r.id))
         .toList();
     for (final id in freshIds) {
       if (_pendingIds.remove(id)) {
@@ -177,8 +181,7 @@ class ExpenseProvider extends ChangeNotifier {
       return;
     }
     final tailIds = merged.map((r) => r.id).toSet();
-    final tail =
-        _records.where((r) => !tailIds.contains(r.id)).toList();
+    final tail = _records.where((r) => !tailIds.contains(r.id)).toList();
     _records = [...merged, ...tail];
   }
 
@@ -232,6 +235,7 @@ class ExpenseProvider extends ChangeNotifier {
     } else {
       anyFailed = true;
     }
+    _totalsHaveData = true;
 
     notifyListeners();
 
@@ -250,13 +254,15 @@ class ExpenseProvider extends ChangeNotifier {
 
   void _seedTotalsFromCache() {
     try {
-      // Seed only on cold start; mid-session seeding flashes stale values.
-      if (_totalExpenses != 0.0 || _totalCount > 0) return;
+      // Seed only before the session has any total data (cold start);
+      // mid-session seeding flashes stale values.
+      if (_totalsHaveData) return;
       final cached = OfflineCacheService().getCachedExpenseTotals();
       if (cached == null) return;
       _totalExpenses = cached['totalExpenses'] ?? 0.0;
       _todayExpenses = cached['todayExpenses'] ?? 0.0;
       _totalCount = (cached['totalCount'] ?? 0).toInt();
+      _totalsHaveData = true;
       notifyListeners();
     } catch (_) {
       // Cache read failure is non-fatal: fall through to network path.
@@ -304,6 +310,9 @@ class ExpenseProvider extends ChangeNotifier {
     _totalExpenses += optimistic.amount;
     _todayExpenses += optimistic.amount;
     _totalCount += 1;
+    // Optimistic mutations establish live session data: later refreshes
+    // must never seed stale cache values over them.
+    _totalsHaveData = true;
     _pendingIds.add(id);
     notifyListeners();
     _totalsGeneration++;
@@ -312,8 +321,32 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   Future<bool> updateExpense(ExpenseRecord record) async {
+    final idx = _records.indexWhere((r) => r.id == record.id);
+    final old = idx >= 0 ? _records[idx] : null;
+    final fullIdx = _fullRecords.indexWhere((r) => r.id == record.id);
+    final oldFull = fullIdx >= 0 ? _fullRecords[fullIdx] : null;
+
+    // Optimistic replace BEFORE awaiting the service: offline edits must
+    // show up instantly; the service queues the op and returns true.
+    _records = [for (final r in _records) r.id == record.id ? record : r];
+    _fullRecords = [
+      for (final r in _fullRecords) r.id == record.id ? record : r,
+    ];
+    notifyListeners();
+
     final success = await _service.updateExpense(record);
     if (!success) {
+      // Rollback the optimistic replace (queue failure path).
+      if (old != null) {
+        _records = [
+          for (final r in _records) r.id == old.id ? old : r,
+        ];
+      }
+      if (oldFull != null) {
+        _fullRecords = [
+          for (final r in _fullRecords) r.id == oldFull.id ? oldFull : r,
+        ];
+      }
       _errorMessage = 'Failed to update expense';
       notifyListeners();
       return false;
@@ -328,31 +361,41 @@ class ExpenseProvider extends ChangeNotifier {
     await OfflineCacheService().removePendingOperationByOpId(id);
     _pendingIds.remove(id);
 
+    // Optimistic removal BEFORE the service call: offline deletes must
+    // drop the row instantly, and if the record never reached the server
+    // (pending create) no stream emission will ever arrive to remove it.
+    final removed = <String, ExpenseRecord>{};
+    for (final r in [..._records, ..._fullRecords]) {
+      if (r.id != id || removed.containsKey(r.id)) continue;
+      removed[r.id] = r;
+    }
+    _records = _records.where((r) => r.id != id).toList();
+    _fullRecords = _fullRecords.where((r) => r.id != id).toList();
+    // Bump the generation BEFORE mutating totals so any in-flight refresh
+    // cannot clobber these values while we await the service call below.
+    _totalsGeneration++;
+    _totalsHaveData = true;
+    // Optimistically decrement totals; next refresh reconciles with truth.
+    for (final r in removed.values) {
+      _totalExpenses -= r.amount;
+      _todayExpenses -= r.amount;
+      _totalCount -= 1;
+    }
+    debugPrint(
+        '[Expense] deleteExpense id=$id remaining records=${_records.length} total=$_totalExpenses');
+    notifyListeners();
+
     final success = await _service.deleteExpense(id);
     debugPrint('[Expense] deleteExpense id=$id serverSuccess=$success');
     if (!success) {
-      _errorMessage = 'Failed to delete expense';
-      notifyListeners();
+      // Keep removed state (already tombstoned) — outbox will retry.
       return false;
     }
-    // Optimistic totals decrement; next refresh reconciles.
-    final removedIds = <String>{};
-    for (final r in [..._records, ..._fullRecords]) {
-      if (r.id != id || !removedIds.add(r.id)) continue;
-      _totalExpenses -= r.amount;
-    }
-    // Remove from live lists + cache immediately (same rationale as the
-    // income provider: no stream emission may ever arrive to drop the row).
-    _records = _records.where((r) => r.id != id).toList();
-    _fullRecords = _fullRecords.where((r) => r.id != id).toList();
     try {
       await OfflineCacheService().removeCachedExpense(id);
     } catch (_) {
       // Cache write failure is non-fatal: next cache sync reconciles.
     }
-    debugPrint(
-        '[Expense] deleteExpense id=$id remaining records=${_records.length} total=$_totalExpenses');
-    notifyListeners();
     _totalsGeneration++;
     _refreshTotals();
     return true;
