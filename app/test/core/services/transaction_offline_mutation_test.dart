@@ -187,6 +187,56 @@ void main() {
         200);
   });
 
+  test('offline delete of oversized distribution throws', () async {
+    final fake = FakeFirebaseFirestore();
+    OfflineSyncService().firestore = fake;
+    final svc = TransactionService(firestore: fake);
+    final now = DateTime.now();
+    // cached worker balance is only 30; deleting a distribution of 100 would
+    // push the balance negative, so the guard must throw before queueing
+    await OfflineCacheService().cacheWorkers([
+      Worker(
+          id: 'w1',
+          name: 'n',
+          phone: '0',
+          role: 'Worker',
+          currentBalance: 30,
+          createdAt: now),
+    ]);
+    await OfflineCacheService().cacheWorkerProfile(
+      Worker(
+          id: 'w1',
+          name: 'n',
+          phone: '0',
+          role: 'Worker',
+          currentBalance: 30,
+          createdAt: now),
+    );
+    await OfflineCacheService().cacheTransactions([
+      MoneyTransaction(
+          id: 't_dist',
+          workerId: 'w1',
+          workerName: 'n',
+          type: 'distribution',
+          amount: 100,
+          createdAt: now,
+          createdBy: 'u'),
+    ]);
+    expect(() => svc.deleteTransaction('t_dist'),
+        throwsA(contains('Insufficient')));
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['opId'] == 't_dist'),
+        isFalse);
+    // tx stays in cache since the delete was rejected
+    expect(
+        OfflineCacheService()
+            .getCachedTransactions()!
+            .any((t) => t.id == 't_dist'),
+        isTrue);
+  });
+
   test('deleteTransfer offline queues and removes from cache', () async {
     final fake = FakeFirebaseFirestore();
     OfflineSyncService().firestore = fake;
