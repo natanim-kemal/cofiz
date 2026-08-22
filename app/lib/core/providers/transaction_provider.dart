@@ -646,12 +646,16 @@ class TransactionProvider with ChangeNotifier {
     MoneyTransaction transaction, {
     String? overrideReason,
   }) async {
+    final allSnap = _allTransactions;
+    final workerSnap = _workerTransactions;
     try {
       _optimisticReplace(transaction);
       await _transactionService.updateTransaction(transaction,
           overrideReason: overrideReason);
       return true;
     } catch (e) {
+      _allTransactions = allSnap;
+      _workerTransactions = workerSnap;
       _errorMessage = e.toString();
       notifyListeners();
       return false;
@@ -665,12 +669,16 @@ class TransactionProvider with ChangeNotifier {
     String transactionId, {
     String? overrideReason,
   }) async {
+    final allSnap = _allTransactions;
+    final workerSnap = _workerTransactions;
     try {
       _optimisticRemove((t) => t.id == transactionId);
       await _transactionService.deleteTransaction(transactionId,
           overrideReason: overrideReason);
       return true;
     } catch (e) {
+      _allTransactions = allSnap;
+      _workerTransactions = workerSnap;
       _errorMessage = e.toString();
       notifyListeners();
       return false;
@@ -684,6 +692,8 @@ class TransactionProvider with ChangeNotifier {
     String transferId, {
     String? overrideReason,
   }) async {
+    final allSnap = _allTransactions;
+    final workerSnap = _workerTransactions;
     try {
       _optimisticRemove((t) =>
           t.transferId == transferId ||
@@ -693,6 +703,8 @@ class TransactionProvider with ChangeNotifier {
           overrideReason: overrideReason);
       return true;
     } catch (e) {
+      _allTransactions = allSnap;
+      _workerTransactions = workerSnap;
       _errorMessage = e.toString();
       notifyListeners();
       return false;
