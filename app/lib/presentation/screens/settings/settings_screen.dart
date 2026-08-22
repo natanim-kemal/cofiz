@@ -163,12 +163,7 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   icon: Icons.format_size_outlined,
                   title: 'Display Size',
-                  subtitle: switch (densityProvider.density) {
-                    DisplayDensity.veryCompact => 'Very Compact',
-                    DisplayDensity.compact => 'Compact',
-                    DisplayDensity.normal => 'Normal',
-                    DisplayDensity.large => 'Large',
-                  },
+                  subtitle: '${(densityProvider.scale * 100).round()}%',
                   onTap: () => _showDensityBottomSheet(context),
                 ),
                 _buildSettingsTile(
@@ -420,51 +415,139 @@ class SettingsScreen extends StatelessWidget {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
+        isScrollControlled: true,
         builder: (context) {
-          return Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Display Size',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                _buildDensityOption(
-                    context,
-                    'Very Compact',
-                    'Densest layout - smallest text',
-                    DisplayDensity.veryCompact),
-                _buildDensityOption(
-                    context, 'Compact', 'Smaller text, more on screen',
-                    DisplayDensity.compact),
-                _buildDensityOption(
-                    context, 'Normal', 'Default sizing', DisplayDensity.normal),
-                _buildDensityOption(context, 'Large',
-                    'Bigger text, easier to read', DisplayDensity.large),
-              ],
-            ),
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Consumer<DensityProvider>(
+                builder: (context, density, _) {
+                  return Container(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Display Size',
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${(density.scale * 100).round()}%',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Slide to adjust — live preview',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SliderTheme(
+                          data: SliderThemeData(
+                            activeTrackColor: AppColors.primary,
+                            inactiveTrackColor: Colors.grey.shade300,
+                            thumbColor: AppColors.primary,
+                            overlayColor: AppColors.primary.withOpacity(0.18),
+                            activeTickMarkColor: Colors.white,
+                            inactiveTickMarkColor: Colors.grey.shade500,
+                            tickMarkShape: const RoundSliderTickMarkShape(
+                                tickMarkRadius: 3),
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 11),
+                            trackHeight: 4,
+                          ),
+                          child: Slider(
+                            value: density.scale,
+                            min: DensityProvider.minScale,
+                            max: DensityProvider.maxScale,
+                            divisions: 6,
+                            label: '${(density.scale * 100).round()}%',
+                            onChanged: (v) {
+                              density.setScale(v);
+                              setSheetState(() {});
+                            },
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('0.6×',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                              Text('0.7',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                              Text('0.8',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                              Text('0.9',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                              Text('1.0',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                              Text('1.1',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                              Text('1.2×',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.text_fields,
+                                  size: 18, color: Colors.grey.shade600),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'The quick brown fox — preview text scales with the slider',
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           );
         });
-  }
-
-  Widget _buildDensityOption(
-      BuildContext context, String name, String subtitle, DisplayDensity d) {
-    final density = Provider.of<DensityProvider>(context, listen: false);
-    final isSelected = density.density == d;
-
-    return ListTile(
-      title: Text(name),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
-      trailing:
-          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
-      onTap: () {
-        density.setDensity(d);
-        Navigator.pop(context);
-      },
-    );
   }
 
   void _showLanguageBottomSheet(BuildContext context) {
