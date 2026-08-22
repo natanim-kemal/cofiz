@@ -1,9 +1,22 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import '../config/cloudinary_config.dart';
+import '../models/transaction_model.dart';
+import '../utils/receipt_image_utils.dart';
 import 'connectivity_service.dart';
 import 'offline_cache_service.dart';
+
+class OfflineSyncLockedException implements Exception {
+  final String message;
+  OfflineSyncLockedException(this.message);
+  @override
+  String toString() => message;
+}
 
 class OfflineSyncService {
   static final OfflineSyncService _instance = OfflineSyncService._internal();
@@ -85,11 +98,13 @@ class OfflineSyncService {
         } catch (e) {
           final updated = Map<String, dynamic>.from(operation);
           updated['attempts'] = ((operation['attempts'] as int?) ?? 0) + 1;
-          // No cap per spec — permanent failures retry every 30s; attempts logged for observability.
-          // TODO: add cap/circuit-breaker if needed (known debt).
           debugPrint(
               '❌ Failed to sync operation: ${operation['type']} attempt ${updated['attempts']}: $e');
-          remaining.add(updated);
+          if ((updated['attempts'] as int) >= 5) {
+            await _cache.markFailed(updated, e.toString());
+          } else {
+            remaining.add(updated);
+          }
         }
       }
 
@@ -116,6 +131,85 @@ class OfflineSyncService {
       debugPrint('❌ Sync failed: $e');
     } finally {
       _isSyncing = false;
+    }
+  }
+
+  Future<String?> _uploadReceipt(String filePath) async {
+    final compressedBytes = await ReceiptImageUtils.compress(filePath);
+    if (compressedBytes == null || compressedBytes.isEmpty) return null;
+
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(CloudinaryConfig.uploadEndpoint),
+    )
+      ..fields['upload_preset'] = CloudinaryConfig.uploadPreset
+      ..fields['folder'] = CloudinaryConfig.folder
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        compressedBytes,
+        filename: 'receipt_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      ));
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode != 200) {
+      throw 'Failed to upload receipt image (${response.statusCode})';
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final secureUrl = json['secure_url'] as String?;
+    return secureUrl;
+  }
+
+  void _enforceLock(
+    MoneyTransaction transaction, {
+    required String? overrideReason,
+    required String action,
+  }) {
+    if (transaction.isLocked &&
+        (overrideReason == null || overrideReason.trim().isEmpty)) {
+      throw OfflineSyncLockedException(
+          'This transaction is locked. Please provide a reason to $action it.');
+    }
+  }
+
+  Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) {
+    final mult = direction.toDouble();
+    switch (t.type.toLowerCase()) {
+      case 'distribution':
+        return {
+          'currentBalance': FieldValue.increment(t.amount * mult),
+          'totalDistributed': FieldValue.increment(t.amount * mult),
+        };
+      case 'return':
+        return {
+          'currentBalance': FieldValue.increment(-t.amount * mult),
+          'totalReturned': FieldValue.increment(t.amount * mult),
+        };
+      case 'purchase':
+        final updates = <String, dynamic>{
+          'currentBalance': FieldValue.increment(-t.amount * mult),
+          'totalCoffeePurchased': FieldValue.increment(t.amount * mult),
+        };
+        if (t.commissionAmount != null && t.commissionAmount! > 0) {
+          updates['totalCommissionEarned'] =
+              FieldValue.increment(t.commissionAmount! * mult);
+        }
+        return updates;
+      case 'transfer':
+        final effect = t.isTransferSender ? -1.0 : 1.0;
+        final updates = <String, dynamic>{
+          'currentBalance': FieldValue.increment(t.amount * mult * effect),
+        };
+        if (t.isTransferSender) {
+          updates['totalReturned'] = FieldValue.increment(t.amount * mult);
+        } else {
+          updates['totalDistributed'] = FieldValue.increment(t.amount * mult);
+        }
+        return updates;
+      default:
+        return {};
     }
   }
 
@@ -157,6 +251,16 @@ class OfflineSyncService {
           final workerId = operation['workerId'] as String;
           final txType = operation['transactionType'] as String;
           final amount = (operation['amount'] as num).toDouble();
+          String? receiptUrl = operation['receiptUrl'] as String?;
+          final localReceiptPath = operation['localReceiptPath'] as String?;
+          if (localReceiptPath != null && localReceiptPath.isNotEmpty) {
+            final uploaded = await _uploadReceipt(localReceiptPath);
+            if (uploaded != null) {
+              receiptUrl = uploaded;
+            } else {
+              throw 'Failed to upload receipt image';
+            }
+          }
           await firestore.runTransaction((txn) async {
             final ref = firestore.collection('transactions').doc(docId);
             final snap = await txn.get(ref);
@@ -167,7 +271,7 @@ class OfflineSyncService {
               'type': txType,
               'amount': amount,
               'notes': operation['notes'],
-              'receiptUrl': operation['receiptUrl'],
+              'receiptUrl': receiptUrl,
               'createdAt': operation['createdAt'],
               'createdBy': operation['createdBy'],
               'approved': false,
@@ -352,6 +456,144 @@ class OfflineSyncService {
           });
         }
         break;
+      case 'updateIncome':
+        {
+          final docId = operation['docId'] as String;
+          final data = Map<String, dynamic>.from(operation['payload'] as Map);
+          await firestore.runTransaction((txn) async {
+            final ref = firestore.collection('income_records').doc(docId);
+            final snap = await txn.get(ref);
+            if (!snap.exists) return;
+            txn.update(ref, data);
+          });
+          break;
+        }
+      case 'deleteIncome':
+        {
+          final docId = operation['docId'] as String;
+          await firestore.runTransaction((txn) async {
+            final ref = firestore.collection('income_records').doc(docId);
+            final snap = await txn.get(ref);
+            if (!snap.exists) return;
+            txn.delete(ref);
+          });
+          break;
+        }
+      case 'updateExpense':
+        {
+          final docId = operation['docId'] as String;
+          final data = Map<String, dynamic>.from(operation['payload'] as Map);
+          await firestore.runTransaction((txn) async {
+            final ref = firestore.collection('expenses').doc(docId);
+            final snap = await txn.get(ref);
+            if (!snap.exists) return;
+            txn.update(ref, data);
+          });
+          break;
+        }
+      case 'deleteExpense':
+        {
+          final docId = operation['docId'] as String;
+          await firestore.runTransaction((txn) async {
+            final ref = firestore.collection('expenses').doc(docId);
+            final snap = await txn.get(ref);
+            if (!snap.exists) return;
+            txn.delete(ref);
+          });
+          break;
+        }
+      case 'updateTransaction':
+        {
+          final docId = operation['docId'] as String;
+          final overrideReason = operation['overrideReason'] as String?;
+          final payload =
+              Map<String, dynamic>.from(operation['payload'] as Map);
+          await firestore.runTransaction((txn) async {
+            final ref = firestore.collection('transactions').doc(docId);
+            final snap = await txn.get(ref);
+            if (!snap.exists) return;
+            final oldTx = MoneyTransaction.fromFirestore(
+                Map<String, dynamic>.from(snap.data() as Map), docId);
+            _enforceLock(oldTx, overrideReason: overrideReason, action: 'edit');
+            if (oldTx.isTransfer ||
+                payload['type']?.toString().toLowerCase() == 'transfer') {
+              throw 'Transfers cannot be edited.';
+            }
+            final newTx = MoneyTransaction.fromFirestore(payload, docId);
+            final oldWorkerRef =
+                firestore.collection('workers').doc(oldTx.workerId);
+            final newWorkerRef =
+                firestore.collection('workers').doc(newTx.workerId);
+            if (oldTx.workerId == newTx.workerId) {
+              final oldUpdates = _balanceUpdates(oldTx, -1);
+              if (oldUpdates.isNotEmpty) txn.update(oldWorkerRef, oldUpdates);
+              final newUpdates = _balanceUpdates(newTx, 1);
+              if (newUpdates.isNotEmpty) txn.update(newWorkerRef, newUpdates);
+            } else {
+              final oldUpdates = _balanceUpdates(oldTx, -1);
+              if (oldUpdates.isNotEmpty) txn.update(oldWorkerRef, oldUpdates);
+              final newUpdates = _balanceUpdates(newTx, 1);
+              if (newUpdates.isNotEmpty) txn.update(newWorkerRef, newUpdates);
+            }
+            txn.update(ref, payload);
+          });
+          break;
+        }
+      case 'deleteTransaction':
+        {
+          final docId = operation['docId'] as String;
+          final overrideReason = operation['overrideReason'] as String?;
+          await firestore.runTransaction((txn) async {
+            final ref = firestore.collection('transactions').doc(docId);
+            final snap = await txn.get(ref);
+            if (!snap.exists) return;
+            final tx = MoneyTransaction.fromFirestore(
+                Map<String, dynamic>.from(snap.data() as Map), docId);
+            if (tx.isTransfer) {
+              throw 'Use transfer delete for transfers.';
+            }
+            _enforceLock(tx, overrideReason: overrideReason, action: 'delete');
+            final workerRef = firestore.collection('workers').doc(tx.workerId);
+            final updates = _balanceUpdates(tx, -1);
+            if (updates.isNotEmpty) txn.update(workerRef, updates);
+            txn.delete(ref);
+          });
+          break;
+        }
+      case 'deleteTransfer':
+        {
+          final transferId = (operation['transferId'] as String?) ??
+              (operation['opId'] as String);
+          final overrideReason = operation['overrideReason'] as String?;
+          final snapshot = await firestore
+              .collection('transactions')
+              .where('transferId', isEqualTo: transferId)
+              .get();
+          if (snapshot.docs.isEmpty) return;
+          await firestore.runTransaction((txn) async {
+            for (final doc in snapshot.docs) {
+              final ref = firestore.collection('transactions').doc(doc.id);
+              final snap = await txn.get(ref);
+              if (!snap.exists) continue;
+              final tx = MoneyTransaction.fromFirestore(
+                  Map<String, dynamic>.from(snap.data() as Map), snap.id);
+              _enforceLock(tx,
+                  overrideReason: overrideReason, action: 'delete');
+              final workerRef =
+                  firestore.collection('workers').doc(tx.workerId);
+              final updates = _balanceUpdates(tx, -1);
+              if (updates.isNotEmpty) txn.update(workerRef, updates);
+              txn.delete(ref);
+            }
+          });
+          break;
+        }
+      case 'auditLog':
+        {
+          final data = Map<String, dynamic>.from(operation['payload'] as Map);
+          await firestore.collection('audit_logs').add(data);
+          break;
+        }
       default:
         throw UnsupportedError('Unknown operation type: $type');
     }
