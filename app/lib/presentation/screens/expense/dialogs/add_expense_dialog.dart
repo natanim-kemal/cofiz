@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -121,21 +123,23 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        final auditProvider =
-            Provider.of<AuditProvider>(context, listen: false);
-        final userName = auth.user?.displayName ?? auth.user?.email ?? '';
-        await auditProvider.logExpenseRecorded(
-          userId: auth.user?.uid ?? 'unknown',
-          userName: userName,
-          expenseId: record.id,
-          category: record.expenseCategory,
-          amount: amount,
-        );
         Navigator.pop(context, true);
         AppToast.show(
           AppLocalizations.of(context)!.expenseRecorded,
           success: true,
         );
+        // Audit is best-effort — fire-and-forget so offline success still
+        // closes the dialog (Firestore add hangs offline).
+        final auditProvider =
+            Provider.of<AuditProvider>(context, listen: false);
+        final userName = auth.user?.displayName ?? auth.user?.email ?? '';
+        unawaited(auditProvider.logExpenseRecorded(
+          userId: auth.user?.uid ?? 'unknown',
+          userName: userName,
+          expenseId: record.id,
+          category: record.expenseCategory,
+          amount: amount,
+        ));
       } else {
         AppToast.show(provider.errorMessage ?? 'Failed to record expense');
       }
