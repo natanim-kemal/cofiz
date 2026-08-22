@@ -35,12 +35,16 @@ class NotificationService {
       iOS: initializationSettingsDarwin,
     );
 
-    await _notificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (details) {
-        // Handle notification tap
-      },
-    );
+    await _notificationsPlugin
+        .initialize(
+          initializationSettings,
+          onDidReceiveNotificationResponse: (details) {
+            // Handle notification tap
+          },
+        )
+        // A stuck platform channel must not block app startup (hot-restart
+        // hang); a timeout leaves the app running without notifications.
+        .timeout(const Duration(seconds: 3));
 
     _isInitialized = true;
   }

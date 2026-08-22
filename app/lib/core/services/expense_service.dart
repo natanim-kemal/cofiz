@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/expense_record_model.dart';
 import 'offline_cache_service.dart';
@@ -192,6 +193,7 @@ class ExpenseService {
     final cached = OfflineCacheService().getCachedExpenses() ?? [];
     await OfflineCacheService()
         .cacheExpenses([...cached, record.copyWith(id: opId)]);
+    debugPrint('[ExpenseService] addExpense opId=$opId queued+cached, syncing...');
     unawaited(OfflineSyncService().syncNow());
     return opId;
   }
@@ -212,9 +214,10 @@ class ExpenseService {
   Future<bool> deleteExpense(String id) async {
     try {
       await _firestore.collection(_collectionName).doc(id).delete();
+      debugPrint('[ExpenseService] deleteExpense id=$id OK');
       return true;
     } catch (e) {
-      print('Error deleting expense: $e');
+      debugPrint('[ExpenseService] deleteExpense id=$id FAILED: $e');
       return false;
     }
   }

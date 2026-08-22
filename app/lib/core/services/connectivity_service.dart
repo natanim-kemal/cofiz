@@ -24,7 +24,14 @@ class ConnectivityService {
 
   Future<void> initialize() async {
     // Check initial connectivity
-    _isOnline = await _checkConnectivity();
+    debugPrint('[Connectivity] checking initial state...');
+    try {
+      _isOnline = await _checkConnectivity()
+          .timeout(const Duration(seconds: 3), onTimeout: () => true);
+    } catch (e) {
+      _isOnline = false;
+    }
+    debugPrint('[Connectivity] initial isOnline=$_isOnline');
 
     // Listen to connectivity changes
     _connectivity.onConnectivityChanged

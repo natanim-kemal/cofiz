@@ -28,6 +28,15 @@ class IncomeProvider extends ChangeNotifier {
   DateTime? _activeDay;
   int _loadGeneration = 0;
 
+  // Guards concurrent _refreshTotals() runs: only the latest invocation may
+  // write results, so a slow stale refresh can never clobber fresh totals
+  // (the "total went up then reverted" bug).
+  int _totalsGeneration = 0;
+
+  // Optimistic record ids (queued ops not yet confirmed by the server
+  // stream). Protected from being dropped by _mergeFirstPage.
+  final Set<String> _pendingIds = {};
+
   // Full dataset (used by reports/export, loaded on demand)
   List<IncomeRecord> _fullRecords = [];
 
@@ -155,17 +164,48 @@ class IncomeProvider extends ChangeNotifier {
 
   void _mergeFirstPage(List<IncomeRecord> freshHead) {
     if (_activeDay != null) return;
-    if (!_loadedExtraPages) {
-      _records = freshHead;
+
+    // Optimistic records the server hasn't confirmed yet stay visible;
+    // otherwise a snapshot taken before the sync commit wipes them (they
+    // reappear on the next emission - the "row flashed away" bug).
+    final freshIds = freshHead.map((r) => r.id).toSet();
+    final stillPending = _records
+        .where((r) =>
+            _pendingIds.contains(r.id) && !freshIds.contains(r.id))
+        .toList();
+    for (final id in freshIds) {
+      if (_pendingIds.remove(id)) {
+        // Confirmed by the server: reconcile totals so the pending delta
+        // added by the last refresh is dropped exactly once.
+        unawaited(_refreshTotals());
+      }
+    }
+    if (stillPending.isEmpty) {
+      if (!_loadedExtraPages) {
+        _records = freshHead;
+        return;
+      }
+      final tail = _records.length > freshHead.length
+          ? _records.sublist(freshHead.length)
+          : <IncomeRecord>[];
+      _records = [...freshHead, ...tail];
       return;
     }
-    final tail = _records.length > freshHead.length
-        ? _records.sublist(freshHead.length)
-        : <IncomeRecord>[];
-    _records = [...freshHead, ...tail];
+
+    final merged = <IncomeRecord>[...stillPending, ...freshHead]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (!_loadedExtraPages) {
+      _records = merged;
+      return;
+    }
+    final tailIds = merged.map((r) => r.id).toSet();
+    final tail =
+        _records.where((r) => !tailIds.contains(r.id)).toList();
+    _records = [...merged, ...tail];
   }
 
   Future<void> _refreshTotals() async {
+    final generation = ++_totalsGeneration;
     _seedTotalsFromCache();
 
     final incomeTotal = await _service.getIncomeTotal();
@@ -179,42 +219,79 @@ class IncomeProvider extends ChangeNotifier {
         await _service.getIncomeTodayTotalByKind(IncomeKind.investment);
     final count = await _service.getIncomeCount();
 
+    // A newer refresh started while this one was in flight - discard these
+    // (stale) results instead of overwriting the newer values.
+    if (generation != _totalsGeneration) return;
+
+    // Reconcile: a server aggregate taken BEFORE the queued create commits
+    // is stale by exactly the pending records' amounts. Add them back so a
+    // successful-but-stale response can never pull the total down (the
+    // visible "total bumped then reverted" bug).
+    final pendingById = {
+      for (final r in _records)
+        if (_pendingIds.contains(r.id)) r.id: r,
+      for (final r in _fullRecords)
+        if (_pendingIds.contains(r.id)) r.id: r,
+    };
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    double pendingTotal = 0;
+    double pendingSales = 0;
+    double pendingInvestments = 0;
+    double pendingToday = 0;
+    double pendingTodaySales = 0;
+    double pendingTodayInvestments = 0;
+    for (final r in pendingById.values) {
+      pendingTotal += r.amount;
+      final isToday = r.createdAt.isAfter(dayStart);
+      if (r.kind == IncomeKind.investment) {
+        pendingInvestments += r.amount;
+        if (isToday) pendingTodayInvestments += r.amount;
+      } else {
+        pendingSales += r.amount;
+        if (isToday) pendingTodaySales += r.amount;
+      }
+      if (isToday) pendingToday += r.amount;
+    }
+    debugPrint(
+        '[Income] refresh gen=$generation serverTotal=$incomeTotal pending=${pendingById.length} ($pendingTotal)');
+
     // Only overwrite fields that actually succeeded; keep last-known values
     // otherwise so a failed query (e.g. index still building) never zeros
     // the dashboard.
     var anyFailed = false;
     if (incomeTotal != null) {
-      _totalIncome = incomeTotal;
+      _totalIncome = incomeTotal + pendingTotal;
     } else {
       anyFailed = true;
     }
     if (salesTotal != null) {
-      _totalSales = salesTotal;
+      _totalSales = salesTotal + pendingSales;
     } else {
       anyFailed = true;
     }
     if (investmentsTotal != null) {
-      _totalInvestments = investmentsTotal;
+      _totalInvestments = investmentsTotal + pendingInvestments;
     } else {
       anyFailed = true;
     }
     if (todayIncome != null) {
-      _todayIncome = todayIncome;
+      _todayIncome = todayIncome + pendingToday;
     } else {
       anyFailed = true;
     }
     if (todaySales != null) {
-      _todaySales = todaySales;
+      _todaySales = todaySales + pendingTodaySales;
     } else {
       anyFailed = true;
     }
     if (todayInvestments != null) {
-      _todayInvestments = todayInvestments;
+      _todayInvestments = todayInvestments + pendingTodayInvestments;
     } else {
       anyFailed = true;
     }
     if (count != null) {
-      _totalCount = count;
+      _totalCount = count + pendingById.length;
     } else {
       anyFailed = true;
     }
@@ -240,6 +317,10 @@ class IncomeProvider extends ChangeNotifier {
 
   void _seedTotalsFromCache() {
     try {
+      // Seed only on cold start (memory still empty). Mid-session seeding
+      // would flash stale cached totals over fresher in-memory values -
+      // the visible "total reverted" symptom.
+      if (_totalIncome != 0.0 || _totalCount > 0) return;
       final cached = OfflineCacheService().getCachedIncomeTotals();
       if (cached == null) return;
       _totalIncome = cached['totalIncome'] ?? 0.0;
@@ -279,6 +360,7 @@ class IncomeProvider extends ChangeNotifier {
 
   Future<bool> addIncome(IncomeRecord record) async {
     final id = await _service.addIncome(record);
+    debugPrint('[Income] addIncome queued id=$id amount=${record.amount}');
     if (id == null) {
       _errorMessage = 'Failed to record income';
       notifyListeners();
@@ -291,7 +373,24 @@ class IncomeProvider extends ChangeNotifier {
     if (!_fullRecords.any((r) => r.id == id)) {
       _fullRecords = [optimistic, ..._fullRecords];
     }
+    // Optimistically reflect the new record in totals so the UI never
+    // depends on aggregate-query timing. The next successful
+    // _refreshTotals reconciles with server truth.
+    _totalIncome += optimistic.amount;
+    if (optimistic.kind == IncomeKind.investment) {
+      _totalInvestments += optimistic.amount;
+      _todayInvestments += optimistic.amount;
+    } else {
+      _totalSales += optimistic.amount;
+      _todaySales += optimistic.amount;
+    }
+    _todayIncome += optimistic.amount;
+    _totalCount += 1;
+    _pendingIds.add(id);
     notifyListeners();
+    // Bump the generation so the in-flight (stale) refresh triggered before
+    // this add cannot clobber these values when it completes.
+    _totalsGeneration++;
     _refreshTotals();
     return true;
   }
@@ -308,12 +407,47 @@ class IncomeProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteIncome(String id) async {
+    // If the record's create op hasn't synced yet, cancelling the queued
+    // op is essential: a server delete of a not-yet-existing doc is a
+    // no-op, and the queued create would resurrect the record afterwards
+    // (total income going UP after a delete).
+    await OfflineCacheService().removePendingOperationByOpId(id);
+    _pendingIds.remove(id);
+
     final success = await _service.deleteIncome(id);
+    debugPrint('[Income] deleteIncome id=$id serverSuccess=$success');
     if (!success) {
       _errorMessage = 'Failed to delete income';
+      debugPrint('[Income] deleteIncome id=$id FAILED');
       notifyListeners();
       return false;
     }
+    // Optimistically remove from totals; next refresh reconciles.
+    // Dedupe: the record typically lives in both _records and _fullRecords.
+    final removedIds = <String>{};
+    for (final r in [..._records, ..._fullRecords]) {
+      if (r.id != id || !removedIds.add(r.id)) continue;
+      _totalIncome -= r.amount;
+      if (r.kind == IncomeKind.investment) {
+        _totalInvestments -= r.amount;
+      } else {
+        _totalSales -= r.amount;
+      }
+    }
+    // Remove from the live lists and the cache immediately: if the record
+    // never reached the server (pending op) no stream emission will ever
+    // arrive to drop the row, so it would stay on screen forever.
+    _records = _records.where((r) => r.id != id).toList();
+    _fullRecords = _fullRecords.where((r) => r.id != id).toList();
+    try {
+      await OfflineCacheService().removeCachedIncome(id);
+    } catch (_) {
+      // Cache write failure is non-fatal: next cache sync reconciles.
+    }
+    debugPrint(
+        '[Income] deleteIncome id=$id remaining records=${_records.length} total=$_totalIncome');
+    notifyListeners();
+    _totalsGeneration++;
     _refreshTotals();
     return true;
   }

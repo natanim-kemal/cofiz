@@ -27,11 +27,15 @@ class OfflineSyncService {
   Timer? _periodicTimer;
 
   Future<void> initialize() async {
+    debugPrint('[Sync] initialize: opening caches...');
     await _cache.initialize();
+    debugPrint('[Sync] initialize: caches open');
     await _connectivity.initialize();
+    debugPrint('[Sync] initialize: connectivity ready');
 
     // Listen for connectivity changes
     _connectivity.connectionStatus.listen((isOnline) {
+      debugPrint('[Sync] connectivity changed isOnline=$isOnline');
       if (isOnline && !_isSyncing) {
         syncPendingOperations();
       }
@@ -52,6 +56,9 @@ class OfflineSyncService {
   Future<void> syncNow() async {
     if (_connectivity.isOnline && !_isSyncing) {
       await syncPendingOperations();
+    } else {
+      debugPrint(
+          '[Sync] syncNow skipped: online=${_connectivity.isOnline} isSyncing=$_isSyncing');
     }
   }
 

@@ -44,6 +44,7 @@ bool shouldAnimateTabSwitch(int from, int to) => (to - from).abs() == 1;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  debugPrint('[main] initializing Firebase...');
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -54,22 +55,29 @@ void main() async {
       rethrow;
     }
   }
+  debugPrint('[main] Firebase ready');
 
   // Register the FCM background handler early (cheap, local).
   FCMService().setup();
 
   // Fast, local-only initialization required before the first frame.
   final notificationService = NotificationService();
+  debugPrint('[main] initializing NotificationService...');
   await notificationService.initialize();
+  debugPrint('[main] NotificationService ready');
 
   // Initialize local caches (Hive) so the UI can read cached data immediately.
   final offlineSyncService = OfflineSyncService();
+  debugPrint('[main] initializing OfflineSyncService...');
   await offlineSyncService.initialize();
+  debugPrint('[main] OfflineSyncService ready');
 
+  debugPrint('[main] runApp');
   runApp(StitchWorkerApp(
     notificationService: notificationService,
     offlineSyncService: offlineSyncService,
   ));
+  debugPrint('[main] first frame scheduled; network services deferred');
 
   // Network-dependent initialization is deferred until after the first
   // frame so a slow connection doesn't hold up app startup. All calls run

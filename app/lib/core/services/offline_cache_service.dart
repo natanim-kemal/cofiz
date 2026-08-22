@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/worker_model.dart';
 import '../models/transaction_model.dart';
@@ -351,6 +352,17 @@ class OfflineCacheService {
         _legacyIncomeKey,
       );
 
+  /// Drops one record from the income cache (called on local delete so a
+  /// deleted record cannot resurface from the cache after a restart).
+  Future<void> removeCachedIncome(String id) async {
+    final cached = getCachedIncome();
+    if (cached == null) return;
+    final kept = cached.where((r) => r.id != id).toList();
+    if (kept.length == cached.length) return;
+    debugPrint('[Cache] removeCachedIncome id=$id cache ${cached.length}->${kept.length}');
+    await cacheIncome(kept);
+  }
+
   // ---------------------------------------------------------------------------
   // Expenses cache
   // ---------------------------------------------------------------------------
@@ -373,6 +385,16 @@ class OfflineCacheService {
         ExpenseRecord.fromJson,
         _legacyExpensesKey,
       );
+
+  /// Drops one record from the expense cache (see [removeCachedIncome]).
+  Future<void> removeCachedExpense(String id) async {
+    final cached = getCachedExpenses();
+    if (cached == null) return;
+    final kept = cached.where((r) => r.id != id).toList();
+    if (kept.length == cached.length) return;
+    debugPrint('[Cache] removeCachedExpense id=$id cache ${cached.length}->${kept.length}');
+    await cacheExpenses(kept);
+  }
 
   // ---------------------------------------------------------------------------
   // Totals caches
@@ -418,13 +440,24 @@ class OfflineCacheService {
   // Pending operations queue
   // ---------------------------------------------------------------------------
 
+  /// opIds explicitly cancelled while an in-flight sync still holds them in
+  /// its snapshot. [replacePendingOperations] filters these out so a failed
+  /// sync's merge-back cannot resurrect an operation the user deleted
+  /// mid-flight. Kept for the process lifetime (op ids are fresh UUIDs, so
+  /// a legitimate re-queue can never collide with a tombstone).
+  final Set<String> _cancelledOpIds = {};
+
   Future<void> queueOperation(Map<String, dynamic> operation) async {
     assert(operation.containsKey('opId'),
         'queueOperation requires opId for idempotent drain');
+    _cancelledOpIds.remove(operation['opId']);
     final box = Hive.box(_pendingBox);
     final pending = box.get('queue', defaultValue: <Map>[]) as List;
+    debugPrint(
+        '[Cache] queueOperation opId=${operation['opId']} type=${operation['type']} before=${pending.length}');
     pending.add(operation);
     await box.put('queue', pending);
+    debugPrint('[Cache] queueOperation done now=${pending.length}');
   }
 
   List<Map<String, dynamic>> getPendingOperations() {
@@ -434,6 +467,7 @@ class OfflineCacheService {
   }
 
   Future<void> clearPendingOperations() async {
+    _cancelledOpIds.clear();
     final box = Hive.box(_pendingBox);
     await box.put('queue', <Map>[]);
   }
@@ -449,8 +483,34 @@ class OfflineCacheService {
 
   Future<void> replacePendingOperations(
       List<Map<String, dynamic>> operations) async {
+    // Drop operations the user cancelled while this batch was in flight.
+    // The tombstones stay in _cancelledOpIds - an earlier sync cycle can
+    // still merge them back after this write.
+    final effective = operations
+        .where((op) => !_cancelledOpIds.contains(op['opId']))
+        .toList();
+    if (operations.length != effective.length) {
+      debugPrint(
+          '[Cache] replacePendingOperations dropped ${operations.length - effective.length} cancelled op(s)');
+    }
     final box = Hive.box(_pendingBox);
-    await box.put('queue', operations);
+    await box.put('queue', effective);
+  }
+
+  /// Removes every queued operation whose opId equals [opId]. Returns how
+  /// many were removed. Used to cancel a queued create when the record is
+  /// deleted before its sync commits (prevents post-delete resurrection).
+  Future<int> removePendingOperationByOpId(String opId) async {
+    _cancelledOpIds.add(opId);
+    final pending = getPendingOperations();
+    final kept = pending.where((op) => op['opId'] != opId).toList();
+    final removed = pending.length - kept.length;
+    debugPrint(
+        '[Cache] removePendingOperationByOpId opId=$opId removed=$removed now=${kept.length}');
+    if (removed > 0) {
+      await replacePendingOperations(kept);
+    }
+    return removed;
   }
 
   Future<void> markDelivered(String opId, String type) async {
@@ -486,6 +546,7 @@ class OfflineCacheService {
 
   // Clear all cache
   Future<void> clearAllCache() async {
+    _cancelledOpIds.clear();
     await Hive.box(_workersBox).clear();
     await Hive.box(_transactionsBox).clear();
     await Hive.box(_workerTxsBox).clear();
