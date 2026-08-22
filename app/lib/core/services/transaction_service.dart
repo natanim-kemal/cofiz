@@ -162,8 +162,13 @@ class TransactionService {
     }
   }
 
-  /// Add transaction and update worker balance (queue-first)
-  Future<String?> addTransaction(MoneyTransaction transaction) async {
+  /// Add transaction and update worker balance (queue-first).
+  /// [localReceiptPath] carries a receipt captured offline; the sync service
+  /// uploads it when connectivity returns.
+  Future<String?> addTransaction(
+    MoneyTransaction transaction, {
+    String? localReceiptPath,
+  }) async {
     if (transaction.amount <= 0) throw 'Amount must be greater than 0';
     if (ConnectivityService().isOnline &&
         (transaction.type.toLowerCase() == 'purchase' ||
@@ -203,6 +208,7 @@ class TransactionService {
       'amount': transaction.amount,
       'notes': transaction.notes,
       'receiptUrl': transaction.receiptUrl,
+      'localReceiptPath': localReceiptPath,
       'createdAt': transaction.createdAt.millisecondsSinceEpoch,
       'createdBy': transaction.createdBy,
       'coffeeType': transaction.coffeeType,

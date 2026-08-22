@@ -8,6 +8,7 @@ import '../../../core/models/transaction_model.dart';
 import '../../../core/constants/coffee_types.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
+import '../../../core/services/connectivity_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -170,18 +171,29 @@ class _TransactionDialogState extends State<TransactionDialog> {
     final transactionProvider =
         Provider.of<TransactionProvider>(context, listen: false);
 
-    // Upload receipt if exists
+    // Receipt handling: online, upload immediately and block on failure.
+    // Offline, skip the upload entirely — keep the local file path in the
+    // queued op so the sync service uploads it once connectivity returns.
+    final bool offline = !ConnectivityService().isOnline;
     String? receiptUrl;
+    String? localReceiptPath;
     if (_receiptImage != null) {
-      receiptUrl = await transactionProvider.uploadReceipt(_receiptImage!.path);
-      if (receiptUrl == null) {
-        // Upload failed
-        if (mounted) {
-          setState(() => _isLoading = false);
-          AppToast.show(transactionProvider.errorMessage ??
-              AppLocalizations.of(context)!.failedToUploadReceipt);
+      if (offline) {
+        if (widget.existing == null) {
+          localReceiptPath = _receiptImage!.path;
         }
-        return;
+      } else {
+        receiptUrl =
+            await transactionProvider.uploadReceipt(_receiptImage!.path);
+        if (receiptUrl == null) {
+          // Upload failed
+          if (mounted) {
+            setState(() => _isLoading = false);
+            AppToast.show(transactionProvider.errorMessage ??
+                AppLocalizations.of(context)!.failedToUploadReceipt);
+          }
+          return;
+        }
       }
     }
 
@@ -227,6 +239,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
             createdBy: authProvider.user?.uid ?? 'unknown',
             notes: notes.isEmpty ? null : notes,
             receiptUrl: receiptUrl,
+            localReceiptPath: localReceiptPath,
           );
           break;
         case 'return':
@@ -237,6 +250,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
             createdBy: authProvider.user?.uid ?? 'unknown',
             notes: notes.isEmpty ? null : notes,
             receiptUrl: receiptUrl,
+            localReceiptPath: localReceiptPath,
           );
           break;
         case 'purchase':
@@ -255,6 +269,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
             createdBy: authProvider.user?.uid ?? 'unknown',
             notes: notes.isEmpty ? null : notes,
             receiptUrl: receiptUrl,
+            localReceiptPath: localReceiptPath,
             coffeeType: _selectedCoffeeType?.name,
             weight: weight,
             pricePerKg: price,

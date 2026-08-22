@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -210,7 +211,9 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
     if (success) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final auditProvider = Provider.of<AuditProvider>(context, listen: false);
-      await auditProvider.logTransactionDeleted(
+      // Fire-and-forget: the audit op is queued locally, so the delete UX
+      // must never block (or fail) waiting on it.
+      unawaited(auditProvider.logTransactionDeleted(
         userId: authProvider.user?.uid ?? 'unknown',
         userName:
             authProvider.appUser?.displayName ?? authProvider.user?.email ?? '',
@@ -221,7 +224,7 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
         workerName: transaction.workerName,
         wasUnconfirmed: !transaction.approved,
         reason: overrideReason,
-      );
+      ));
       _reload();
       AppToast.show(l10n.transactionDeleted, success: true);
     } else {
