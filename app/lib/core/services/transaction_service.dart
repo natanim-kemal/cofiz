@@ -8,7 +8,6 @@ import '../models/worker_model.dart';
 import '../config/cloudinary_config.dart';
 import '../utils/receipt_image_utils.dart';
 import '../utils/transaction_balance.dart' as tb;
-import '../utils/transaction_balance.dart' show TransactionLockedException;
 export '../utils/transaction_balance.dart' show TransactionLockedException;
 import 'connectivity_service.dart';
 import 'notification_trigger_service.dart';
@@ -503,11 +502,24 @@ class TransactionService {
       if (tx.isTransfer) {
         throw 'Use transfer delete for transfers.';
       }
-      if (tx.type.toLowerCase() == 'distribution' &&
-          !ConnectivityService().isOnline) {
-        final projected = _projectedBalance(tx.workerId);
-        if (projected != null && tx.amount > projected) {
-          throw 'Insufficient balance. Available: ETB ${projected.toStringAsFixed(2)}, Required: ETB ${tx.amount.toStringAsFixed(2)}';
+      // Deleting a distribution removes money from the worker's balance:
+      // refuse when the removal would push it negative, regardless of
+      // connectivity (live balance when online, projected otherwise).
+      if (tx.type.toLowerCase() == 'distribution') {
+        double? available;
+        if (ConnectivityService().isOnline) {
+          try {
+            final workerDoc =
+                await _firestore.collection('workers').doc(tx.workerId).get();
+            if (workerDoc.exists) {
+              available =
+                  (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
+            }
+          } catch (_) {}
+        }
+        available ??= _projectedBalance(tx.workerId);
+        if (available != null && tx.amount > available) {
+          throw 'Insufficient balance. Available: ETB ${available.toStringAsFixed(2)}, Required: ETB ${tx.amount.toStringAsFixed(2)}';
         }
       }
     }
@@ -534,10 +546,6 @@ class TransactionService {
   }) =>
       tb.enforceTransactionLock(transaction,
           overrideReason: overrideReason, action: action);
-
-  // shared with OfflineSyncService — keep in sync
-  Map<String, dynamic> _balanceUpdates(MoneyTransaction t, int direction) =>
-      tb.transactionBalanceUpdates(t, direction);
 
   double _numericBalanceDelta(MoneyTransaction t, int direction) {
     final mult = direction.toDouble();
@@ -615,12 +623,11 @@ class TransactionService {
           } catch (_) {
             continue;
           }
-          if (old != null && old.workerId == workerId)
+          if (old != null && old.workerId == workerId) {
             base += _numericBalanceDelta(old, -1);
-          if (newTx.workerId == workerId)
+          }
+          if (newTx.workerId == workerId) {
             base += _numericBalanceDelta(newTx, 1);
-          if (old == null && newTx.workerId == workerId) {
-            // if old not in cache, only new matters (handled)
           }
         } else if (type == 'createTransfer') {
           final amt = (op['amount'] as num?)?.toDouble() ?? 0;
@@ -822,22 +829,6 @@ class TransactionService {
         'returned': 0.0,
         'purchased': 0.0,
       };
-    }
-  }
-
-  /// Handle Firestore exceptions with user-friendly messages
-  String _handleFirestoreError(FirebaseException e) {
-    switch (e.code) {
-      case 'permission-denied':
-        return 'Database access denied. Please check your permissions.';
-      case 'unavailable':
-        return 'Database is currently unavailable. Please check your internet connection.';
-      case 'not-found':
-        return 'Transaction not found in database.';
-      case 'already-exists':
-        return 'This transaction already exists.';
-      default:
-        return 'Database error: ${e.message ?? 'Unknown error'}';
     }
   }
 
