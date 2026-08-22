@@ -126,4 +126,31 @@ void main() {
       isTrue,
     );
   });
+
+  test('failed delete rolls back optimistic removal', () async {
+    final p = TransactionProvider(
+      transactionService:
+          TransactionService(firestore: FakeFirebaseFirestore()),
+    );
+    // Past the 7-day immutability window: delete without overrideReason is
+    // rejected by the service (TransactionLockedException).
+    final oldTx = MoneyTransaction(
+      id: 'locked-tx',
+      workerId: 'w1',
+      workerName: 'n',
+      type: 'distribution',
+      amount: 50,
+      createdAt: DateTime.now().subtract(const Duration(days: 8)),
+      createdBy: 'u',
+      approved: false,
+    );
+    await OfflineCacheService().cacheTransactions([oldTx]);
+    p.debugSetWorkerTransactions([oldTx]);
+
+    final ok = await p.deleteTransaction(oldTx.id);
+
+    expect(ok, isFalse);
+    expect(p.workerTransactions.any((t) => t.id == oldTx.id), isTrue);
+    expect(p.errorMessage, isNotNull);
+  });
 }
