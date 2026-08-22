@@ -459,10 +459,20 @@ class OfflineCacheService {
     debugPrint(
         '[Cache] queueOperation opId=${operation['opId']} type=${operation['type']} before=${pending.length}');
 
-    // Coalesce with existing queued op sharing the same opId.
+    // Coalesce with existing queued op sharing the same logical key.
+    // Transfer ops may use transferId alias, so fallback to transferId.
     final opId = operation['opId'] as String;
     final newType = (operation['type'] as String?) ?? '';
-    final existingIdx = pending.indexWhere((e) => (e as Map)['opId'] == opId);
+    final newTransferId = operation['transferId'] as String?;
+    final existingIdx = pending.indexWhere((e) {
+      final m = e as Map;
+      if (m['opId'] == opId) return true;
+      if (m['transferId'] == opId) return true;
+      if (newTransferId != null && m['transferId'] == newTransferId) {
+        return true;
+      }
+      return false;
+    });
     if (existingIdx != -1) {
       final existing = Map<String, dynamic>.from(pending[existingIdx] as Map);
       final existingType = (existing['type'] as String?) ?? '';
@@ -478,16 +488,19 @@ class OfflineCacheService {
       final newIsUpdate = isUpdate(newType);
       final newIsDelete = isDelete(newType);
 
-      // create+delete -> drop both with tombstone
+      // 1. create + delete -> drop both with tombstone
       if (existingIsCreate && newIsDelete) {
         pending.removeAt(existingIdx);
         _cancelledOpIds.add(opId);
+        final tid = existing['transferId'] as String?;
+        if (tid != null) _cancelledOpIds.add(tid);
+        if (newTransferId != null) _cancelledOpIds.add(newTransferId);
         await box.put('queue', pending);
         debugPrint('[Cache] coalesce create+delete drop opId=$opId');
         return;
       }
 
-      // create+update -> single create with merged payload
+      // 2. create + update -> merge into create
       if (existingIsCreate && newIsUpdate) {
         final merged = <String, dynamic>{};
         if (existing['payload'] is Map) {
@@ -497,14 +510,13 @@ class OfflineCacheService {
           merged.addAll(Map<String, dynamic>.from(operation['payload'] as Map));
         }
         if (merged.isNotEmpty) existing['payload'] = merged;
-        // keep create type and original opId/docId
         pending[existingIdx] = existing;
         await box.put('queue', pending);
         debugPrint('[Cache] coalesce create+update merge opId=$opId');
         return;
       }
 
-      // update+update -> last (merged payload)
+      // 3. update + update -> last (merged payload)
       if (existingIsUpdate && newIsUpdate) {
         final merged = <String, dynamic>{};
         if (existing['payload'] is Map) {
@@ -521,7 +533,7 @@ class OfflineCacheService {
         return;
       }
 
-      // update+delete -> delete
+      // 4. update + delete -> delete
       if (existingIsUpdate && newIsDelete) {
         pending[existingIdx] = Map<String, dynamic>.from(operation);
         await box.put('queue', pending);
@@ -529,32 +541,16 @@ class OfflineCacheService {
         return;
       }
 
-      // delete+create -> keep both in order (fall through to add)
-
-      // Other duplicates (e.g. create+create) -> replace with newest
-      if (!existingIsDelete || !newIsCreate) {
-        // If not the keep-both case, check if still duplicate
-        if (existingIdx != -1 && !(existingIsDelete && newIsCreate)) {
-          // For any other same-opId collision not handled above,
-          // default is to replace existing with new (covers
-          // delete+delete, create+create, etc.)
-          final handled = (existingIsCreate && newIsDelete) ||
-              (existingIsCreate && newIsUpdate) ||
-              (existingIsUpdate && newIsUpdate) ||
-              (existingIsUpdate && newIsDelete);
-          if (!handled) {
-            // Only replace if not already handled and not keep-both
-            if (existingIsDelete && newIsCreate) {
-              // keep both - do nothing here
-            } else {
-              pending[existingIdx] = Map<String, dynamic>.from(operation);
-              await box.put('queue', pending);
-              debugPrint(
-                  '[Cache] coalesce replace opId=$opId $existingType -> $newType');
-              return;
-            }
-          }
-        }
+      // 5. delete + create -> keep both in order (fall through to add)
+      if (existingIsDelete && newIsCreate) {
+        // fall through
+      } else {
+        // default: replace existing with newest (create+create, delete+delete, etc.)
+        pending[existingIdx] = Map<String, dynamic>.from(operation);
+        await box.put('queue', pending);
+        debugPrint(
+            '[Cache] coalesce replace opId=$opId $existingType -> $newType');
+        return;
       }
     }
 
