@@ -4,7 +4,6 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:hive/hive.dart';
 import 'package:cofiz/core/services/offline_sync_service.dart';
 import 'package:cofiz/core/services/offline_cache_service.dart';
-import 'package:cofiz/core/models/transaction_model.dart';
 
 void main() {
   late Directory dir;
@@ -260,8 +259,8 @@ void main() {
   });
 
   test(
-      'receipt defer: createTransaction with missing localReceiptPath no crash',
-      () async {
+      'receipt integrity: createTransaction with missing localReceiptPath '
+      'stays pending and does not commit', () async {
     await fake.collection('workers').doc('w1').set({
       'currentBalance': 2000,
       'totalDistributed': 0,
@@ -280,16 +279,171 @@ void main() {
       'amount': 50,
       'notes': 'receipt test',
       'receiptUrl': null,
-      'localReceiptPath': '/tmp/nonexistent_receipt_${nowMs}.jpg',
+      'localReceiptPath': '/tmp/nonexistent_receipt_$nowMs.jpg',
       'createdAt': nowMs,
       'createdBy': 'tester',
       'attempts': 0,
     });
-    // should not throw even though file missing
+    // Missing file -> upload returns null -> executor throws so the op
+    // stays queued (retryable) instead of committing without the receipt.
     await OfflineSyncService().syncPendingOperations();
     final snap = await fake.collection('transactions').doc(docId).get();
-    expect(snap.exists, isTrue);
-    expect((snap.data()!['amount'] as num).toDouble(), 50);
+    expect(snap.exists, isFalse);
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['opId'] == docId),
+        isTrue);
+    expect(OfflineCacheService().getFailedOperations(), isEmpty);
+  });
+
+  test('failed op requeues on next sync and succeeds once unblocked', () async {
+    // approveTransaction updates a doc that does not exist yet -> throws.
+    await OfflineCacheService().queueOperation({
+      'opId': 'retry1',
+      'type': 'approveTransaction',
+      'transactionId': 'tx_retry',
+      'attempts': 4,
+    });
+    await OfflineSyncService().syncPendingOperations();
+    expect(
+        OfflineCacheService()
+            .getFailedOperations()
+            .any((o) => o['opId'] == 'retry1'),
+        isTrue);
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['opId'] == 'retry1'),
+        isFalse);
+
+    // Blocker clears; next sync requeues the failed op with a fresh
+    // attempt budget and it succeeds.
+    await fake
+        .collection('transactions')
+        .doc('tx_retry')
+        .set({'approved': false});
+    await OfflineSyncService().syncPendingOperations();
+    final snap = await fake.collection('transactions').doc('tx_retry').get();
+    expect(snap.data()!['approved'], true);
+    expect(
+        OfflineCacheService()
+            .getFailedOperations()
+            .any((o) => o['opId'] == 'retry1'),
+        isFalse);
     expect(OfflineCacheService().getPendingOperations(), isEmpty);
+  });
+
+  test(
+      'updateTransaction with missing localReceiptPath stays pending '
+      '(no commit, retryable)', () async {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final txId = 'tx_upd_rcpt_$nowMs';
+    await fake.collection('transactions').doc(txId).set({
+      'workerId': 'w1',
+      'workerName': 'Test',
+      'type': 'distribution',
+      'amount': 100,
+      'createdAt': nowMs,
+      'createdBy': 'tester',
+      'approved': true,
+    });
+    await OfflineCacheService().queueOperation({
+      'opId': txId,
+      'type': 'updateTransaction',
+      'docId': txId,
+      'payload': {
+        'workerId': 'w1',
+        'workerName': 'Test',
+        'type': 'distribution',
+        'amount': 150,
+        'createdAt': nowMs,
+        'approved': true,
+      },
+      'localReceiptPath': '/tmp/nonexistent_edit_$nowMs.jpg',
+      'attempts': 0,
+    });
+    await OfflineSyncService().syncPendingOperations();
+    // Not committed with a lost receipt; op remains queued for retry.
+    final snap = await fake.collection('transactions').doc(txId).get();
+    expect((snap.data()!['amount'] as num).toDouble(), 100);
+    expect(
+        OfflineCacheService()
+            .getPendingOperations()
+            .any((o) => o['opId'] == txId),
+        isTrue);
+  });
+
+  test('mergeRemainingWithCurrent prefers coalesced current payload', () {
+    final remaining = [
+      {
+        'opId': 'opX',
+        'type': 'updateIncome',
+        'docId': 'a',
+        'payload': {'amount': 100},
+        'attempts': 2,
+      },
+    ];
+    final current = [
+      {
+        // Same opId, newer coalesced edit queued while sync was in flight.
+        'opId': 'opX',
+        'type': 'updateIncome',
+        'docId': 'a',
+        'payload': {'amount': 200, 'description': 'edited'},
+        'attempts': 2,
+      },
+      {
+        'opId': 'opNew',
+        'type': 'deleteExpense',
+        'docId': 'b',
+      },
+    ];
+    final merged =
+        OfflineSyncService.mergeRemainingWithCurrent(remaining, current);
+    expect(merged.length, 2);
+    final opX = merged.firstWhere((o) => o['opId'] == 'opX');
+    expect(opX['payload']['amount'], 200);
+    expect(opX['payload']['description'], 'edited');
+    expect(merged.any((o) => o['opId'] == 'opNew'), isTrue);
+  });
+
+  test('mergeRemainingWithCurrent keeps unchanged remaining copy', () {
+    final remaining = [
+      {
+        'opId': 'opY',
+        'type': 'createExpense',
+        'docId': 'c',
+        'payload': {'amount': 10},
+        'attempts': 3,
+      },
+    ];
+    final current = [
+      {
+        'opId': 'opY',
+        'type': 'createExpense',
+        'docId': 'c',
+        'payload': {'amount': 10},
+        'attempts': 3,
+      },
+    ];
+    // Only attempts differs after this pass -> keep remaining as-is.
+    current.first['attempts'] = 4;
+    final merged =
+        OfflineSyncService.mergeRemainingWithCurrent(remaining, current);
+    expect(merged.single['attempts'], 3);
+    expect(merged.single['payload']['amount'], 10);
+  });
+
+  test(
+      'mergeRemainingWithCurrent never resurrects delivered/failed snapshot ops',
+      () {
+    final remaining = <Map<String, dynamic>>[];
+    final current = [
+      {'opId': 'delivered1', 'type': 'approveTransaction'},
+    ];
+    final merged = OfflineSyncService.mergeRemainingWithCurrent(
+        remaining, current, {'delivered1'});
+    expect(merged, isEmpty);
   });
 }

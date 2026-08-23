@@ -461,17 +461,21 @@ class IncomeProvider extends ChangeNotifier {
     _totalsGeneration++;
     _totalsHaveData = true;
     // Optimistically decrement totals by kind; next refresh reconciles
-    // with server truth.
+    // with server truth. Today totals only move for records created today —
+    // deleting an old record must not corrupt them.
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
     for (final r in removed.values) {
       _totalIncome -= r.amount;
+      final isToday = r.createdAt.isAfter(dayStart);
       if (r.kind == IncomeKind.investment) {
         _totalInvestments -= r.amount;
-        _todayInvestments -= r.amount;
+        if (isToday) _todayInvestments -= r.amount;
       } else {
         _totalSales -= r.amount;
-        _todaySales -= r.amount;
+        if (isToday) _todaySales -= r.amount;
       }
-      _todayIncome -= r.amount;
+      if (isToday) _todayIncome -= r.amount;
       _totalCount -= 1;
     }
     debugPrint(

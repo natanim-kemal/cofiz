@@ -651,13 +651,14 @@ class TransactionProvider with ChangeNotifier {
   Future<bool> updateTransaction(
     MoneyTransaction transaction, {
     String? overrideReason,
+    String? localReceiptPath,
   }) async {
     final allSnap = _allTransactions;
     final workerSnap = _workerTransactions;
     try {
       _optimisticReplace(transaction);
       await _transactionService.updateTransaction(transaction,
-          overrideReason: overrideReason);
+          overrideReason: overrideReason, localReceiptPath: localReceiptPath);
       return true;
     } catch (e) {
       _allTransactions = allSnap;

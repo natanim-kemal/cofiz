@@ -167,4 +167,45 @@ void main() {
       isTrue,
     );
   });
+
+  test('deleting yesterday income leaves today totals unchanged', () async {
+    final p = IncomeProvider(
+        service: IncomeService(firestore: FakeFirebaseFirestore()));
+    await p.addIncome(sale(100));
+    final id = p.records.first.id;
+    expect(p.todayIncome, 100);
+
+    // Age the record to yesterday via an offline edit.
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final okUpd = await p.updateIncome(p.records.first.copyWith(
+      createdAt: yesterday,
+    ));
+    expect(okUpd, isTrue);
+
+    final okDel = await p.deleteIncome(id);
+    expect(okDel, isTrue);
+    // Total drops by the deleted amount; today totals must NOT.
+    expect(p.totalIncome, 0);
+    expect(p.todayIncome, 100);
+    expect(p.todayManualSales, 100);
+  });
+
+  test('deleting yesterday expense leaves today totals unchanged', () async {
+    final p = ExpenseProvider(
+        service: ExpenseService(firestore: FakeFirebaseFirestore()));
+    await p.addExpense(expense(80));
+    final id = p.records.first.id;
+    expect(p.todayExpenses, 80);
+
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final okUpd = await p.updateExpense(p.records.first.copyWith(
+      createdAt: yesterday,
+    ));
+    expect(okUpd, isTrue);
+
+    final okDel = await p.deleteExpense(id);
+    expect(okDel, isTrue);
+    expect(p.totalExpenses, 0);
+    expect(p.todayExpenses, 80);
+  });
 }
