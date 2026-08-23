@@ -11,6 +11,7 @@ import '../utils/receipt_image_utils.dart';
 import '../utils/transaction_balance.dart' as tb;
 import '../utils/transaction_balance.dart' show TransactionLockedException;
 import 'connectivity_service.dart';
+import 'notification_trigger_service.dart';
 import 'offline_cache_service.dart';
 
 // shared with TransactionService — keep in sync (delegates to transaction_balance.dart)
@@ -325,6 +326,17 @@ class OfflineSyncService {
               txn.update(workerRef, updates);
             }
           });
+          // Post-commit side effects (queue-first refactor orphaned the
+          // old in-process trigger): fire best-effort, never fail the op.
+          _fireTransactionNotifications(
+            workerId: workerId,
+            txType: txType,
+            amount: amount,
+            commissionAmount:
+                (operation['commissionAmount'] as num?)?.toDouble(),
+            coffeeType: operation['coffeeType'] as String?,
+            coffeeWeight: (operation['coffeeWeight'] as num?)?.toDouble(),
+          );
         }
         break;
       case 'createTransfer':
@@ -700,6 +712,70 @@ class OfflineSyncService {
       default:
         throw UnsupportedError('Unknown operation type: $type');
     }
+  }
+
+  /// Best-effort post-commit notifications for a synced createTransaction.
+  /// Never throws - notification failures must not fail the (already
+  /// committed) sync operation.
+  void _fireTransactionNotifications({
+    required String workerId,
+    required String txType,
+    required double amount,
+    double? commissionAmount,
+    String? coffeeType,
+    double? coffeeWeight,
+  }) {
+    unawaited(() async {
+      try {
+        final workerDoc =
+            await firestore.collection('workers').doc(workerId).get();
+        if (!workerDoc.exists) return;
+        final data = workerDoc.data() ?? <String, dynamic>{};
+        final workerUserId = data['userId'] as String?;
+        if (workerUserId == null || workerUserId.isEmpty) return;
+        final workerName = (data['name'] as String?) ?? 'Collector';
+        final newBalance = ((data['currentBalance'] as num?) ?? 0).toDouble();
+        final totalCommission =
+            ((data['totalCommissionEarned'] as num?) ?? 0).toDouble();
+
+        switch (txType.toLowerCase()) {
+          case 'distribution':
+            await NotificationTriggerService().notifyMoneyDistributed(
+              workerId: workerId,
+              workerUserId: workerUserId,
+              workerName: workerName,
+              amount: amount,
+              adminName: null,
+            );
+            break;
+          case 'purchase':
+            await NotificationTriggerService().checkLowBalance(
+              workerId: workerId,
+              workerUserId: workerUserId,
+              workerName: workerName,
+              newBalance: newBalance,
+            );
+            if ((commissionAmount ?? 0) > 0) {
+              await NotificationTriggerService().notifyCommissionEarned(
+                workerUserId: workerUserId,
+                workerName: workerName,
+                commission: commissionAmount!,
+                totalCommission: totalCommission,
+              );
+            }
+            await NotificationTriggerService().checkLargePurchase(
+              workerId: workerId,
+              workerName: workerName,
+              amount: amount,
+              coffeeType: coffeeType,
+              weight: coffeeWeight,
+            );
+            break;
+        }
+      } catch (e) {
+        debugPrint('[Sync] post-commit notification failed: $e');
+      }
+    }());
   }
 
   int getPendingOperationsCount() {

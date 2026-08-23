@@ -194,10 +194,12 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                   ),
                 ] else ...[
                   DropdownButtonFormField<String>(
-                    initialValue:
-                        _saleCategories.contains(_selectedSaleCategory)
-                            ? _selectedSaleCategory
-                            : null,
+                    // Controlled `value`, NOT initialValue: categories load
+                    // async after the first build and initialValue ignores
+                    // rebuilds, leaving the field null -> validation fails.
+                    value: _saleCategories.contains(_selectedSaleCategory)
+                        ? _selectedSaleCategory
+                        : null,
                     decoration: InputDecoration(
                       labelText: l10n.selectSaleCategory,
                       prefixIcon:

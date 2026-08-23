@@ -84,6 +84,9 @@ class IncomeProvider extends ChangeNotifier {
     _subscription = _service.getIncomePageStream(limit: _pageSize).listen(
       (records) {
         _mergeFirstPage(records);
+        // A full first page implies more may exist - enable Load More.
+        // (The cursor itself is bootstrapped lazily in loadMore.)
+        if (!_loadedExtraPages) _hasMore = records.length >= _pageSize;
         _isLoading = false;
         _errorMessage = null;
         notifyListeners();
@@ -143,8 +146,23 @@ class IncomeProvider extends ChangeNotifier {
     _isLoadingMore = true;
     notifyListeners();
 
+    // The live stream cannot expose a DocumentSnapshot cursor. When no
+    // cursor exists yet (first loadMore after the stream-only init), fetch
+    // a fresh first page to establish it; known ids are filtered below.
+    var startAfter = _lastDoc;
+    if (startAfter == null && _records.isNotEmpty) {
+      final bootstrap = await _service.getIncomePage(pageSize: _pageSize);
+      startAfter = bootstrap.lastDoc;
+      if (startAfter == null) {
+        _hasMore = false;
+        _isLoadingMore = false;
+        notifyListeners();
+        return;
+      }
+    }
+
     final page = await _service.getIncomePage(
-      startAfter: _lastDoc,
+      startAfter: startAfter,
       pageSize: _pageSize,
     );
 
