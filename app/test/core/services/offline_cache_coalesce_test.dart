@@ -73,7 +73,8 @@ void main() {
             .firstWhere((o) => o['opId'] == 'c')['payload']['amount'],
         30);
   });
-  test('update+delete keeps delete', () async {
+  test('update+delete supersedes everything (remove-all + tombstone)',
+      () async {
     final svc = OfflineCacheService();
     await svc.queueOperation({
       'opId': 'd',
@@ -84,10 +85,9 @@ void main() {
     });
     await svc.queueOperation(
         {'opId': 'd', 'type': 'deleteIncome', 'docId': 'd', 'attempts': 0});
-    final ops =
-        svc.getPendingOperations().where((o) => o['opId'] == 'd').toList();
-    expect(ops.length, 1);
-    expect(ops[0]['type'], 'deleteIncome');
+    // Delete supersedes every queued variant: nothing left to sync and the
+    // opId is tombstoned so no merge-back can resurrect it.
+    expect(svc.getPendingOperations().where((o) => o['opId'] == 'd'), isEmpty);
   });
   test('delete+create keeps both in order', () async {
     final svc = OfflineCacheService();

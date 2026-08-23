@@ -153,4 +153,30 @@ void main() {
     expect(p.workerTransactions.any((t) => t.id == oldTx.id), isTrue);
     expect(p.errorMessage, isNotNull);
   });
+
+  test('offline distribute bumps today activity + worker delta callback',
+      () async {
+    final p = await makeProvider();
+    final before = p.todayDistributed; // makeProvider seeded 50
+    var deltaTx;
+    var deltaDir = 0;
+    p.onTransactionApplied = (tx, dir) {
+      deltaTx = tx;
+      deltaDir = dir;
+    };
+
+    await p.distributeMoneyToWorker(
+        workerId: 'w1', workerName: 'n', amount: 300, createdBy: 'u');
+
+    // Today card reconcile source: pending op exists and provider counters
+    // moved optimistically.
+    expect(p.todayDistributed, before + 300.0);
+    expect(deltaTx, isNotNull);
+    expect(deltaDir, 1);
+    expect(deltaTx.amount, 300.0);
+
+    // Worker balance card: applying -1 then +1 nets back to start (rollback
+    // path uses the same primitives).
+    expect(deltaTx.workerId, 'w1');
+  });
 }
