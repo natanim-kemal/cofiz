@@ -171,41 +171,51 @@ void main() {
   test('deleting yesterday income leaves today totals unchanged', () async {
     final p = IncomeProvider(
         service: IncomeService(firestore: FakeFirebaseFirestore()));
-    await p.addIncome(sale(100));
-    final id = p.records.first.id;
-    expect(p.todayIncome, 100);
-
-    // Age the record to yesterday via an offline edit.
+    // Seed an OLD record straight into the cache (created yesterday) so no
+    // optimistic today-bump ever happened for it.
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final okUpd = await p.updateIncome(p.records.first.copyWith(
-      createdAt: yesterday,
-    ));
-    expect(okUpd, isTrue);
+    await OfflineCacheService().cacheIncome([
+      IncomeRecord(
+        id: 'old1',
+        kind: IncomeKind.sale,
+        amount: 100,
+        createdAt: yesterday,
+        createdBy: 'u',
+        createdByName: 'n',
+        saleCategory: 'Other',
+      ),
+    ]);
+    await p.loadFullRecords();
+    final beforeToday = p.todayIncome;
 
-    final okDel = await p.deleteIncome(id);
+    final okDel = await p.deleteIncome('old1');
     expect(okDel, isTrue);
-    // Total drops by the deleted amount; today totals must NOT.
     expect(p.totalIncome, 0);
-    expect(p.todayIncome, 100);
-    expect(p.todayManualSales, 100);
+    // Today figures must NOT move for an old-record delete.
+    expect(p.todayIncome, beforeToday);
+    expect(p.todayManualSales, beforeToday);
   });
 
   test('deleting yesterday expense leaves today totals unchanged', () async {
     final p = ExpenseProvider(
         service: ExpenseService(firestore: FakeFirebaseFirestore()));
-    await p.addExpense(expense(80));
-    final id = p.records.first.id;
-    expect(p.todayExpenses, 80);
-
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final okUpd = await p.updateExpense(p.records.first.copyWith(
-      createdAt: yesterday,
-    ));
-    expect(okUpd, isTrue);
+    await OfflineCacheService().cacheExpenses([
+      ExpenseRecord(
+        id: 'old2',
+        amount: 80,
+        expenseCategory: 'Food',
+        createdAt: yesterday,
+        createdBy: 'u',
+        createdByName: 'n',
+      ),
+    ]);
+    await p.loadFullRecords();
+    final beforeToday = p.todayExpenses;
 
-    final okDel = await p.deleteExpense(id);
+    final okDel = await p.deleteExpense('old2');
     expect(okDel, isTrue);
     expect(p.totalExpenses, 0);
-    expect(p.todayExpenses, 80);
+    expect(p.todayExpenses, beforeToday);
   });
 }
