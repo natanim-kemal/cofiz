@@ -415,6 +415,7 @@ class TransactionService {
   Future<void> updateTransaction(
     MoneyTransaction transaction, {
     String? overrideReason,
+    String? localReceiptPath,
   }) async {
     final cached = OfflineCacheService().getCachedTransactions();
     MoneyTransaction? old;
@@ -477,6 +478,7 @@ class TransactionService {
       'docId': transaction.id,
       'payload': transaction.toFirestore(),
       'overrideReason': overrideReason,
+      'localReceiptPath': localReceiptPath,
       'attempts': 0,
       'queuedAt': DateTime.now().toIso8601String(),
     });

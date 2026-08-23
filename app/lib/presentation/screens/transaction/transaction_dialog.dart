@@ -179,9 +179,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     String? localReceiptPath;
     if (_receiptImage != null) {
       if (offline) {
-        if (widget.existing == null) {
-          localReceiptPath = _receiptImage!.path;
-        }
+        localReceiptPath = _receiptImage!.path;
       } else {
         receiptUrl =
             await transactionProvider.uploadReceipt(_receiptImage!.path);
@@ -228,7 +226,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
             widget.type == 'purchase' ? commission : existing.commissionAmount,
       );
       success = await transactionProvider.updateTransaction(updated,
-          overrideReason: widget.overrideReason);
+          overrideReason: widget.overrideReason,
+          localReceiptPath: localReceiptPath);
     } else {
       switch (widget.type) {
         case 'distribution':

@@ -80,6 +80,9 @@ class OfflineSyncService {
     debugPrint('📡 Starting sync of pending operations...');
 
     try {
+      // Failed ops (attempts>=5) are retried with a fresh budget on every
+      // sync pass; user-discarded ops are excluded via tombstones.
+      await _cache.requeueFailedOperations();
       final pendingOps = _cache.getPendingOperations();
       debugPrint('📡 Found ${pendingOps.length} pending operations');
 
@@ -112,17 +115,8 @@ class OfflineSyncService {
           if (op['opId'] is String) op['opId'] as String
       };
       final current = _cache.getPendingOperations();
-      final newDuringSync = current.where((op) {
-        final id = op['opId'] as String?;
-        if (id != null) return !snapshotIds.contains(id);
-        // Fallback for legacy ops without opId: consider new if no equal snapshot op.
-        return !pendingOps.any((s) =>
-            s['type'] == op['type'] &&
-            s['transactionId'] == op['transactionId'] &&
-            s['transferId'] == op['transferId'] &&
-            s['workerId'] == op['workerId']);
-      }).toList();
-      await _cache.replacePendingOperations([...remaining, ...newDuringSync]);
+      await _cache.replacePendingOperations(
+          mergeRemainingWithCurrent(remaining, current, snapshotIds));
       await _cache.pruneDelivered();
       debugPrint('📡 Sync completed!');
     } catch (e) {
@@ -130,6 +124,61 @@ class OfflineSyncService {
     } finally {
       _isSyncing = false;
     }
+  }
+
+  /// Merges the ops that survived this sync pass ([remaining]) with the live
+  /// box contents ([current], which may hold coalesced edits queued while the
+  /// sync was in flight). For an opId present in both, the CURRENT entry wins
+  /// whenever it differs from the remaining copy — the user's newer coalesced
+  /// edit must not be clobbered by the stale pre-sync payload. Entries only in
+  /// [current] are appended only when [snapshotIds] never saw their opId:
+  /// snapshot ops that are no longer remaining were either delivered or moved
+  /// to the failed box and must not be resurrected. Bookkeeping fields
+  /// ('attempts') are ignored when comparing.
+  @visibleForTesting
+  static List<Map<String, dynamic>> mergeRemainingWithCurrent(
+    List<Map<String, dynamic>> remaining,
+    List<Map<String, dynamic>> current, [
+    Set<String> snapshotIds = const {},
+  ]) {
+    final merged = [...remaining];
+    for (final cur in current) {
+      final id = cur['opId'] as String?;
+      final idx = id == null ? -1 : merged.indexWhere((r) => r['opId'] == id);
+      if (idx == -1) {
+        if (!snapshotIds.contains(id)) merged.add(cur);
+        continue;
+      }
+      if (!_sameOperation(merged[idx], cur)) merged[idx] = cur;
+    }
+    return merged;
+  }
+
+  /// Equality ignoring the 'attempts' bookkeeping field; payloads compared
+  /// deep so a coalesced payload change is always detected.
+  static bool _sameOperation(Map<String, dynamic> a, Map<String, dynamic> b) {
+    bool deepEq(Object? x, Object? y) {
+      if (x is Map && y is Map) {
+        final mx = Map<String, dynamic>.from(x);
+        final my = Map<String, dynamic>.from(y);
+        if (mx.length != my.length) return false;
+        for (final k in mx.keys) {
+          if (!my.containsKey(k)) return false;
+          if (!deepEq(mx[k], my[k])) return false;
+        }
+        return true;
+      }
+      return x == y;
+    }
+
+    final keysA = a.keys.where((k) => k != 'attempts').toSet();
+    final keysB = b.keys.where((k) => k != 'attempts').toSet();
+    if (keysA.length != keysB.length) return false;
+    for (final k in keysA) {
+      if (!keysB.contains(k)) return false;
+      if (!deepEq(a[k], b[k])) return false;
+    }
+    return true;
   }
 
   Future<String?> _uploadReceipt(String filePath) async {
@@ -215,10 +264,13 @@ class OfflineSyncService {
           final localReceiptPath = operation['localReceiptPath'] as String?;
           if (localReceiptPath != null && localReceiptPath.isNotEmpty) {
             final uploaded = await _uploadReceipt(localReceiptPath);
-            if (uploaded != null) {
-              receiptUrl = uploaded;
+            if (uploaded == null) {
+              // Missing/corrupt receipt file: throw so the op stays queued
+              // and retries instead of committing a transaction whose
+              // receipt is silently lost forever.
+              throw 'Receipt unavailable for $docId (compress/upload returned null)';
             }
-            // if upload returns null (file missing/compress fail) defer — keep receiptUrl as-is (no crash)
+            receiptUrl = uploaded;
           }
           await firestore.runTransaction((txn) async {
             final ref = firestore.collection('transactions').doc(docId);
@@ -467,6 +519,18 @@ class OfflineSyncService {
           final overrideReason = operation['overrideReason'] as String?;
           final payload =
               Map<String, dynamic>.from(operation['payload'] as Map);
+          // Receipt captured offline for an edit: upload before commit; a
+          // null result throws so the op stays queued and retries rather
+          // than losing the newly attached receipt.
+          final localReceiptPath = operation['localReceiptPath'] as String?;
+          String? uploadedReceiptUrl;
+          if (localReceiptPath != null && localReceiptPath.isNotEmpty) {
+            final uploaded = await _uploadReceipt(localReceiptPath);
+            if (uploaded == null) {
+              throw 'Receipt unavailable for $docId (compress/upload returned null)';
+            }
+            uploadedReceiptUrl = uploaded;
+          }
           await firestore.runTransaction((txn) async {
             final ref = firestore.collection('transactions').doc(docId);
             final snap = await txn.get(ref);
@@ -494,7 +558,10 @@ class OfflineSyncService {
               final newUpdates = _balanceUpdates(newTx, 1);
               if (newUpdates.isNotEmpty) txn.update(newWorkerRef, newUpdates);
             }
-            txn.update(ref, payload);
+            txn.update(ref, {
+              ...payload,
+              if (uploadedReceiptUrl != null) 'receiptUrl': uploadedReceiptUrl,
+            });
           });
           break;
         }

@@ -376,9 +376,13 @@ class ExpenseProvider extends ChangeNotifier {
     _totalsGeneration++;
     _totalsHaveData = true;
     // Optimistically decrement totals; next refresh reconciles with truth.
+    // Today totals only move for records created today — deleting an old
+    // record must not corrupt them (mirrors IncomeProvider).
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
     for (final r in removed.values) {
       _totalExpenses -= r.amount;
-      _todayExpenses -= r.amount;
+      if (r.createdAt.isAfter(dayStart)) _todayExpenses -= r.amount;
       _totalCount -= 1;
     }
     debugPrint(

@@ -665,6 +665,36 @@ class OfflineCacheService {
     debugPrint('[Cache] markFailed opId=${operation['opId']} reason=$reason');
   }
 
+  /// Moves every failed operation back onto the pending queue (appended
+  /// after existing pending ops) so the next sync retries it with a fresh
+  /// attempt budget. [failedReason]/[failedAt] bookkeeping is stripped and
+  /// attempts reset to 0. Ops the user discarded (tombstoned) stay out.
+  /// The failed box is cleared afterwards, so a successful requeue+sync
+  /// removes the op from both boxes.
+  Future<void> requeueFailedOperations() async {
+    if (!Hive.isBoxOpen(failedBoxName)) return;
+    final failedBox = Hive.box(failedBoxName);
+    final failed = failedBox.get('queue', defaultValue: <Map>[]) as List;
+    if (failed.isEmpty) return;
+    final pendingBox = Hive.box(pendingBoxName);
+    final pending = pendingBox.get('queue', defaultValue: <Map>[]) as List;
+    var requeued = 0;
+    for (final e in failed) {
+      final op = Map<String, dynamic>.from(e as Map);
+      final opId = op['opId'] as String?;
+      if (opId != null && _cancelledOpIds.contains(opId)) continue;
+      op
+        ..remove('failedReason')
+        ..remove('failedAt');
+      op['attempts'] = 0;
+      pending.add(op);
+      requeued++;
+    }
+    await pendingBox.put('queue', pending);
+    await failedBox.put('queue', <Map>[]);
+    debugPrint('[Cache] requeueFailedOperations requeued=$requeued');
+  }
+
   Future<void> discardFailed(String opId) async {
     if (!Hive.isBoxOpen(failedBoxName)) return;
     final box = Hive.box(failedBoxName);
