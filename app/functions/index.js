@@ -133,11 +133,16 @@ exports.cleanupOldNotifications = functions.pubsub
  * Firestore security rules to configure in the Firebase console (project `cofiz-9dd0b`):
  *
  *   match /emailVerifications/{uid} {
- *     allow read, write: if request.auth != null && request.auth.uid == uid;
+ *     // DENY all client access: both callables below use the Admin SDK,
+ *     // which bypasses rules. Client read/write would let a user overwrite
+ *     // their own codeHash and "verify" without receiving any email.
+ *     allow read, write: if false;
  *   }
  *   match /mail/{document=**} {
- *     allow create: if request.auth != null;
- *     allow read, update, delete: if false;
+ *     // DENY all client access: mail docs are enqueued only by the
+ *     // requestEmailVerification callable (Admin SDK). Client writes would
+ *     // let any authenticated user send arbitrary emails (spam/cost).
+ *     allow read, write: if false;
  *   }
  *   match /users/{uid} {
  *     // existing rules stay; emailVerified is only written by the verifyEmailCode function
@@ -158,35 +163,63 @@ exports.cleanupOldNotifications = functions.pubsub
  * SHA-256 hash in emailVerifications/{uid}, and queues a mail/{autoId} doc
  * for the Trigger Email extension to send.
  *
- * Expected payload: { email: string } (the address to verify)
+ * The target address is ALWAYS derived from the caller's verified Firebase
+ * auth identity - client-supplied emails are ignored, so a user can only
+ * ever verify their own account's address.
+ *
  * Requires authentication; the uid comes from the caller's auth context.
  */
+const RESEND_COOLDOWN_MS = 60 * 1000; // 1 minute between code requests
+
 exports.requestEmailVerification = onCall(async (request) => {
   const uid = request.auth ? request.auth.uid : null;
   if (!uid) {
     throw new HttpsError("unauthenticated", "Authentication required.");
   }
-  const email = request.data && request.data.email;
-  if (typeof email !== "string" || email.length === 0) {
-    throw new HttpsError("invalid-argument", "A valid email is required.");
+  const tokenEmail = request.auth.token.email;
+  if (typeof tokenEmail !== "string" || tokenEmail.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Your account has no email address to verify.",
+    );
   }
+  const email = tokenEmail.toLowerCase();
 
-  const code = String(100000 + Math.floor(Math.random() * 900000)); // 100000-999999
-  const salt = crypto.randomBytes(16).toString("hex");
-  const codeHash = crypto.createHash("sha256").update(salt + code).digest("hex");
+  const ref = db.collection("emailVerifications").doc(uid);
 
-  await db.collection("emailVerifications").doc(uid).set({
-    email,
-    codeHash,
-    salt,
-    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
-    attempts: 0,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  await db.collection("mail").add({
-    to: email,
-    template: { name: "verification", data: { code, expiresMinutes: 10 } },
+  // Per-UID resend cooldown so the callable cannot be spammed.
+  await db.runTransaction(async (t) => {
+    const snap = await t.get(ref);
+    const doc = snap.exists ? snap.data() : null;
+    if (doc && doc.createdAt) {
+      const created = doc.createdAt.toMillis ? doc.createdAt.toMillis() : Date.parse(doc.createdAt);
+      if (Date.now() - created < RESEND_COOLDOWN_MS) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "Please wait a minute before requesting a new code.",
+        );
+      }
+    }
+    // Generate inside the transaction with a crypto-secure source.
+    const code = String(crypto.randomInt(100000, 1000000)); // 100000-999999
+    const salt = crypto.randomBytes(16).toString("hex");
+    const codeHash = crypto.createHash("sha256").update(salt + code).digest("hex");
+    t.set(ref, {
+      email,
+      codeHash,
+      salt,
+      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    // Mail enqueue must happen after the transaction commits (no side
+    // effects inside transactions); staged below via returned values.
+    return { code };
+  }).then(async (staged) => {
+    await db.collection("mail").add({
+      to: email,
+      template: { name: "verification", data: { code: staged.code, expiresMinutes: 10 } },
+    });
   });
 
   return { ok: true };
@@ -226,13 +259,19 @@ exports.verifyEmailCode = onCall(async (request) => {
     }
     const hash = crypto.createHash("sha256").update(doc.salt + input).digest("hex");
     if (hash !== doc.codeHash) {
+      // Commit the attempt increment; the caller-visible error is thrown
+      // AFTER the transaction resolves (throwing inside would roll the
+      // increment back and give unlimited guesses).
       t.update(ref, { attempts: doc.attempts + 1 });
-      throw new HttpsError("invalid-argument", "Invalid code. Try again.");
+      return { verified: false };
     }
     t.update(db.collection("users").doc(uid), { emailVerified: true });
     t.delete(ref);
     return { verified: true };
   });
 
+  if (!result.verified) {
+    throw new HttpsError("invalid-argument", "Invalid code. Try again.");
+  }
   return result;
 });

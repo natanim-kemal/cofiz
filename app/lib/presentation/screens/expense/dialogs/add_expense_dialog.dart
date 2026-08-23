@@ -174,7 +174,10 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  initialValue: _categories.contains(_selectedCategory)
+                  // Controlled `value`, NOT initialValue: categories load
+                  // async after the first build and initialValue ignores
+                  // rebuilds, leaving the field null -> validation fails.
+                  value: _categories.contains(_selectedCategory)
                       ? _selectedCategory
                       : null,
                   decoration: InputDecoration(

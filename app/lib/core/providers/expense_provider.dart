@@ -67,6 +67,8 @@ class ExpenseProvider extends ChangeNotifier {
     _subscription = _service.getExpensesPageStream(limit: _pageSize).listen(
       (records) {
         _mergeFirstPage(records);
+        // Full first page implies more may exist - enable Load More.
+        if (!_loadedExtraPages) _hasMore = records.length >= _pageSize;
         _isLoading = false;
         _errorMessage = null;
         notifyListeners();

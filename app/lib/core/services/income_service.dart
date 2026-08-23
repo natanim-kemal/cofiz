@@ -163,7 +163,15 @@ class IncomeService {
           .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
           .toList();
     } catch (_) {
-      return const [];
+      // Offline: serve the cached records for that day, if any.
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      final cached = OfflineCacheService().getCachedIncome() ?? const [];
+      return cached
+          .where((r) =>
+              !r.createdAt.isBefore(dayStart) && r.createdAt.isBefore(dayEnd))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
   }
 
@@ -178,8 +186,9 @@ class IncomeService {
           .map((doc) => IncomeRecord.fromFirestore(doc.data(), doc.id))
           .toList();
     } catch (e) {
-      print('Error fetching all income records: $e');
-      return const [];
+      // Offline: fall back to the Hive cache instead of an empty set that
+      // would wipe reports/export data.
+      return OfflineCacheService().getCachedIncome() ?? const [];
     }
   }
 

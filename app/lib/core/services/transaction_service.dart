@@ -110,7 +110,17 @@ class TransactionService {
           .map((doc) => MoneyTransaction.fromFirestore(doc.data(), doc.id))
           .toList();
     } catch (e) {
-      return const [];
+      // Offline: filter the per-worker Hive cache by day instead of an
+      // empty set that would blank the date-filtered history.
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      final cached =
+          OfflineCacheService().getCachedWorkerTransactions(workerId);
+      return cached
+          .where((t) =>
+              !t.createdAt.isBefore(dayStart) && t.createdAt.isBefore(dayEnd))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
   }
 
@@ -173,20 +183,31 @@ class TransactionService {
     if (ConnectivityService().isOnline &&
         (transaction.type.toLowerCase() == 'purchase' ||
             transaction.type.toLowerCase() == 'return')) {
-      final workerDoc = await _firestore
-          .collection('workers')
-          .doc(transaction.workerId)
-          .get();
+      try {
+        final workerDoc = await _firestore
+            .collection('workers')
+            .doc(transaction.workerId)
+            .get();
 
-      if (!workerDoc.exists) {
-        throw 'Collector not found';
-      }
+        if (!workerDoc.exists) {
+          throw 'Collector not found';
+        }
 
-      final currentBalance =
-          (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
+        final currentBalance =
+            (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
 
-      if (transaction.amount > currentBalance) {
-        throw 'Insufficient balance. Available: ETB ${currentBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+        if (transaction.amount > currentBalance) {
+          throw 'Insufficient balance. Available: ETB ${currentBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+        }
+      } catch (e) {
+        if (e is String) rethrow; // business rule - surface to the user
+        // Network failure while marked online (fail-open connectivity):
+        // fall through to the offline projected check + queue instead of
+        // erroring the user out of a valid offline action.
+        final projected = _projectedBalance(transaction.workerId);
+        if (projected != null && transaction.amount > projected) {
+          throw 'Insufficient balance. Available: ETB ${projected.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
+        }
       }
     } else if (!ConnectivityService().isOnline &&
         (transaction.type.toLowerCase() == 'purchase' ||
@@ -243,8 +264,21 @@ class TransactionService {
       transferRole: transaction.transferRole,
     );
     await OfflineCacheService().cacheTransactions([...cached, optimistic]);
+    // Mirror into the per-worker cache so the worker detail page still sees
+    // the optimistic row after an app restart (offline).
+    unawaited(_mirrorWorkerCache(optimistic.workerId));
     unawaited(OfflineSyncService().syncNow());
     return docId;
+  }
+
+  /// Re-persist [workerId]'s slice of the global transaction cache into the
+  /// per-worker box. Best-effort: failures are non-fatal.
+  Future<void> _mirrorWorkerCache(String workerId) async {
+    try {
+      final all = OfflineCacheService().getCachedTransactions() ?? [];
+      final forWorker = all.where((t) => t.workerId == workerId).toList();
+      await OfflineCacheService().cacheWorkerTransactions(workerId, forWorker);
+    } catch (_) {}
   }
 
   /// Record a collector-to-collector transfer: two linked records + balances (queue-first).
@@ -404,8 +438,16 @@ class TransactionService {
       'queuedAt': DateTime.now().toIso8601String(),
     });
     final cachedList = OfflineCacheService().getCachedTransactions() ?? [];
+    final affectedWorkers = cached
+            ?.where((t) => t.transferId == transferId)
+            .map((t) => t.workerId)
+            .toSet() ??
+        {};
     await OfflineCacheService().cacheTransactions(
         cachedList.where((t) => t.transferId != transferId).toList());
+    for (final w in affectedWorkers) {
+      unawaited(_mirrorWorkerCache(w));
+    }
     unawaited(OfflineSyncService().syncNow());
   }
 
@@ -496,6 +538,7 @@ class TransactionService {
         if (t.id != transaction.id) t,
       transaction,
     ]);
+    unawaited(_mirrorWorkerCache(transaction.workerId));
     unawaited(OfflineSyncService().syncNow());
   }
 
@@ -551,6 +594,7 @@ class TransactionService {
     final cachedList = OfflineCacheService().getCachedTransactions() ?? [];
     await OfflineCacheService().cacheTransactions(
         cachedList.where((t) => t.id != transactionId).toList());
+    if (tx != null) unawaited(_mirrorWorkerCache(tx.workerId));
     unawaited(OfflineSyncService().syncNow());
   }
 

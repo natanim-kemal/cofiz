@@ -85,6 +85,10 @@ class TransactionProvider with ChangeNotifier {
         (transactions) {
           if (_currentWorkerId != workerId) return;
           _mergeFirstPage(transactions);
+          // Full first page implies more may exist - enable Load More.
+          if (!_workerLoadedExtraPages) {
+            _workerHasMore = transactions.length >= _workerPageSize;
+          }
           notifyListeners();
           _persistWorkerCache(workerId);
         },
@@ -147,9 +151,25 @@ class TransactionProvider with ChangeNotifier {
     _isLoadingMoreWorker = true;
     notifyListeners();
 
+    // Bootstrap the cursor when the stream-only init left it unset.
+    var startAfter = _workerLastDoc;
+    if (startAfter == null && _workerTransactions.isNotEmpty) {
+      final bootstrap = await _transactionService.getWorkerTransactionsPage(
+        workerId,
+        pageSize: _workerPageSize,
+      );
+      startAfter = bootstrap.lastDoc;
+      if (startAfter == null) {
+        _workerHasMore = false;
+        _isLoadingMoreWorker = false;
+        notifyListeners();
+        return;
+      }
+    }
+
     final page = await _transactionService.getWorkerTransactionsPage(
       workerId,
-      startAfter: _workerLastDoc,
+      startAfter: startAfter,
       pageSize: _workerPageSize,
     );
 
