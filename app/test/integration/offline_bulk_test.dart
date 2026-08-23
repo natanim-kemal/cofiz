@@ -162,6 +162,38 @@ void main() {
     expect(OfflineCacheService().getFailedOperations(), isEmpty);
   });
 
+  test(
+      'discardFailed on a failed createIncome evicts the cache copy '
+      'and tombstones the opId', () async {
+    final record = IncomeRecord(
+      id: 'inc9',
+      kind: IncomeKind.sale,
+      amount: 12,
+      createdAt: DateTime.now(),
+      createdBy: 'u1',
+      createdByName: 'Tester',
+      saleCategory: 'Coffee Beans',
+    );
+    await OfflineCacheService().cacheIncome([record]);
+    await OfflineCacheService().markFailed(
+      {'opId': 'f3', 'type': 'createIncome', 'docId': 'inc9'},
+      'boom',
+    );
+
+    await OfflineCacheService().discardFailed('f3');
+
+    // Optimistic copy gone - it cannot resurface after restart.
+    final cached = OfflineCacheService().getCachedIncome() ?? [];
+    expect(cached.where((r) => r.id == 'inc9'), isEmpty);
+    expect(OfflineCacheService().getFailedOperations(), isEmpty);
+
+    // Tombstoned: a sync merge-back cannot resurrect the discarded op.
+    await OfflineCacheService().replacePendingOperations([
+      {'opId': 'f3', 'type': 'createIncome', 'docId': 'inc9'}
+    ]);
+    expect(OfflineCacheService().getPendingOperations(), isEmpty);
+  });
+
   testWidgets('Retry button invokes onRetry callback', (tester) async {
     await writeCache(() => OfflineCacheService().queueOperation({
           'opId': 'p1',

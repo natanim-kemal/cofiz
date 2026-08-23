@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../core/services/offline_cache_service.dart';
 import '../../core/services/offline_sync_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Outbox banner showing queued/failed sync operation counts.
 ///
@@ -12,25 +13,44 @@ import '../../core/services/offline_sync_service.dart';
 /// per-failed-operation Discard action
 /// ([OfflineCacheService.discardFailed]). Override either behaviour via
 /// [onRetry] / [onDiscard] (mainly for tests).
-class SyncOutboxBanner extends StatelessWidget {
+class SyncOutboxBanner extends StatefulWidget {
   final VoidCallback? onRetry;
   final void Function(String opId)? onDiscard;
 
   const SyncOutboxBanner({super.key, this.onRetry, this.onDiscard});
 
   @override
-  Widget build(BuildContext context) {
-    final cache = OfflineCacheService();
-    if (!Hive.isBoxOpen('pending_operations') ||
-        !Hive.isBoxOpen('failed_operations')) {
-      return const SizedBox.shrink();
+  State<SyncOutboxBanner> createState() => _SyncOutboxBannerState();
+}
+
+class _SyncOutboxBannerState extends State<SyncOutboxBanner> {
+  List<Listenable>? _listenables;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Hive.isBoxOpen(OfflineCacheService.pendingBoxName) &&
+        Hive.isBoxOpen(OfflineCacheService.failedBoxName)) {
+      _listenables = [
+        Hive.box(OfflineCacheService.pendingBoxName).listenable(),
+        Hive.box(OfflineCacheService.failedBoxName).listenable(),
+      ];
     }
+  }
+
+  @override
+  void dispose() {
+    _listenables = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_listenables == null) return const SizedBox.shrink();
     return AnimatedBuilder(
-      animation: Listenable.merge([
-        Hive.box('pending_operations').listenable(),
-        Hive.box('failed_operations').listenable(),
-      ]),
+      animation: Listenable.merge(_listenables!),
       builder: (context, _) {
+        final cache = OfflineCacheService();
         final pending = cache.getPendingOperations();
         final failed = cache.getFailedOperations();
         if (pending.isEmpty && failed.isEmpty) {
@@ -58,14 +78,15 @@ class SyncOutboxBanner extends StatelessWidget {
               ),
               TextButton(
                 key: const Key('outbox_retry'),
-                onPressed: onRetry ?? () => OfflineSyncService().syncNow(),
+                onPressed:
+                    widget.onRetry ?? () => OfflineSyncService().syncNow(),
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('Retry'),
+                child: Text(AppLocalizations.of(context)?.retry ?? 'Retry'),
               ),
               if (failed.isNotEmpty)
                 Flexible(
@@ -81,8 +102,8 @@ class SyncOutboxBanner extends StatelessWidget {
                           onPressed: () async {
                             final opId = op['opId'] as String?;
                             if (opId == null) return;
-                            if (onDiscard != null) {
-                              onDiscard!(opId);
+                            if (widget.onDiscard != null) {
+                              widget.onDiscard!(opId);
                             } else {
                               await cache.discardFailed(opId);
                             }
