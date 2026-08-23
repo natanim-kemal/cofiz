@@ -7,6 +7,8 @@ import '../../../core/providers/income_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../../widgets/custom_header.dart';
+import '../../widgets/offline_indicator.dart';
+import '../../widgets/sync_outbox_banner.dart';
 import '../../widgets/app_toast.dart';
 import 'dialogs/add_income_dialog.dart';
 import '../settings/sale_categories_screen.dart';
@@ -92,6 +94,8 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
               ],
             ),
           ),
+          // Inline offline notice between header and first card.
+          const OfflineIndicator(),
           Expanded(
             child: Consumer<IncomeProvider>(
               builder: (context, provider, _) {
@@ -144,6 +148,7 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                       },
                     ),
                     const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -156,6 +161,9 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                             ),
                           ),
                         ),
+                        // Pending/failed sync counts - right end of the
+                        // date/filter row.
+                        const SyncOutboxBanner(),
                         if (_selectedDate != null)
                           TextButton.icon(
                             onPressed: _clearDate,
@@ -198,28 +206,31 @@ class _CompanyIncomeScreenState extends State<CompanyIncomeScreen> {
                       if (provider.hasMoreRecords)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: OutlinedButton.icon(
-                            onPressed: provider.isLoadingMore
-                                ? null
-                                : () => _loadMore(provider),
-                            icon: provider.isLoadingMore
-                                ? const SizedBox(
-                                    height: 16,
-                                    width: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primary),
-                                  )
-                                : const Icon(Icons.expand_more),
-                            label: Text(l10n.loadMore),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: BorderSide(
-                                  color: AppColors.primary.withOpacity(0.5)),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                          child: Center(
+                            child: OutlinedButton.icon(
+                              onPressed: provider.isLoadingMore
+                                  ? null
+                                  : () => _loadMore(provider),
+                              icon: provider.isLoadingMore
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.primary),
+                                    )
+                                  : const Icon(Icons.expand_more),
+                              label: Text(l10n.loadMore),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                side: BorderSide(
+                                    color:
+                                        AppColors.primary.withOpacity(0.5)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                               ),
                             ),
                           ),

@@ -21,6 +21,8 @@ import '../transaction/transfer_dialog.dart';
 import '../../widgets/custom_header.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/offline_indicator.dart';
+import '../../widgets/sync_outbox_banner.dart';
 import '../../widgets/worker_picker_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -131,17 +133,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    // Pending/failed sync counts - right end of the date row.
+                    const SyncOutboxBanner(),
+                  ],
                 ),
               ],
             ),
           ),
+          // Inline offline notice: sits between the warm-orange header and
+          // the first cards, no background.
+          const OfflineIndicator(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {

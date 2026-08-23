@@ -209,7 +209,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Retry'));
+    // New inline design: the whole capsule is tappable (key outbox_retry).
+    await tester.tap(find.byKey(const Key('outbox_retry')));
     await tester.pump();
     expect(retried, 1);
   });

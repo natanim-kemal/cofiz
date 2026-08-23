@@ -123,17 +123,6 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     const SettingsScreen(),
                   ],
                 ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: OfflineIndicator(
-                    datasets: [
-                      OfflineCacheService.workerTxDataset(widget.workerId),
-                      OfflineCacheService.dsWorkerProfile,
-                    ],
-                  ),
-                ),
               ],
             ),
             bottomNavigationBar: Theme(
