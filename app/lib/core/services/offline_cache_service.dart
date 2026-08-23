@@ -22,9 +22,9 @@ class OfflineCacheService {
   static const String _workersBox = 'workers_cache';
   static const String _transactionsBox = 'transactions_cache';
   static const String _workerTxsBox = 'worker_transactions_cache';
-  static const String _pendingBox = 'pending_operations';
+  static const String pendingBoxName = 'pending_operations';
   static const String _deliveredBox = 'delivered_operations';
-  static const String _failedBox = 'failed_operations';
+  static const String failedBoxName = 'failed_operations';
   static const String _incomeBox = 'income_cache';
   static const String _expensesBox = 'expenses_cache';
   static const String _totalsBox = 'totals_cache';
@@ -72,9 +72,9 @@ class OfflineCacheService {
     await Hive.openBox(_workersBox);
     await Hive.openBox(_transactionsBox);
     await Hive.openBox(_workerTxsBox);
-    await Hive.openBox(_pendingBox);
+    await Hive.openBox(pendingBoxName);
     await Hive.openBox(_deliveredBox);
-    await Hive.openBox(_failedBox);
+    await Hive.openBox(failedBoxName);
     await Hive.openBox(_incomeBox);
     await Hive.openBox(_expensesBox);
     await Hive.openBox(_totalsBox);
@@ -454,7 +454,7 @@ class OfflineCacheService {
     assert(operation.containsKey('opId'),
         'queueOperation requires opId for idempotent drain');
     _cancelledOpIds.remove(operation['opId']);
-    final box = Hive.box(_pendingBox);
+    final box = Hive.box(pendingBoxName);
     final pending = box.get('queue', defaultValue: <Map>[]) as List;
     debugPrint(
         '[Cache] queueOperation opId=${operation['opId']} type=${operation['type']} before=${pending.length}');
@@ -560,19 +560,19 @@ class OfflineCacheService {
   }
 
   List<Map<String, dynamic>> getPendingOperations() {
-    final box = Hive.box(_pendingBox);
+    final box = Hive.box(pendingBoxName);
     final pending = box.get('queue', defaultValue: <Map>[]) as List;
     return pending.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   Future<void> clearPendingOperations() async {
     _cancelledOpIds.clear();
-    final box = Hive.box(_pendingBox);
+    final box = Hive.box(pendingBoxName);
     await box.put('queue', <Map>[]);
   }
 
   Future<void> removePendingOperation(int index) async {
-    final box = Hive.box(_pendingBox);
+    final box = Hive.box(pendingBoxName);
     final pending = box.get('queue', defaultValue: <Map>[]) as List;
     if (index < pending.length) {
       pending.removeAt(index);
@@ -592,7 +592,7 @@ class OfflineCacheService {
       debugPrint(
           '[Cache] replacePendingOperations dropped ${operations.length - effective.length} cancelled op(s)');
     }
-    final box = Hive.box(_pendingBox);
+    final box = Hive.box(pendingBoxName);
     await box.put('queue', effective);
   }
 
@@ -648,14 +648,14 @@ class OfflineCacheService {
   // ---------------------------------------------------------------------------
 
   List<Map<String, dynamic>> getFailedOperations() {
-    if (!Hive.isBoxOpen(_failedBox)) return [];
-    final box = Hive.box(_failedBox);
+    if (!Hive.isBoxOpen(failedBoxName)) return [];
+    final box = Hive.box(failedBoxName);
     final failed = box.get('queue', defaultValue: <Map>[]) as List;
     return failed.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   Future<void> markFailed(Map<String, dynamic> operation, String reason) async {
-    final box = Hive.box(_failedBox);
+    final box = Hive.box(failedBoxName);
     final failed = box.get('queue', defaultValue: <Map>[]) as List;
     final entry = Map<String, dynamic>.from(operation);
     entry['failedReason'] = reason;
@@ -666,17 +666,49 @@ class OfflineCacheService {
   }
 
   Future<void> discardFailed(String opId) async {
-    if (!Hive.isBoxOpen(_failedBox)) return;
-    final box = Hive.box(_failedBox);
+    if (!Hive.isBoxOpen(failedBoxName)) return;
+    final box = Hive.box(failedBoxName);
     final failed = box.get('queue', defaultValue: <Map>[]) as List;
-    final kept = failed.where((e) => (e as Map)['opId'] != opId).toList();
+    Map<String, dynamic>? discarded;
+    final kept = failed.where((e) {
+      final m = e as Map;
+      if (m['opId'] != opId) return true;
+      discarded = Map<String, dynamic>.from(m);
+      return false;
+    }).toList();
     await box.put('queue', kept);
+    // Tombstone the op so an in-flight sync's merge-back can never
+    // resurrect what the user just discarded.
+    _cancelledOpIds.add(opId);
     debugPrint('[Cache] discardFailed opId=$opId kept=${kept.length}');
+    if (discarded == null) return;
+    await _evictOptimisticCopy(discarded!);
+  }
+
+  /// A failed create has no server document behind it - only its optimistic
+  /// cache copy. Evict that copy so it cannot resurface after a restart.
+  /// Failed deletes are left alone on purpose: the server doc still exists
+  /// and the stream will restore the cached row.
+  Future<void> _evictOptimisticCopy(Map<String, dynamic> op) async {
+    final type = (op['type'] as String?) ?? '';
+    switch (type) {
+      case 'createIncome':
+        final docId = op['docId'] as String?;
+        if (docId != null) await removeCachedIncome(docId);
+      case 'createExpense':
+        final docId = op['docId'] as String?;
+        if (docId != null) await removeCachedExpense(docId);
+      case 'createTransaction':
+      case 'createTransfer':
+        final docId = op['docId'] as String?;
+        final transferId = op['transferId'] as String? ?? op['opId'] as String?;
+        await removeCachedTransaction(docId ?? transferId ?? '');
+    }
   }
 
   Future<void> clearFailed() async {
-    if (Hive.isBoxOpen(_failedBox)) {
-      await Hive.box(_failedBox).clear();
+    if (Hive.isBoxOpen(failedBoxName)) {
+      await Hive.box(failedBoxName).clear();
     }
   }
 
@@ -702,10 +734,10 @@ class OfflineCacheService {
     await Hive.box(_workerTxsBox).clear();
     await Hive.box(_incomeBox).clear();
     await Hive.box(_expensesBox).clear();
-    await Hive.box(_pendingBox).clear();
+    await Hive.box(pendingBoxName).clear();
     await Hive.box(_deliveredBox).clear();
-    if (Hive.isBoxOpen(_failedBox)) {
-      await Hive.box(_failedBox).clear();
+    if (Hive.isBoxOpen(failedBoxName)) {
+      await Hive.box(failedBoxName).clear();
     }
     await Hive.box(_totalsBox).clear();
     await Hive.box(metaBoxName).clear();
