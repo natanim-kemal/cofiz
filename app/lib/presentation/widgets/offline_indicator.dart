@@ -4,6 +4,7 @@ import '../../core/services/connectivity_service.dart';
 import '../../core/services/offline_cache_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/services/offline_sync_service.dart';
+import 'sync_outbox_banner.dart';
 
 class OfflineIndicator extends StatefulWidget {
   /// Datasets whose fetch time reflects the data visible on this screen.
@@ -49,10 +50,18 @@ class _OfflineIndicatorState extends State<OfflineIndicator> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isOnline) {
-      return const SizedBox.shrink();
-    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!_isOnline) _buildOfflineBar(context),
+        // Outbox banner self-hides when nothing is pending/failed, and stays
+        // visible after reconnect so failed operations remain discoverable.
+        const SyncOutboxBanner(),
+      ],
+    );
+  }
 
+  Widget _buildOfflineBar(BuildContext context) {
     final pendingCount = _sync.getPendingOperationsCount();
     final age = _cachedDataAge();
 
