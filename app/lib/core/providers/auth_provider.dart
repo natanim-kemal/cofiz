@@ -147,7 +147,7 @@ class AuthProvider with ChangeNotifier {
 
       await _authService.signOut();
 
-      await OfflineCacheService().clearAllCache();
+      await OfflineCacheService().clearAllCache(keepOutbox: true);
 
       // Explicitly clear all user data
       _user = null;
@@ -177,7 +177,7 @@ class AuthProvider with ChangeNotifier {
       _workerId = null;
       _status = AuthStatus.unauthenticated;
       try {
-        await OfflineCacheService().clearAllCache();
+        await OfflineCacheService().clearAllCache(keepOutbox: true);
       } catch (_) {}
       notifyListeners();
     }

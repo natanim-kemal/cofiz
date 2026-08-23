@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/worker_model.dart';
+import '../models/transaction_model.dart';
 import '../services/worker_service.dart';
 import '../services/notification_service.dart';
 import '../services/offline_cache_service.dart';
@@ -165,6 +166,56 @@ class WorkerProvider with ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Optimistically apply a transaction's balance effect to the matching
+  /// worker so the detail-page Balance Card moves instantly offline.
+  /// [direction] is +1 for create, -1 for reversal (delete/old-effect).
+  /// Mirrors `_balanceUpdates` semantics — keep in sync.
+  void applyTransactionDelta(MoneyTransaction t, int direction) {
+    final idx = _workers.indexWhere((w) => w.id == t.workerId);
+    if (idx == -1) return;
+    final w = _workers[idx];
+    final m = direction.toDouble();
+    double balance = w.currentBalance;
+    double dist = w.totalDistributed;
+    double ret = w.totalReturned;
+    double purch = w.totalCoffeePurchased;
+    double comm = w.totalCommissionEarned;
+    switch (t.type.toLowerCase()) {
+      case 'distribution':
+        balance += t.amount * m;
+        dist += t.amount * m;
+        break;
+      case 'return':
+        balance -= t.amount * m;
+        ret += t.amount * m;
+        break;
+      case 'purchase':
+        balance -= t.amount * m;
+        purch += t.amount * m;
+        if ((t.commissionAmount ?? 0) > 0) comm += t.commissionAmount! * m;
+        break;
+      case 'transfer':
+        final eff = t.isTransferSender ? -1.0 : 1.0;
+        balance += t.amount * m * eff;
+        if (t.isTransferSender) {
+          ret += t.amount * m;
+        } else {
+          dist += t.amount * m;
+        }
+        break;
+    }
+    _workers[idx] = w.copyWith(
+      currentBalance: balance,
+      totalDistributed: dist < 0 ? 0 : dist,
+      totalReturned: ret < 0 ? 0 : ret,
+      totalCoffeePurchased: purch < 0 ? 0 : purch,
+      totalCommissionEarned: comm < 0 ? 0 : comm,
+    );
+    notifyListeners();
+    // Persist so a restart keeps the optimistic figures until sync.
+    OfflineCacheService().cacheWorkers(_workers).catchError((_) {});
   }
 
   /// Add new worker (returns ID on success, null on failure)

@@ -456,13 +456,17 @@ class TransactionService {
               .collection('workers')
               .doc(transaction.workerId)
               .get();
-          if (workerDoc.exists && old != null) {
+          if (workerDoc.exists) {
             final currentBalance =
                 (workerDoc.data()?['currentBalance'] ?? 0.0).toDouble();
-            final oldDirection =
-                old.type.toLowerCase() == 'distribution' ? 1.0 : -1.0;
+            // Old row may be absent from the (already-mutated) cache; the
+            // check must still run - just without an old-effect adjustment.
+            final oldEffect =
+                old != null && old.type.toLowerCase() == 'distribution'
+                    ? old.amount
+                    : 0.0;
             final projectedBalance =
-                currentBalance + oldDirection * old.amount - transaction.amount;
+                currentBalance + oldEffect - transaction.amount;
             if (projectedBalance < 0) {
               throw 'Insufficient balance. Available: ETB ${projectedBalance.toStringAsFixed(2)}, Required: ETB ${transaction.amount.toStringAsFixed(2)}';
             }
@@ -477,6 +481,10 @@ class TransactionService {
       'type': 'updateTransaction',
       'docId': transaction.id,
       'payload': transaction.toFirestore(),
+      // Pre-mutation snapshot so projected-balance math (and the sync
+      // executor) can reverse the OLD effect even though the cache was
+      // already replaced optimistically.
+      if (old != null) 'previous': old.toFirestore(),
       'overrideReason': overrideReason,
       'localReceiptPath': localReceiptPath,
       'attempts': 0,
@@ -535,6 +543,7 @@ class TransactionService {
       'opId': transactionId,
       'type': 'deleteTransaction',
       'docId': transactionId,
+      if (tx != null) 'previous': tx.toFirestore(),
       'overrideReason': overrideReason,
       'attempts': 0,
       'queuedAt': DateTime.now().toIso8601String(),
@@ -616,12 +625,30 @@ class TransactionService {
           base += _numericBalanceDelta(mt, 1);
         } else if (type == 'deleteTransaction') {
           final docId = op['docId'] as String?;
-          final tx = txMap[docId];
+          // Prefer the pre-mutation snapshot: the cache was already
+          // optimistically mutated, so txMap no longer holds the original.
+          final prevMap = op['previous'] as Map<String, dynamic>?;
+          MoneyTransaction? tx;
+          if (prevMap != null) {
+            try {
+              tx = MoneyTransaction.fromFirestore(
+                  Map<String, dynamic>.from(prevMap), docId ?? '');
+            } catch (_) {}
+          }
+          tx ??= txMap[docId];
           if (tx == null || tx.workerId != workerId) continue;
           base += _numericBalanceDelta(tx, -1);
         } else if (type == 'updateTransaction') {
           final docId = op['docId'] as String?;
-          final old = txMap[docId];
+          final prevMap = op['previous'] as Map<String, dynamic>?;
+          MoneyTransaction? old;
+          if (prevMap != null) {
+            try {
+              old = MoneyTransaction.fromFirestore(
+                  Map<String, dynamic>.from(prevMap), docId ?? '');
+            } catch (_) {}
+          }
+          old ??= txMap[docId];
           final payload = op['payload'] as Map<String, dynamic>?;
           if (payload == null) continue;
           MoneyTransaction newTx;

@@ -464,15 +464,40 @@ class OfflineCacheService {
     final opId = operation['opId'] as String;
     final newType = (operation['type'] as String?) ?? '';
     final newTransferId = operation['transferId'] as String?;
-    final existingIdx = pending.indexWhere((e) {
-      final m = e as Map;
+    bool matches(Map m) {
       if (m['opId'] == opId) return true;
       if (m['transferId'] == opId) return true;
       if (newTransferId != null && m['transferId'] == newTransferId) {
         return true;
       }
       return false;
-    });
+    }
+
+    final matchingIdxs = <int>[
+      for (var i = 0; i < pending.length; i++)
+        if (matches(pending[i] as Map)) i,
+    ];
+
+    // A delete supersedes every queued variant of the key: drop them all
+    // (covers create+delete AND delete+create+delete without leaving a
+    // stale earlier entry for a later coalesce to mistakenly match).
+    if (newType.startsWith('delete') && matchingIdxs.isNotEmpty) {
+      for (final idx in matchingIdxs.reversed) {
+        final removed = Map<String, dynamic>.from(pending.removeAt(idx) as Map);
+        final tid = removed['transferId'] as String?;
+        if (tid != null) _cancelledOpIds.add(tid);
+      }
+      _cancelledOpIds.add(opId);
+      if (newTransferId != null) _cancelledOpIds.add(newTransferId);
+      await box.put('queue', pending);
+      debugPrint(
+          '[Cache] coalesce delete-removes-all opId=$opId count=${matchingIdxs.length}');
+      return;
+    }
+
+    // Coalesce with the NEWEST matching entry (last), never an older one -
+    // after a delete+create pair the create is the live state.
+    final existingIdx = matchingIdxs.isEmpty ? -1 : matchingIdxs.last;
     if (existingIdx != -1) {
       final existing = Map<String, dynamic>.from(pending[existingIdx] as Map);
       final existingType = (existing['type'] as String?) ?? '';
@@ -486,21 +511,10 @@ class OfflineCacheService {
       final existingIsDelete = isDelete(existingType);
       final newIsCreate = isCreate(newType);
       final newIsUpdate = isUpdate(newType);
-      final newIsDelete = isDelete(newType);
+      // Deletes were already handled (remove-all) above; only create/update
+      // merges reach here.
 
-      // 1. create + delete -> drop both with tombstone
-      if (existingIsCreate && newIsDelete) {
-        pending.removeAt(existingIdx);
-        _cancelledOpIds.add(opId);
-        final tid = existing['transferId'] as String?;
-        if (tid != null) _cancelledOpIds.add(tid);
-        if (newTransferId != null) _cancelledOpIds.add(newTransferId);
-        await box.put('queue', pending);
-        debugPrint('[Cache] coalesce create+delete drop opId=$opId');
-        return;
-      }
-
-      // 2. create + update -> merge into create
+      // 1. create + update -> merge into create
       if (existingIsCreate && newIsUpdate) {
         final merged = <String, dynamic>{};
         if (existing['payload'] is Map) {
@@ -533,8 +547,9 @@ class OfflineCacheService {
         return;
       }
 
-      // 4. update + delete -> delete
-      if (existingIsUpdate && newIsDelete) {
+      // 4. update + delete -> delete (unreachable for deletes: the
+      // remove-all block above already consumed them; kept for safety)
+      if (existingIsUpdate && newType.startsWith('delete')) {
         pending[existingIdx] = Map<String, dynamic>.from(operation);
         await box.put('queue', pending);
         debugPrint('[Cache] coalesce update+delete -> delete opId=$opId');
@@ -756,18 +771,22 @@ class OfflineCacheService {
     await cacheTransactions(kept);
   }
 
-  // Clear all cache
-  Future<void> clearAllCache() async {
+  // Clear all cache. When [keepOutbox] is true (sign-out), the pending and
+  // failed queues survive so offline mutations can still sync under the
+  // next session instead of being silently destroyed.
+  Future<void> clearAllCache({bool keepOutbox = false}) async {
     _cancelledOpIds.clear();
     await Hive.box(_workersBox).clear();
     await Hive.box(_transactionsBox).clear();
     await Hive.box(_workerTxsBox).clear();
     await Hive.box(_incomeBox).clear();
     await Hive.box(_expensesBox).clear();
-    await Hive.box(pendingBoxName).clear();
-    await Hive.box(_deliveredBox).clear();
-    if (Hive.isBoxOpen(failedBoxName)) {
-      await Hive.box(failedBoxName).clear();
+    if (!keepOutbox) {
+      await Hive.box(pendingBoxName).clear();
+      await Hive.box(_deliveredBox).clear();
+      if (Hive.isBoxOpen(failedBoxName)) {
+        await Hive.box(failedBoxName).clear();
+      }
     }
     await Hive.box(_totalsBox).clear();
     await Hive.box(metaBoxName).clear();

@@ -117,7 +117,15 @@ class StitchWorkerApp extends StatelessWidget {
         Provider.value(value: notificationService),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => WorkerProvider()),
-        ChangeNotifierProvider(create: (_) => TransactionProvider()),
+        ChangeNotifierProxyProvider<WorkerProvider, TransactionProvider>(
+          create: (_) => TransactionProvider(),
+          update: (_, workerProvider, txProvider) {
+            // Optimistic creates/deletes move the worker Balance Card too.
+            txProvider!.onTransactionApplied = (tx, direction) =>
+                workerProvider.applyTransactionDelta(tx, direction);
+            return txProvider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => IncomeProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
@@ -127,7 +135,8 @@ class StitchWorkerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: Consumer3<ThemeProvider, SettingsProvider, DensityProvider>(
-        builder: (context, themeProvider, settingsProvider, densityProvider, _) {
+        builder:
+            (context, themeProvider, settingsProvider, densityProvider, _) {
           return MaterialApp(
             title: 'Cofiz',
             // Locale

@@ -579,6 +579,19 @@ class OfflineSyncService {
               throw 'Use transfer delete for transfers.';
             }
             _enforceLock(tx, overrideReason: overrideReason, action: 'delete');
+            // Authoritative sufficiency recheck: deleting a distribution
+            // removes money from the worker; never drive currentBalance
+            // below zero even if the balance shifted since queue-time.
+            if (tx.type.toLowerCase() == 'distribution') {
+              final workerSnap = await txn
+                  .get(firestore.collection('workers').doc(tx.workerId));
+              final balance =
+                  ((workerSnap.data()?['currentBalance'] as num?) ?? 0)
+                      .toDouble();
+              if (tx.amount > balance) {
+                throw 'Insufficient balance. Available: ETB ${balance.toStringAsFixed(2)}, Required: ETB ${tx.amount.toStringAsFixed(2)}';
+              }
+            }
             final workerRef = firestore.collection('workers').doc(tx.workerId);
             final updates = _balanceUpdates(tx, -1);
             if (updates.isNotEmpty) txn.update(workerRef, updates);

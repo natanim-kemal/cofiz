@@ -8,6 +8,11 @@ import '../services/offline_cache_service.dart';
 class TransactionProvider with ChangeNotifier {
   final TransactionService _transactionService;
 
+  /// Wired at app composition (main.dart) so optimistic creates/deletes can
+  /// also move the worker Balance Card. Signature: (tx, +1 create | -1 reverse).
+  void Function(MoneyTransaction transaction, int direction)?
+      onTransactionApplied;
+
   TransactionProvider({TransactionService? transactionService})
       : _transactionService = transactionService ?? TransactionService();
 
@@ -515,6 +520,40 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
+  /// Pending offline deltas for today's activity: queued creates that the
+  /// server aggregates cannot see yet (write not committed). Mirrors the
+  /// income/expense `_refreshTotals` reconcile so Cash In / Cash Out never
+  /// revert while ops are pending.
+  (double, double, double) _pendingTodayDeltas() {
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    double distributed = 0;
+    double returned = 0;
+    double purchased = 0;
+    for (final op in OfflineCacheService().getPendingOperations()) {
+      final type = op['type'] as String? ?? '';
+      if (type != 'createTransaction') continue;
+      if (op['workerId'] != null && op['workerId'] == '') continue;
+      final createdAtMs = op['createdAt'] as int?;
+      final isToday = createdAtMs != null &&
+          DateTime.fromMillisecondsSinceEpoch(createdAtMs).isAfter(dayStart);
+      if (!isToday) continue;
+      final amount = ((op['amount'] as num?) ?? 0).toDouble();
+      switch ((op['transactionType'] as String? ?? '').toLowerCase()) {
+        case 'distribution':
+          distributed += amount;
+          break;
+        case 'return':
+          returned += amount;
+          break;
+        case 'purchase':
+          purchased += amount;
+          break;
+      }
+    }
+    return (distributed, returned, purchased);
+  }
+
   /// Load today's totals
   Future<void> loadTodayTotals() async {
     try {
@@ -531,11 +570,18 @@ class TransactionProvider with ChangeNotifier {
 
     try {
       final totals = await _transactionService.getTodayTotals();
-      _todayDistributed = totals['distributed'] ?? 0.0;
-      _todayReturned = totals['returned'] ?? 0.0;
-      _todayPurchased = totals['purchased'] ?? 0.0;
+      // Reconcile with still-pending offline creates so a successful-but-
+      // stale aggregate can't drag today's activity back down.
+      final (pendingDist, pendingRet, pendingPurch) = _pendingTodayDeltas();
+      _todayDistributed = (totals['distributed'] ?? 0.0) + pendingDist;
+      _todayReturned = (totals['returned'] ?? 0.0) + pendingRet;
+      _todayPurchased = (totals['purchased'] ?? 0.0) + pendingPurch;
       notifyListeners();
-      OfflineCacheService().cacheTodayTotals(totals).catchError((_) {});
+      OfflineCacheService().cacheTodayTotals({
+        'distributed': _todayDistributed,
+        'returned': _todayReturned,
+        'purchased': _todayPurchased,
+      }).catchError((_) {});
     } catch (e) {
       print('Error loading today totals: $e');
     }
@@ -590,6 +636,25 @@ class TransactionProvider with ChangeNotifier {
       if (!_workerTransactions.any((t) => t.id == tx.id)) {
         _workerTransactions = [tx, ..._workerTransactions];
       }
+    }
+    // Optimistically reflect in today's activity so Cash In / Cash Out move
+    // instantly offline (server aggregate reconciles later).
+    onTransactionApplied?.call(tx, 1);
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    if (tx.createdAt.isAfter(dayStart)) {
+      switch (tx.type.toLowerCase()) {
+        case 'distribution':
+          _todayDistributed += tx.amount;
+          break;
+        case 'return':
+          _todayReturned += tx.amount;
+          break;
+        case 'purchase':
+          _todayPurchased += tx.amount;
+          break;
+      }
+      notifyListeners();
     }
     notifyListeners();
   }
@@ -655,12 +720,24 @@ class TransactionProvider with ChangeNotifier {
   }) async {
     final allSnap = _allTransactions;
     final workerSnap = _workerTransactions;
+    final oldTx = _workerTransactions.firstWhere(
+      (t) => t.id == transaction.id,
+      orElse: () => _allTransactions.firstWhere(
+        (t) => t.id == transaction.id,
+        orElse: () => transaction,
+      ),
+    );
     try {
+      // Reverse the OLD effect, then apply the NEW one.
+      onTransactionApplied?.call(oldTx, -1);
+      onTransactionApplied?.call(transaction, 1);
       _optimisticReplace(transaction);
       await _transactionService.updateTransaction(transaction,
           overrideReason: overrideReason, localReceiptPath: localReceiptPath);
       return true;
     } catch (e) {
+      onTransactionApplied?.call(transaction, -1);
+      onTransactionApplied?.call(oldTx, 1);
       _allTransactions = allSnap;
       _workerTransactions = workerSnap;
       _errorMessage = e.toString();
@@ -678,12 +755,21 @@ class TransactionProvider with ChangeNotifier {
   }) async {
     final allSnap = _allTransactions;
     final workerSnap = _workerTransactions;
+    final removedTx = () {
+      try {
+        return _allTransactions.firstWhere((t) => t.id == transactionId);
+      } catch (_) {
+        return null;
+      }
+    }();
     try {
+      if (removedTx != null) onTransactionApplied?.call(removedTx, -1);
       _optimisticRemove((t) => t.id == transactionId);
       await _transactionService.deleteTransaction(transactionId,
           overrideReason: overrideReason);
       return true;
     } catch (e) {
+      if (removedTx != null) onTransactionApplied?.call(removedTx, 1);
       _allTransactions = allSnap;
       _workerTransactions = workerSnap;
       _errorMessage = e.toString();
@@ -701,7 +787,12 @@ class TransactionProvider with ChangeNotifier {
   }) async {
     final allSnap = _allTransactions;
     final workerSnap = _workerTransactions;
+    final removedLegs =
+        _allTransactions.where((t) => t.transferId == transferId).toList();
     try {
+      for (final leg in removedLegs) {
+        onTransactionApplied?.call(leg, -1);
+      }
       _optimisticRemove((t) =>
           t.transferId == transferId ||
           t.id == transferId ||
@@ -710,6 +801,9 @@ class TransactionProvider with ChangeNotifier {
           overrideReason: overrideReason);
       return true;
     } catch (e) {
+      for (final leg in removedLegs.reversed) {
+        onTransactionApplied?.call(leg, 1);
+      }
       _allTransactions = allSnap;
       _workerTransactions = workerSnap;
       _errorMessage = e.toString();
