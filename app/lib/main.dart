@@ -379,14 +379,6 @@ class _MainLayoutState extends State<MainLayout> {
               children: _screens,
             ),
 
-            // Offline Indicator
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: OfflineIndicator(),
-            ),
-
             // Fixed Bottom Nav
             Positioned(
               left: 0,

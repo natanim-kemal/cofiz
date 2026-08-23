@@ -5,16 +5,13 @@ import '../../core/services/offline_cache_service.dart';
 import '../../core/services/offline_sync_service.dart';
 import '../../l10n/app_localizations.dart';
 
-/// Outbox banner showing queued/failed sync operation counts.
+/// Inline outbox status: plain "N pending · M failed" white text with a
+/// Retry tap action (and per-failed discard icons when failures exist).
 ///
-/// Rendered as a floating rounded capsule (horizontally inset so it spans
-/// between the header's curve edges rather than edge-to-edge under the
-/// camera cutout). Visible whenever the pending or failed operation boxes
-/// are non-empty - regardless of connectivity, so failures stay
-/// discoverable after reconnect. Offers a Retry action
-/// ([OfflineSyncService.syncNow]) and a per-failed-operation Discard action
-/// ([OfflineCacheService.discardFailed]). Override either behaviour via
-/// [onRetry] / [onDiscard] (mainly for tests).
+/// Designed to sit at the right end of the header's date/filter row -
+/// background-free, matching the header's white typography. Hidden entirely
+/// when both boxes are empty; stays visible after reconnect so failures
+/// remain discoverable.
 class SyncOutboxBanner extends StatefulWidget {
   final VoidCallback? onRetry;
   final void Function(String opId)? onDiscard;
@@ -49,7 +46,6 @@ class _SyncOutboxBannerState extends State<SyncOutboxBanner> {
   @override
   Widget build(BuildContext context) {
     if (_listenables == null) return const SizedBox.shrink();
-    final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: Listenable.merge(_listenables!),
       builder: (context, _) {
@@ -59,99 +55,61 @@ class _SyncOutboxBannerState extends State<SyncOutboxBanner> {
         if (pending.isEmpty && failed.isEmpty) {
           return const SizedBox.shrink();
         }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          child: Material(
-            color: theme.brightness == Brightness.dark
-                ? Colors.grey.shade900
-                : Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(18),
-            elevation: 6,
-            shadowColor: Colors.black26,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              key: const Key('outbox_retry'),
+              borderRadius: BorderRadius.circular(8),
               onTap: widget.onRetry ?? () => OfflineSyncService().syncNow(),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Status ring: amber while pending, red once anything
-                    // has permanently failed.
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color:
-                            failed.isEmpty ? Colors.amberAccent : Colors.redAccent,
-                        boxShadow: [
-                          BoxShadow(
-                            color: (failed.isEmpty
-                                    ? Colors.amberAccent
-                                    : Colors.redAccent)
-                                .withOpacity(0.5),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
+                    Icon(
+                      failed.isEmpty
+                          ? Icons.outbound_rounded
+                          : Icons.error_outline_rounded,
+                      size: 14,
+                      color: failed.isEmpty ? Colors.white : Colors.redAccent,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${pending.length} pending · ${failed.length} failed',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 4),
+                    Text(
+                      '${pending.length} pending · ${failed.length} failed',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    TextButton(
-                      key: const Key('outbox_retry'),
-                      onPressed: widget.onRetry ??
-                          () => OfflineSyncService().syncNow(),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.white.withOpacity(0.12),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(AppLocalizations.of(context)?.retry ?? 'Retry'),
-                    ),
-                    if (failed.isNotEmpty)
-                      Flexible(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            for (final op in failed)
-                              IconButton(
-                                key: Key('discard_${op['opId']}'),
-                                tooltip: 'Discard',
-                                icon: const Icon(Icons.close_rounded, size: 18),
-                                color: Colors.white70,
-                                onPressed: () async {
-                                  final opId = op['opId'] as String?;
-                                  if (opId == null) return;
-                                  if (widget.onDiscard != null) {
-                                    widget.onDiscard!(opId);
-                                  } else {
-                                    await cache.discardFailed(opId);
-                                  }
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
                   ],
                 ),
               ),
             ),
-          ),
+            for (final op in failed)
+              InkWell(
+                key: Key('discard_${op['opId']}'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () async {
+                  final opId = op['opId'] as String?;
+                  if (opId == null) return;
+                  if (widget.onDiscard != null) {
+                    widget.onDiscard!(opId);
+                  } else {
+                    await cache.discardFailed(opId);
+                  }
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+                  child: Icon(Icons.close_rounded,
+                      size: 14, color: Colors.white.withOpacity(0.75)),
+                ),
+              ),
+          ],
         );
       },
     );

@@ -15,6 +15,8 @@ import '../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../screens/transaction/transaction_dialog.dart';
+import 'offline_indicator.dart';
+import 'sync_outbox_banner.dart';
 import 'app_toast.dart';
 
 class WorkerTransactionsList extends StatefulWidget {
@@ -246,6 +248,10 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Inline offline notice (no background) above the history.
+            const OfflineIndicator(
+              datasets: [],
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -257,6 +263,8 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
+                // Pending/failed sync counts - right end of the header row.
+                const SyncOutboxBanner(),
                 if (_selectedDate != null)
                   TextButton.icon(
                     onPressed: _clearDate,
