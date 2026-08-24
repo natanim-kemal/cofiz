@@ -293,42 +293,8 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                 for (final transaction in filtered)
                   _buildTransactionItem(transaction)
               else ...[
-                for (final transaction in filtered.take(_itemsToShow))
+                for (final transaction in filtered)
                   _buildTransactionItem(transaction),
-                if (filtered.length > _itemsToShow ||
-                    transactionProvider.hasMoreWorkerTransactions)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Center(
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            transactionProvider.isLoadingMoreWorkerTransactions
-                                ? null
-                                : () => _loadMore(transactionProvider),
-                        icon:
-                            transactionProvider.isLoadingMoreWorkerTransactions
-                                ? const SizedBox(
-                                    height: 16,
-                                    width: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primary),
-                                  )
-                                : const Icon(Icons.expand_more),
-                        label: Text(AppLocalizations.of(context)!.loadMore),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.5)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ],
           ],
