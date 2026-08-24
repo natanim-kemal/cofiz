@@ -69,8 +69,11 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     for (final t in tp.allTransactions) {
       switch (t.type.toLowerCase()) {
         case 'return':
-        case 'purchase':
           moneyIn += t.amount;
+          break;
+        case 'purchase':
+          // Company buys coffee from collectors — money leaves the company.
+          moneyOut += t.amount;
           break;
         case 'distribution':
           moneyOut += t.amount;
