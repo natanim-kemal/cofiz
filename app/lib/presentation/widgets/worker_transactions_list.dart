@@ -380,6 +380,9 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
   }
 
   Widget _buildTransactionItem(MoneyTransaction transaction) {
+    final isPending = context
+        .watch<TransactionProvider>()
+        .isPending(transaction.id);
     Color typeColor;
     IconData typeIcon;
     bool isPositive = transaction.increasesBalance;
@@ -453,6 +456,8 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 4),
+                          _buildStatusTick(transaction, isPending),
                           if (transaction.isLocked) ...[
                             const SizedBox(width: 6),
                             const Icon(
@@ -700,5 +705,24 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
       default:
         return transaction.type;
     }
+  }
+
+  Widget _buildStatusTick(MoneyTransaction t, bool isPending) {
+    if (isPending) {
+      return const Icon(Icons.access_time, size: 12, color: Colors.grey);
+    }
+    if (!t.approved) {
+      return const Icon(Icons.done, size: 12, color: Colors.grey);
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.done, size: 12, color: Colors.blue),
+        Transform.translate(
+          offset: const Offset(-4, 0),
+          child: const Icon(Icons.done, size: 12, color: Colors.blue),
+        ),
+      ],
+    );
   }
 }

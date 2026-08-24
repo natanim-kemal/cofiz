@@ -32,6 +32,10 @@ class TransactionProvider with ChangeNotifier {
   int _workerTotalCount = 0;
   String? _currentWorkerId;
 
+  final Set<String> _pendingTxIds = {};
+
+  bool isPending(String id) => _pendingTxIds.contains(id);
+
   // Today's totals
   double _todayDistributed = 0.0;
   double _todayReturned = 0.0;
@@ -195,20 +199,33 @@ class TransactionProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Merge the live first-page stream into the accumulated list without
-  /// dropping previously loaded pages. Newest items from the stream replace
-  /// the head; older loaded pages are preserved.
   void _mergeFirstPage(List<MoneyTransaction> freshHead) {
+    final freshIds = freshHead.map((t) => t.id).toSet();
+    final stillPending = _workerTransactions
+        .where((t) => _pendingTxIds.contains(t.id) && !freshIds.contains(t.id))
+        .toList();
+    for (final id in freshIds) {
+      _pendingTxIds.remove(id);
+    }
     if (!_workerLoadedExtraPages) {
-      // No pages loaded yet - take the stream head directly.
-      _workerTransactions = freshHead;
+      if (stillPending.isEmpty) {
+        _workerTransactions = freshHead;
+        return;
+      }
+      final merged = [...stillPending, ...freshHead]
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _workerTransactions = merged;
       return;
     }
-    // Keep everything beyond the first page; the stream head is the newest.
-    final tail = _workerTransactions.length > freshHead.length
-        ? _workerTransactions.sublist(freshHead.length)
-        : <MoneyTransaction>[];
-    _workerTransactions = [...freshHead, ...tail];
+    final tailIds = {...freshHead.map((t) => t.id), ...stillPending.map((t) => t.id)};
+    final tail = _workerTransactions.where((t) => !tailIds.contains(t.id)).toList();
+    if (stillPending.isEmpty) {
+      _workerTransactions = [...freshHead, ...tail];
+    } else {
+      final merged = [...stillPending, ...freshHead]
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _workerTransactions = [...merged, ...tail];
+    }
   }
 
   Future<void> _loadWorkerCount(String workerId) async {
@@ -227,9 +244,21 @@ class TransactionProvider with ChangeNotifier {
 
     _transactionService.getAllTransactionsStream().listen(
       (transactions) {
-        _allTransactions = transactions;
+        final freshIds = transactions.map((t) => t.id).toSet();
+        final stillPending = _allTransactions
+            .where((t) => _pendingTxIds.contains(t.id) && !freshIds.contains(t.id))
+            .toList();
+        for (final id in freshIds) {
+          _pendingTxIds.remove(id);
+        }
+        if (stillPending.isEmpty) {
+          _allTransactions = transactions;
+        } else {
+          _allTransactions = [...stillPending, ...transactions]
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        }
         OfflineCacheService()
-            .cacheTransactions(transactions)
+            .cacheTransactions(_allTransactions)
             .catchError((_) {});
         notifyListeners();
       },
@@ -647,18 +676,17 @@ class TransactionProvider with ChangeNotifier {
   }
 
   void _optimisticInsert(MoneyTransaction tx) {
-    // Insert at front of allTransactions (newest first)
     if (!_allTransactions.any((t) => t.id == tx.id)) {
       _allTransactions = [tx, ..._allTransactions];
     }
-    // Also insert into workerTransactions if it matches the currently viewed worker
-    if (_currentWorkerId != null && tx.workerId == _currentWorkerId) {
-      if (!_workerTransactions.any((t) => t.id == tx.id)) {
-        _workerTransactions = [tx, ..._workerTransactions];
-      }
+    if (!_workerTransactions.any((t) => t.id == tx.id)) {
+      _workerTransactions = [tx, ..._workerTransactions];
     }
-    // Optimistically reflect in today's activity so Cash In / Cash Out move
-    // instantly offline (server aggregate reconciles later).
+    _pendingTxIds.add(tx.id);
+    if (tx.isTransfer && tx.transferId != null) {
+      _pendingTxIds.add(tx.transferId!);
+      _pendingTxIds.add('${tx.transferId}_r');
+    }
     onTransactionApplied?.call(tx, 1);
     final now = DateTime.now();
     final dayStart = DateTime(now.year, now.month, now.day);
@@ -721,6 +749,11 @@ class TransactionProvider with ChangeNotifier {
   /// Optimistically remove matching in-memory entries so the UI reflects the
   /// delete immediately. The live stream reconciles once back online.
   void _optimisticRemove(bool Function(MoneyTransaction) matches) {
+    final toRemove = _allTransactions.where(matches).toList();
+    for (final t in toRemove) {
+      _pendingTxIds.remove(t.id);
+      if (t.transferId != null) _pendingTxIds.remove(t.transferId!);
+    }
     final newAll = _allTransactions.where((t) => !matches(t)).toList();
     final newWorker = _workerTransactions.where((t) => !matches(t)).toList();
     final changed = newAll.length != _allTransactions.length ||
