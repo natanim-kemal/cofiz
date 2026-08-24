@@ -409,6 +409,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEntrySection() {
+    final role = Provider.of<AuthProvider>(context).userRole;
+    if (role?.canCreateTransactions == false) return const SizedBox.shrink();
     final localizations = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
