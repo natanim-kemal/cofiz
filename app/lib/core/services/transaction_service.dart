@@ -375,6 +375,8 @@ class TransactionService {
     );
     await OfflineCacheService()
         .cacheTransactions([...cached, senderTx, receiverTx]);
+    unawaited(_mirrorWorkerCache(senderTx.workerId));
+    unawaited(_mirrorWorkerCache(receiverTx.workerId));
     unawaited(OfflineSyncService().syncNow());
     return transferId;
   }
