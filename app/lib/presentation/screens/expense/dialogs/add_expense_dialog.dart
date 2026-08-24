@@ -69,8 +69,12 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
     for (final t in tp.allTransactions) {
       switch (t.type.toLowerCase()) {
         case 'return':
-        case 'purchase':
           moneyIn += t.amount;
+          break;
+        case 'purchase':
+          // Purchases are collectors buying FOR the company with already-
+          // distributed funds - already counted as Money Out via the
+          // distribution. Excluded here to match dashboard Total Activity.
           break;
         case 'distribution':
           moneyOut += t.amount;
