@@ -11,7 +11,6 @@ import '../../../core/models/expense_record_model.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../../widgets/custom_header.dart';
 import '../../widgets/offline_indicator.dart';
-import '../../widgets/sync_outbox_banner.dart';
 import '../../../core/services/report_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -332,9 +331,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         icon: Icons.filter_list,
                       ),
                     ),
-                    // Pending/failed sync counts - right end of filter row.
-                    const SizedBox(width: 8),
-                    const SyncOutboxBanner(),
                   ],
                 ),
               ],
