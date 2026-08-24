@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../services/offline_cache_service.dart';
@@ -40,6 +42,8 @@ class AuthProvider with ChangeNotifier {
     _initializeAuth();
   }
 
+  static const String _cachedAppUserKey = 'cached_app_user';
+
   Future<void> _initializeAuth() async {
     await _authService.enablePersistence();
     final currentUser = _authService.currentUser;
@@ -48,46 +52,100 @@ class AuthProvider with ChangeNotifier {
       final isValid = await _authService.isSessionValid();
       if (!isValid) {
         await _authService.signOut();
+      } else {
+        // Warm offline start: restore cached role instantly so AuthGate doesn't hang.
+        final cached = await _loadCachedAppUser(currentUser.uid);
+        if (cached != null) {
+          _appUser = cached;
+          _userRole = cached.role;
+          _workerId = cached.workerId;
+        }
       }
     }
 
     _authService.authStateChanges.listen((User? user) async {
       if (user != null) {
         _user = user;
-        await _fetchUserData(user.uid);
         _status = AuthStatus.authenticated;
+        notifyListeners();
+        await _fetchUserData(user.uid);
+        notifyListeners();
       } else {
         _user = null;
         _appUser = null;
         _userRole = null;
         _workerId = null;
         _status = AuthStatus.unauthenticated;
+        notifyListeners();
       }
-      notifyListeners();
     });
   }
 
-  /// Fetch user data from Firestore
+  Future<void> _cacheAppUser(AppUser user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_cachedAppUserKey:${user.uid}',
+          '${user.role.name}|${user.workerId ?? ''}|${user.displayName}|${user.email}');
+    } catch (_) {}
+  }
+
+  Future<AppUser?> _loadCachedAppUser(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_cachedAppUserKey:$uid');
+      if (raw == null) return null;
+      final parts = raw.split('|');
+      if (parts.length < 4) return null;
+      final role = UserRole.values.firstWhere((r) => r.name == parts[0],
+          orElse: () => UserRole.viewer);
+      return AppUser(
+        uid: uid,
+        email: parts[3],
+        displayName: parts[2],
+        role: role,
+        workerId: parts[1].isEmpty ? null : parts[1],
+        createdAt: DateTime.now(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _fetchUserData(String uid) async {
     try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-
+      final doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 3));
       if (doc.exists) {
         _appUser = AppUser.fromFirestore(doc.data()!, uid);
         _userRole = _appUser!.role;
         _workerId = _appUser!.workerId;
-      } else {
-        // User document doesn't exist - must be manually created by admin
-        debugPrint('ERROR: User document not found for uid: $uid');
-        debugPrint('This user must be manually created in Firestore');
-        _userRole = null;
-        _appUser = null;
-        _workerId = null;
+        await _cacheAppUser(_appUser!);
+        return;
       }
-    } catch (e) {
-      debugPrint('Error fetching user data: $e');
-      _userRole = null;
-      _appUser = null;
+    } catch (_) {}
+
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get(const GetOptions(source: Source.cache));
+      if (doc.exists) {
+        _appUser = AppUser.fromFirestore(doc.data()!, uid);
+        _userRole = _appUser!.role;
+        _workerId = _appUser!.workerId;
+        await _cacheAppUser(_appUser!);
+        return;
+      }
+    } catch (_) {}
+
+    final cached = await _loadCachedAppUser(uid);
+    if (cached != null) {
+      _appUser = cached;
+      _userRole = cached.role;
+      _workerId = cached.workerId;
     }
   }
 
