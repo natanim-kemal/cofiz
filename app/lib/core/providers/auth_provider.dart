@@ -68,6 +68,9 @@ class AuthProvider with ChangeNotifier {
         _user = user;
         _status = AuthStatus.authenticated;
         notifyListeners();
+        // Restored sessions must (re)bind the FCM token - it may have
+        // rotated while the app was closed.
+        unawaited(FCMService().saveTokenForUser(user.uid));
         await _fetchUserData(user.uid);
         notifyListeners();
       } else {
@@ -244,6 +247,38 @@ class AuthProvider with ChangeNotifier {
   /// Clear error message
   void clearError() {
     _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Locally reflect a successful email verification (server writes
+  /// users/{uid}.emailVerified via Admin SDK; this updates the in-memory
+  /// AppUser + cache so the UI flips without waiting for a stream).
+  Future<void> markEmailVerified() async {
+    final uid = _user?.uid;
+    if (_appUser != null) {
+      _appUser = AppUser(
+        uid: _appUser!.uid,
+        email: _appUser!.email,
+        displayName: _appUser!.displayName,
+        role: _appUser!.role,
+        photoUrl: _appUser!.photoUrl,
+        createdAt: _appUser!.createdAt,
+        lastLoginAt: _appUser!.lastLoginAt,
+        isActive: _appUser!.isActive,
+        emailVerified: true,
+        createdBy: _appUser!.createdBy,
+        workerId: _appUser!.workerId,
+      );
+    }
+    if (uid != null) {
+      try {
+        await _firestore.collection('users').doc(uid).update({
+          'emailVerified': true,
+        });
+      } catch (_) {}
+      // Refresh the cold-start cache with the verified state.
+      if (_appUser != null) await _cacheAppUser(_appUser!);
+    }
     notifyListeners();
   }
 

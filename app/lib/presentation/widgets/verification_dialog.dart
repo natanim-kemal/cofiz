@@ -63,8 +63,12 @@ class _VerifyEmailTileState extends State<VerifyEmailTile> {
 class VerificationDialog extends StatefulWidget {
   final String email;
   final EmailVerificationService? service;
+  /// Called after a successful verification so callers can propagate the
+  /// state globally (e.g. AuthProvider.markEmailVerified).
+  final Future<void> Function()? onVerified;
 
-  const VerificationDialog({super.key, required this.email, this.service});
+  const VerificationDialog(
+      {super.key, required this.email, this.service, this.onVerified});
 
   @override
   State<VerificationDialog> createState() => _VerificationDialogState();
@@ -140,6 +144,9 @@ class _VerificationDialogState extends State<VerificationDialog> {
       await _service.requestCode(widget.email);
       if (!mounted) return;
       AppToast.show(l10n.codeSentToEmail);
+    } on EmailVerificationException catch (e) {
+      if (!mounted) return;
+      AppToast.show(e.message);
     } catch (_) {
       if (!mounted) return;
       AppToast.show(l10n.codeSendFailed);
@@ -158,9 +165,14 @@ class _VerificationDialogState extends State<VerificationDialog> {
       final ok = await _service.verifyCode(code);
       if (!mounted) return;
       if (ok) {
+        try {
+          await widget.onVerified?.call();
+        } catch (_) {}
         AppToast.show(l10n.emailVerifiedSuccess, success: true);
         Navigator.of(context).pop(true);
       } else {
+        // Server counts the attempt but returns ok=false only for
+        // non-exception paths; treat as invalid.
         setState(() {
           _submitting = false;
           _attempts--;
@@ -171,14 +183,12 @@ class _VerificationDialogState extends State<VerificationDialog> {
         });
         AppToast.show(l10n.invalidCode);
       }
-    } on Exception catch (e) {
+    } on EmailVerificationException catch (e) {
       if (!mounted) return;
-      final msg = e.toString().toLowerCase();
       setState(() {
         _submitting = false;
-        if (msg.contains('expired') || msg.contains('too many')) {
-          _locked = true;
-        } else {
+        if (e.locked) _locked = true;
+        if (!e.locked) {
           _attempts--;
           if (_attempts <= 0) {
             _attempts = 0;
@@ -186,11 +196,18 @@ class _VerificationDialogState extends State<VerificationDialog> {
           }
         }
       });
-      AppToast.show(msg.contains('expired')
-          ? l10n.codeExpired
-          : msg.contains('too many')
-              ? l10n.tooManyAttempts
-              : l10n.invalidCode);
+      AppToast.show(e.message);
+    } on Exception catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _attempts--;
+        if (_attempts <= 0) {
+          _attempts = 0;
+          _locked = true;
+        }
+      });
+      AppToast.show(l10n.invalidCode);
     }
   }
 
@@ -252,6 +269,8 @@ class _VerificationDialogState extends State<VerificationDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Resend stays available even when locked - the lock only
+              // blocks Verify; the user needs a fresh code to continue.
               TextButton(
                 onPressed: _countdown > 0 ? null : _resendCode,
                 child: Text(l10n.resendCode),

@@ -19,6 +19,7 @@ class FCMService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String? _currentToken;
+  String? _boundUserId;
   StreamSubscription? _tokenRefreshSubscription;
 
   String? get currentToken => _currentToken;
@@ -79,25 +80,32 @@ class FCMService {
     return isAuthorized;
   }
 
-  /// Save FCM token for a user
+  /// Save FCM token for a user and remember the binding so token refreshes
+  /// re-save automatically.
   Future<void> saveTokenForUser(String userId) async {
+    _boundUserId = userId;
     _currentToken ??= await _messaging.getToken();
 
     if (_currentToken != null) {
-      try {
-        await _firestore.collection('users').doc(userId).update({
-          'fcmToken': _currentToken,
-          'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-        });
-        debugPrint('FCM token saved for user: $userId');
-      } catch (e) {
-        debugPrint('Error saving FCM token: $e');
-      }
+      await _persistToken(userId, _currentToken!);
+    }
+  }
+
+  Future<void> _persistToken(String userId, String token) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint('FCM token saved for user: $userId');
+    } catch (e) {
+      debugPrint('Error saving FCM token: $e');
     }
   }
 
   /// Remove FCM token for a user (on logout)
   Future<void> removeTokenForUser(String userId) async {
+    _boundUserId = null;
     try {
       await _firestore.collection('users').doc(userId).update({
         'fcmToken': FieldValue.delete(),
@@ -109,11 +117,14 @@ class FCMService {
     }
   }
 
-  /// Update token in Firestore when it refreshes
+  /// Update token in Firestore when it rotates - re-save for the bound user.
   Future<void> _updateStoredToken(String newToken) async {
-    // This would need the current user ID - we'll handle this in AuthProvider
-    debugPrint(
-        'Token refresh detected. Update will happen on next auth check.');
+    final uid = _boundUserId;
+    if (uid == null) {
+      debugPrint('Token refreshed before login; will bind on next auth.');
+      return;
+    }
+    await _persistToken(uid, newToken);
   }
 
   /// Handle foreground messages - show local notification
