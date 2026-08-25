@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
@@ -7,6 +10,19 @@ import '../models/income_record_model.dart';
 import '../models/expense_record_model.dart';
 
 class ReportService {
+  static pw.Font? _cachedFont;
+
+  /// Loads a TTF with Ethiopic (Amharic) glyph coverage. The pdf package's
+  /// built-in Helvetica has no Ethiopic glyphs - Amharic strings would
+  /// render as empty boxes without this.
+  Future<pw.Font> _loadFont() async {
+    if (_cachedFont != null) return _cachedFont!;
+    final data =
+        await rootBundle.load('assets/fonts/Ebrima.ttf');
+    _cachedFont = pw.Font.ttf(data);
+    return _cachedFont!;
+  }
+
   /// Generate and print/share PDF report
   Future<void> generateTransactionReport(
     List<MoneyTransaction> transactions,
@@ -19,6 +35,7 @@ class ReportService {
         '${incomeRecords.length} income records, '
         '${expenseRecords.length} expense records');
     try {
+      final amharicFont = await _loadFont();
       final pdf = pw.Document();
       final now = DateTime.now();
       final dateFormatter = DateFormat('MMM d, yyyy h:mm a');
@@ -52,6 +69,12 @@ class ReportService {
       for (var e in expenseRecords) {
         totalExpenses += e.amount;
       }
+
+      final netFlow = totalDistributed -
+          totalReturned +
+          totalInvestment +
+          totalSales -
+          totalExpenses;
 
       final totalRecords =
           transactions.length + incomeRecords.length + expenseRecords.length;
@@ -87,6 +110,7 @@ class ReportService {
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
+          theme: pw.ThemeData.withFont(base: amharicFont, bold: amharicFont),
           footer: (pw.Context context) {
             return pw.Column(
               children: [
@@ -108,6 +132,18 @@ class ReportService {
             );
           },
           build: (pw.Context context) {
+            // Vertical summary: label | value rows span the page width and
+            // never squeeze numbers into a cramped single-row table.
+            final summaryRows = <(String, double)>[
+              ('Distributed', totalDistributed),
+              ('Returned', totalReturned),
+              ('Coffee Purchase', totalPurchased),
+              ('Investment', totalInvestment),
+              ('Sales', totalSales),
+              ('Expenses', totalExpenses),
+              ('Net Flow', netFlow),
+            ];
+
             return [
               // Header
               pw.Header(
@@ -149,41 +185,62 @@ class ReportService {
 
               pw.SizedBox(height: 20),
 
-              // Summary Table
+              // Summary - vertical table spanning full page width.
               pw.Text('Summary',
                   style: pw.TextStyle(
                       fontSize: 18, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 10),
-              pw.Table.fromTextArray(
-                headers: [
-                  'Distributed',
-                  'Returned',
-                  'Coffee Purchase',
-                  'Investment',
-                  'Sales',
-                  'Expenses',
-                  'Net Flow'
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1),
+                  1: pw.FlexColumnWidth(2),
+                },
+                children: [
+                  for (final row in summaryRows)
+                    pw.TableRow(
+                      decoration: pw.BoxDecoration(
+                        color: row.$1 == 'Net Flow'
+                            ? PdfColors.blueGrey800
+                            : PdfColors.blueGrey50,
+                      ),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: pw.Text(
+                            row.$1,
+                            style: pw.TextStyle(
+                              fontSize: row.$1 == 'Net Flow' ? 13 : 11,
+                              fontWeight: row.$1 == 'Net Flow'
+                                  ? pw.FontWeight.bold
+                                  : pw.FontWeight.normal,
+                              color: row.$1 == 'Net Flow'
+                                  ? PdfColors.white
+                                  : PdfColors.blueGrey800,
+                            ),
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: pw.Text(
+                            currencyFormatter.format(row.$2),
+                            textAlign: pw.TextAlign.right,
+                            style: pw.TextStyle(
+                              fontSize: row.$1 == 'Net Flow' ? 13 : 11,
+                              fontWeight: row.$1 == 'Net Flow'
+                                  ? pw.FontWeight.bold
+                                  : pw.FontWeight.normal,
+                              color: row.$1 == 'Net Flow'
+                                  ? PdfColors.white
+                                  : PdfColors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
-                data: [
-                  [
-                    currencyFormatter.format(totalDistributed),
-                    currencyFormatter.format(totalReturned),
-                    currencyFormatter.format(totalPurchased),
-                    currencyFormatter.format(totalInvestment),
-                    currencyFormatter.format(totalSales),
-                    currencyFormatter.format(totalExpenses),
-                    currencyFormatter.format(totalDistributed -
-                        totalReturned +
-                        totalInvestment +
-                        totalSales -
-                        totalExpenses),
-                  ]
-                ],
-                headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-                headerDecoration:
-                    const pw.BoxDecoration(color: PdfColors.blueGrey800),
-                cellAlignment: pw.Alignment.centerRight,
               ),
 
               pw.SizedBox(height: 20),
