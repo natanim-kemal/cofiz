@@ -19,6 +19,24 @@ class NotificationService {
 
     tz.initializeTimeZones();
 
+    // Create the channel FCM pushes target (functions payload references
+    // 'cofiz_main_channel'). Without it Android 8+ falls back to a silent
+    // "Miscellaneous" channel for background pushes.
+    const channel = fln.AndroidNotificationChannel(
+      'cofiz_main_channel',
+      'Cofiz Notifications',
+      description: 'Main channel for app notifications',
+      importance: fln.Importance.max,
+    );
+    try {
+      await _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              fln.AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+    } catch (_) {
+      // Non-Android platform or plugin unavailable - not fatal.
+    }
+
     const fln.AndroidInitializationSettings initializationSettingsAndroid =
         fln.AndroidInitializationSettings('@mipmap/ic_launcher');
 

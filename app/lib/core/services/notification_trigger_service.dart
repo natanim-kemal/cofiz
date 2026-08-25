@@ -103,7 +103,9 @@ class NotificationTriggerService {
     );
   }
 
-  /// Check and notify if worker balance is low after a purchase
+  /// Check and notify admins if worker balance drops below threshold after
+  /// a purchase. Collector-facing alert removed per product decision -
+  /// admins act on it, the collector shouldn't be nagged.
   Future<void> checkLowBalance({
     required String workerId,
     required String workerUserId,
@@ -111,20 +113,6 @@ class NotificationTriggerService {
     required double newBalance,
   }) async {
     if (newBalance < lowBalanceThreshold && newBalance >= 0) {
-      // Notify the worker
-      await _sendNotification(
-        targetUserId: workerUserId,
-        title: '⚠️ Low Balance Alert',
-        body:
-            'Your balance is low (ETB ${newBalance.toStringAsFixed(0)}). Please return funds soon.',
-        type: NotificationType.lowBalance,
-        metadata: {
-          'workerId': workerId,
-          'balance': newBalance,
-        },
-      );
-
-      // Also notify all admins
       await _notifyAllAdmins(
         title: '⚠️ Low Balance: $workerName',
         body:

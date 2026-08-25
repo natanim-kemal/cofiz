@@ -19,7 +19,7 @@ class FakeEmailVerificationService extends EmailVerificationService {
   }
 
   @override
-  Future<void> requestCode(String email) async {
+  Future<void> requestCode(String? email) async {
     requestCalls++;
     lastRequestedEmail = email;
   }

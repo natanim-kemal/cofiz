@@ -4,6 +4,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/email_verification_service.dart';
+import '../../../core/services/email_verification_service.dart'
+    show currentAccountEmail;
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/verification_dialog.dart';
@@ -117,17 +119,30 @@ class NotificationSettingsScreen extends StatelessWidget {
   }
 
   Future<bool> _startVerification(BuildContext context) async {
-    final email = context.read<AuthProvider>().appUser?.email;
-    if (email == null || email.isEmpty) return false;
+    final auth = context.read<AuthProvider>();
+    // Prefer the Firebase Auth account email; fall back to Firestore copy.
+    final email =
+        currentAccountEmail(fallback: auth.appUser?.email) ?? '';
+    if (email.isEmpty) {
+      AppToast.show('No email on this account');
+      return false;
+    }
     try {
       await EmailVerificationService().requestCode(email);
       if (!context.mounted) return false;
       AppToast.show(AppLocalizations.of(context)!.codeSentToEmail);
       final ok = await showDialog<bool>(
         context: context,
-        builder: (_) => VerificationDialog(email: email),
+        builder: (_) => VerificationDialog(
+          email: email,
+          onVerified: () => auth.markEmailVerified(),
+        ),
       );
       return ok ?? false;
+    } on EmailVerificationException catch (e) {
+      if (!context.mounted) return false;
+      AppToast.show(e.message);
+      return false;
     } catch (_) {
       if (!context.mounted) return false;
       AppToast.show(AppLocalizations.of(context)!.codeSendFailed);
