@@ -823,9 +823,13 @@ class OfflineSyncService {
     required String body,
     required String type,
   }) async {
-    if (!RelayConfig.isConfigured) return;
+    if (!RelayConfig.isConfigured) {
+      debugPrint('[Relay] SKIPPED - not configured. '
+          'Build with --dart-define=RELAY_URL=... --dart-define=RELAY_SECRET=...');
+      return;
+    }
     try {
-      await _relayHttpClient.post(
+      final res = await _relayHttpClient.post(
         Uri.parse(RelayConfig.relayUrl),
         headers: {
           'Content-Type': 'application/json',
@@ -838,8 +842,9 @@ class OfflineSyncService {
           'type': type,
         }),
       );
+      debugPrint('[Relay] $type -> $targetUserId: ${res.statusCode} ${res.body}');
     } catch (e) {
-      debugPrint('[Sync] relay push failed: $e');
+      debugPrint('[Relay] push failed: $e');
     }
   }
 
