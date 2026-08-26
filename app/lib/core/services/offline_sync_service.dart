@@ -730,10 +730,16 @@ class OfflineSyncService {
       try {
         final workerDoc =
             await firestore.collection('workers').doc(workerId).get();
-        if (!workerDoc.exists) return;
+        if (!workerDoc.exists) {
+          debugPrint('[Relay] worker doc not found: $workerId');
+          return;
+        }
         final data = workerDoc.data() ?? <String, dynamic>{};
         final workerUserId = data['userId'] as String?;
-        if (workerUserId == null || workerUserId.isEmpty) return;
+        if (workerUserId == null || workerUserId.isEmpty) {
+          debugPrint('[Relay] worker $workerId has no userId linked');
+          return;
+        }
         final workerName = (data['name'] as String?) ?? 'Collector';
         final newBalance = ((data['currentBalance'] as num?) ?? 0).toDouble();
         final totalCommission =

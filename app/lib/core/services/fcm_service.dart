@@ -80,24 +80,27 @@ class FCMService {
     return isAuthorized;
   }
 
-  /// Save FCM token for a user and remember the binding so token refreshes
-  /// re-save automatically.
   Future<void> saveTokenForUser(String userId) async {
     _boundUserId = userId;
-    _currentToken ??= await _messaging.getToken();
-
-    if (_currentToken != null) {
-      await _persistToken(userId, _currentToken!);
+    try {
+      await requestPermission();
+    } catch (_) {}
+    final token = await _messaging.getToken();
+    if (token == null) {
+      debugPrint('FCM getToken null for $userId');
+      return;
     }
+    _currentToken = token;
+    await _persistToken(userId, token);
   }
 
   Future<void> _persistToken(String userId, String token) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      });
-      debugPrint('FCM token saved for user: $userId');
+      }, SetOptions(merge: true));
+      debugPrint('FCM token saved for $userId');
     } catch (e) {
       debugPrint('Error saving FCM token: $e');
     }
