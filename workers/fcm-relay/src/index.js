@@ -1,15 +1,9 @@
-// Cofiz FCM relay - deploy to Cloudflare Workers (free, no card).
-//
+// Cofiz FCM relay - deploy to Cloudflare Workers.
 // Receives {targetUserId, title, body, type} from the app, looks up the
 // target user's fcmToken in Firestore via REST, and sends the push through
 // FCM HTTP v1 - all authenticated with a Firebase service account passed
 // as environment variables.
-//
-// Setup (see workers/fcm-relay/README.md):
-//   wrangler secret put FIREBASE_PROJECT_ID
-//   wrangler secret put FIREBASE_CLIENT_EMAIL
-//   wrangler secret put FIREBASE_PRIVATE_KEY
-//   wrangler secret put RELAY_SECRET
+
 
 const FIREBASE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 const FIRESTORE_HOST = "firestore.googleapis.com";
@@ -82,8 +76,7 @@ async function getFcmToken(env, accessToken, uid) {
 }
 
 async function sendPush(env, accessToken, fcmToken, payload) {
-  const message = {
-    message: {
+  const message = {    message: {
       token: fcmToken,
       notification: { title: payload.title, body: payload.body },
       data: {
@@ -113,6 +106,26 @@ async function sendPush(env, accessToken, fcmToken, payload) {
       body: JSON.stringify(message),
     },
   );
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`FCM send failed: ${res.status} ${errBody}`);
+    // Stale token cleanup
+    if (errBody.includes("registration-token-not-registered") ||
+        errBody.includes("invalid-registration-token") ||
+        errBody.includes("unregistered")) {
+      await fetch(
+        `https://${FIRESTORE_HOST}/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${payload.targetUserId}?updateMask.fieldPaths=fcmToken`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fields: {} }),
+        },
+      );
+    }
+  }
   return res.ok;
 }
 
