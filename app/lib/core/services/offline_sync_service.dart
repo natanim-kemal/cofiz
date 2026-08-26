@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/cloudinary_config.dart';
+import '../config/relay_config.dart';
 import '../models/transaction_model.dart';
 import '../utils/receipt_image_utils.dart';
 import '../utils/transaction_balance.dart' as tb;
@@ -747,6 +748,13 @@ class OfflineSyncService {
               amount: amount,
               adminName: null,
             );
+            await _pushViaRelay(
+              targetUserId: workerUserId,
+              title: '💰 Money Received',
+              body:
+                  'You received ETB ${amount.toStringAsFixed(0)} from Admin',
+              type: 'moneyDistributed',
+            );
             break;
           case 'purchase':
             await NotificationTriggerService().checkLowBalance(
@@ -755,12 +763,29 @@ class OfflineSyncService {
               workerName: workerName,
               newBalance: newBalance,
             );
+            if (newBalance < NotificationTriggerService.lowBalanceThreshold &&
+                newBalance >= 0) {
+              await _pushViaRelay(
+                targetUserId: workerUserId,
+                title: '⚠️ Low Balance',
+                body:
+                    'Your balance is low (ETB ${newBalance.toStringAsFixed(0)}).',
+                type: 'lowBalance',
+              );
+            }
             if ((commissionAmount ?? 0) > 0) {
               await NotificationTriggerService().notifyCommissionEarned(
                 workerUserId: workerUserId,
                 workerName: workerName,
                 commission: commissionAmount!,
                 totalCommission: totalCommission,
+              );
+              await _pushViaRelay(
+                targetUserId: workerUserId,
+                title: '🎉 Commission Earned!',
+                body:
+                    'You earned ETB ${commissionAmount!.toStringAsFixed(0)} commission.',
+                type: 'commissionEarned',
               );
             }
             await NotificationTriggerService().checkLargePurchase(
@@ -770,12 +795,52 @@ class OfflineSyncService {
               coffeeType: coffeeType,
               weight: coffeeWeight,
             );
+            if (amount >=
+                NotificationTriggerService.largePurchaseThreshold) {
+              await _pushViaRelay(
+                targetUserId: workerUserId,
+                title: '📦 Large Purchase',
+                body:
+                    'Purchased ETB ${amount.toStringAsFixed(0)}${coffeeType != null ? " ($coffeeType)" : ""}',
+                type: 'purchaseRecorded',
+              );
+            }
             break;
         }
       } catch (e) {
         debugPrint('[Sync] post-commit notification failed: $e');
       }
     }());
+  }
+
+  static final http.Client _relayHttpClient = http.Client();
+
+  /// Best-effort push through the Cloudflare relay (free FCM path, no
+  /// Google billing). Silent no-op when the relay isn't configured.
+  Future<void> _pushViaRelay({
+    required String targetUserId,
+    required String title,
+    required String body,
+    required String type,
+  }) async {
+    if (!RelayConfig.isConfigured) return;
+    try {
+      await _relayHttpClient.post(
+        Uri.parse(RelayConfig.relayUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Relay-Secret': RelayConfig.relaySecret,
+        },
+        body: jsonEncode({
+          'targetUserId': targetUserId,
+          'title': title,
+          'body': body,
+          'type': type,
+        }),
+      );
+    } catch (e) {
+      debugPrint('[Sync] relay push failed: $e');
+    }
   }
 
   int getPendingOperationsCount() {
