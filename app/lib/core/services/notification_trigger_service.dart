@@ -91,7 +91,7 @@ class NotificationTriggerService {
   }) async {
     await _sendNotification(
       targetUserId: workerUserId,
-      title: '💰 Money Received',
+      title: 'Money Received',
       body:
           'You received ETB ${amount.toStringAsFixed(0)} from ${adminName ?? 'Admin'}',
       type: NotificationType.moneyDistributed,
@@ -114,7 +114,7 @@ class NotificationTriggerService {
   }) async {
     if (newBalance < lowBalanceThreshold && newBalance >= 0) {
       await _notifyAllAdmins(
-        title: '⚠️ Low Balance: $workerName',
+        title: 'Low Balance: $workerName',
         body:
             '$workerName has low balance (ETB ${newBalance.toStringAsFixed(0)})',
         type: NotificationType.lowBalance,
@@ -136,7 +136,7 @@ class NotificationTriggerService {
   }) async {
     await _sendNotification(
       targetUserId: workerUserId,
-      title: '🎉 Commission Earned!',
+      title: 'Commission Earned!',
       body:
           'You earned ETB ${commission.toStringAsFixed(0)} commission. Total: ETB ${totalCommission.toStringAsFixed(0)}',
       type: NotificationType.commissionEarned,
@@ -157,7 +157,7 @@ class NotificationTriggerService {
   }) async {
     if (amount >= largePurchaseThreshold) {
       await _notifyAllAdmins(
-        title: '📦 Large Purchase: $workerName',
+        title: 'Large Purchase: $workerName',
         body:
             '$workerName purchased ETB ${amount.toStringAsFixed(0)} ${coffeeType != null ? "($coffeeType)" : ""} - ${weight?.toStringAsFixed(1) ?? ""} Kg',
         type: NotificationType.purchaseRecorded,
