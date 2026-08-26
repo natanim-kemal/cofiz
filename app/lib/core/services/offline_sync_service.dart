@@ -750,7 +750,7 @@ class OfflineSyncService {
             );
             await _pushViaRelay(
               targetUserId: workerUserId,
-              title: '💰 Money Received',
+              title: 'Money Received',
               body:
                   'You received ETB ${amount.toStringAsFixed(0)} from Admin',
               type: 'moneyDistributed',
@@ -767,7 +767,7 @@ class OfflineSyncService {
                 newBalance >= 0) {
               await _pushViaRelay(
                 targetUserId: workerUserId,
-                title: '⚠️ Low Balance',
+                title: 'Low Balance',
                 body:
                     'Your balance is low (ETB ${newBalance.toStringAsFixed(0)}).',
                 type: 'lowBalance',
@@ -782,7 +782,7 @@ class OfflineSyncService {
               );
               await _pushViaRelay(
                 targetUserId: workerUserId,
-                title: '🎉 Commission Earned!',
+                title: 'Commission Earned!',
                 body:
                     'You earned ETB ${commissionAmount!.toStringAsFixed(0)} commission.',
                 type: 'commissionEarned',
@@ -799,7 +799,7 @@ class OfflineSyncService {
                 NotificationTriggerService.largePurchaseThreshold) {
               await _pushViaRelay(
                 targetUserId: workerUserId,
-                title: '📦 Large Purchase',
+                title: 'Large Purchase',
                 body:
                     'Purchased ETB ${amount.toStringAsFixed(0)}${coffeeType != null ? " ($coffeeType)" : ""}',
                 type: 'purchaseRecorded',
