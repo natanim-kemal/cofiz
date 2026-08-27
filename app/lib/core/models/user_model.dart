@@ -38,6 +38,18 @@ enum UserRole {
   bool get isWorker => this == UserRole.worker;
 }
 
+DateTime? _parseDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  // Firestore Timestamp has .toDate()
+  try {
+    return (value as dynamic).toDate() as DateTime;
+  } catch (_) {
+    return null;
+  }
+}
+
 class AppUser {
   final String uid;
   final String email;
@@ -70,27 +82,20 @@ class AppUser {
     final roleString = (data['role'] as String?)?.toLowerCase() ?? 'viewer';
     final parsedRole = UserRole.values.firstWhere(
       (r) => r.name.toLowerCase() == roleString,
-      orElse: () => UserRole.viewer,
+      orElse: () {
+        if (data['workerId'] != null) return UserRole.worker;
+        return UserRole.viewer;
+      },
     );
 
     return AppUser(
       uid: uid,
       email: data['email'] ?? '',
       displayName: data['displayName'] ?? '',
-      role: UserRole.values.firstWhere(
-        (r) => r.name == data['role'],
-        orElse: () {
-          if (data['workerId'] != null) return UserRole.worker;
-          throw Exception('Invalid user role: ${data['role']}');
-        },
-      ),
+      role: parsedRole,
       photoUrl: data['photoUrl'],
-      createdAt: data['createdAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
-          : DateTime.now(),
-      lastLoginAt: data['lastLoginAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(data['lastLoginAt'])
-          : null,
+      createdAt: _parseDateTime(data['createdAt']) ?? DateTime.now(),
+      lastLoginAt: _parseDateTime(data['lastLoginAt']),
       isActive: data['isActive'] ?? true,
       emailVerified: data['emailVerified'] ?? false,
       createdBy: data['createdBy'],

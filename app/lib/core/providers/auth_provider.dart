@@ -128,7 +128,10 @@ class AuthProvider with ChangeNotifier {
         await _cacheAppUser(_appUser!);
         return;
       }
-    } catch (_) {}
+      debugPrint('[Auth] user doc not found (server): $uid');
+    } catch (e) {
+      debugPrint('[Auth] user doc fetch server failed: $e');
+    }
 
     try {
       final doc = await _firestore
@@ -142,13 +145,19 @@ class AuthProvider with ChangeNotifier {
         await _cacheAppUser(_appUser!);
         return;
       }
-    } catch (_) {}
+      debugPrint('[Auth] user doc not found (cache): $uid');
+    } catch (e) {
+      debugPrint('[Auth] user doc fetch cache failed: $e');
+    }
 
     final cached = await _loadCachedAppUser(uid);
     if (cached != null) {
       _appUser = cached;
       _userRole = cached.role;
       _workerId = cached.workerId;
+      debugPrint('[Auth] user loaded from SharedPreferences: $uid role=${cached.role}');
+    } else {
+      debugPrint('[Auth] NO user data found for $uid — all sources failed');
     }
   }
 

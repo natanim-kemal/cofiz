@@ -110,10 +110,10 @@ class FCMService {
   Future<void> removeTokenForUser(String userId) async {
     _boundUserId = null;
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'fcmToken': FieldValue.delete(),
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       debugPrint('FCM token removed for user: $userId');
     } catch (e) {
       debugPrint('Error removing FCM token: $e');
