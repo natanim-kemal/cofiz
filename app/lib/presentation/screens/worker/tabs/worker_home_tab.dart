@@ -7,6 +7,7 @@ import '../../../../core/providers/auth_provider.dart';
 import '../../../../../core/utils/number_formatter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/models/worker_model.dart';
+import '../../../../core/models/user_model.dart';
 import '../widgets/worker_stat_card.dart';
 import '../widgets/worker_transaction_tile.dart';
 import '../../../widgets/app_toast.dart';
@@ -126,6 +127,20 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                   ),
                   Row(
                     children: [
+                      Consumer<AuthProvider>(
+                        builder: (context, auth, _) {
+                          if (auth.userRole != UserRole.worker) return const SizedBox.shrink();
+                          return IconButton(
+                            icon: const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            tooltip: 'Ping Admin',
+                            onPressed: () => showPingAdminSheet(context, UserRole.worker),
+                          );
+                        },
+                      ),
                       NotificationBadge(
                         child: IconButton(
                           icon: const Icon(
@@ -290,9 +305,6 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                     ],
                   ),
                 ),
-
-                // Ping Admin button — collectors only (handled inside widget)
-                const PingAdminButton(),
 
                 const SizedBox(height: 24),
 

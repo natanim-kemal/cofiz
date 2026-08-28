@@ -11,7 +11,6 @@ import '../../widgets/custom_header.dart';
 import 'profile_edit_screen.dart';
 import 'notification_settings_screen.dart';
 import 'business_settings_screen.dart';
-import 'area_management_screen.dart';
 import 'data_management_screen.dart';
 import 'about_screen.dart';
 import '../audit/audit_log_screen.dart';
@@ -79,7 +78,7 @@ class SettingsScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               children: [
-                if (isAdmin || authProvider.isViewer) ...[
+                if (authProvider.isViewer) ...[
                   _buildSectionHeader(theme, localizations.business),
                   _buildSettingsTile(
                     context,
@@ -94,21 +93,6 @@ class SettingsScreen extends StatelessWidget {
                         MaterialPageRoute(
                             builder: (context) =>
                                 const BusinessSettingsScreen()),
-                      );
-                    },
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.location_on,
-                    title: localizations.manageAreas,
-                    subtitle: localizations.purchaseLocations,
-                    trailing:
-                        const Icon(Icons.chevron_right, color: Colors.grey),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const AreaManagementScreen()),
                       );
                     },
                   ),

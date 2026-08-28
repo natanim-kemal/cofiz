@@ -95,13 +95,7 @@ class _PingAdminSheetState extends State<PingAdminSheet> {
   Future<void> _handleSend() async {
     if (!_canSend) return;
     final note = _controller.text.trim();
-    // Offline gate
     if (!_isOnline) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You are offline — connect to send ping')),
-        );
-      }
       AppToast.show('You are offline — connect to send ping');
       return;
     }
@@ -114,7 +108,6 @@ class _PingAdminSheetState extends State<PingAdminSheet> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final senderId = auth.user?.uid ?? auth.appUser?.uid ?? '';
         final senderName = auth.appUser?.displayName ?? auth.getUserDisplayName() ?? 'Unknown';
-        // Use role from widget, but senderRole from actual auth if available
         final senderRole = widget.role;
         if (senderId.isEmpty) {
           throw StateError('Not authenticated');
@@ -130,34 +123,21 @@ class _PingAdminSheetState extends State<PingAdminSheet> {
       if (!mounted) return;
       Navigator.of(context).pop();
       AppToast.show('Ping sent to admins', success: true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ping sent to admins')),
-      );
     } on StateError catch (e) {
       if (!mounted) return;
       final msg = e.message.contains('cooldown')
           ? 'Please wait 2 minutes before pinging again'
           : e.message;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
       AppToast.show(msg);
     } on ArgumentError catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      AppToast.show(e.message);
     } catch (e) {
       if (!mounted) return;
-      // Try ping fallback for offline detection
       if (!_isOnline) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You are offline — connect to send ping')),
-        );
+        AppToast.show('You are offline — connect to send ping');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send ping: $e')),
-        );
+        AppToast.show('Failed to send ping: $e');
       }
     } finally {
       if (mounted) setState(() => _sending = false);
