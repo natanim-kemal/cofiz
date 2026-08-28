@@ -99,61 +99,6 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                 ],
 
-                if (isAdmin) ...[
-                  _buildSectionHeader(theme, 'Reminders'),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.notifications_active_outlined,
-                    title: 'Nightly reminder',
-                    subtitle: 'Notify if no record today',
-                    trailing: Switch(
-                      value: settingsProvider.reminderEnabled,
-                      onChanged: (val) async {
-                        await settingsProvider.setReminderEnabled(val);
-                      },
-                      activeThumbColor: AppColors.primary,
-                    ),
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.schedule,
-                    title: 'Reminder time',
-                    subtitle:
-                        '${settingsProvider.adminReminderTime} — Checks at +0/+30/+60 min',
-                    trailing: Icon(
-                      Icons.access_time,
-                      color: settingsProvider.reminderEnabled
-                          ? AppColors.primary
-                          : Colors.grey,
-                    ),
-                    onTap: settingsProvider.reminderEnabled
-                        ? () async {
-                            final initial = settingsProvider.adminReminderTimeOfDay;
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: initial,
-                            );
-                            if (picked != null && context.mounted) {
-                              final formatted =
-                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                              await settingsProvider.setAdminReminderTime(formatted);
-                            }
-                          }
-                        : null,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, top: 4, bottom: 8),
-                    child: Text(
-                      'Checks at +0/+30/+60 min (Africa/Addis Ababa)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
                 _buildSectionHeader(theme, localizations.general),
                 _buildSettingsTile(
                   context,
@@ -183,6 +128,68 @@ class SettingsScreen extends StatelessWidget {
                   },
                   trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                 ),
+
+                if (isAdmin) ...[
+                  _buildSectionHeader(theme, 'Reminders'),
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Nightly reminder',
+                    subtitle: 'Notify if no record today',
+                    trailing: Switch(
+                      value: settingsProvider.reminderEnabled,
+                      onChanged: (val) async {
+                        await settingsProvider.setReminderEnabled(val);
+                      },
+                      activeThumbColor: AppColors.primary,
+                    ),
+                  ),
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.schedule,
+                    title: 'Reminder time',
+                    subtitle: settingsProvider.adminReminderTime,
+                    trailing: Icon(
+                      Icons.access_time,
+                      color: settingsProvider.reminderEnabled
+                          ? AppColors.primary
+                          : Colors.grey,
+                    ),
+                    onTap: settingsProvider.reminderEnabled
+                        ? () async {
+                            final initial = settingsProvider.adminReminderTimeOfDay;
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: initial,
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    timePickerTheme: TimePickerThemeData(
+                                      dialHandColor: AppColors.primary,
+                                      hourMinuteColor: WidgetStateColor.resolveWith((states) => states.contains(WidgetState.selected) ? AppColors.primary : Colors.grey.shade200),
+                                      hourMinuteTextColor: WidgetStateColor.resolveWith((states) => states.contains(WidgetState.selected) ? Colors.white : Colors.black87),
+                                      dialBackgroundColor: Colors.grey.shade100,
+                                      entryModeIconColor: AppColors.primary,
+                                      helpTextStyle: const TextStyle(fontSize: 0, color: Colors.transparent),
+                                    ),
+                                  ),
+                                  child: Transform.scale(
+                                    scale: 0.88,
+                                    child: child!,
+                                  ),
+                                );
+                              },
+                            );
+                            if (picked != null && context.mounted) {
+                              final formatted =
+                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              await settingsProvider.setAdminReminderTime(formatted);
+                            }
+                          }
+                        : null,
+                  ),
+                  const SizedBox(height: 24),
+                ],
 
                 const SizedBox(height: 24),
                 _buildSectionHeader(theme, localizations.preferences),
