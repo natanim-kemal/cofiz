@@ -115,6 +115,61 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                 ],
 
+                if (isAdmin) ...[
+                  _buildSectionHeader(theme, 'Reminders'),
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.notifications_active_outlined,
+                    title: 'Nightly reminder',
+                    subtitle: 'Notify if no record today',
+                    trailing: Switch(
+                      value: settingsProvider.reminderEnabled,
+                      onChanged: (val) async {
+                        await settingsProvider.setReminderEnabled(val);
+                      },
+                      activeThumbColor: AppColors.primary,
+                    ),
+                  ),
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.schedule,
+                    title: 'Reminder time',
+                    subtitle:
+                        '${settingsProvider.adminReminderTime} — Checks at +0/+30/+60 min',
+                    trailing: Icon(
+                      Icons.access_time,
+                      color: settingsProvider.reminderEnabled
+                          ? AppColors.primary
+                          : Colors.grey,
+                    ),
+                    onTap: settingsProvider.reminderEnabled
+                        ? () async {
+                            final initial = settingsProvider.adminReminderTimeOfDay;
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: initial,
+                            );
+                            if (picked != null && context.mounted) {
+                              final formatted =
+                                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+                              await settingsProvider.setAdminReminderTime(formatted);
+                            }
+                          }
+                        : null,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, top: 4, bottom: 8),
+                    child: Text(
+                      'Checks at +0/+30/+60 min (Africa/Addis Ababa)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
                 _buildSectionHeader(theme, localizations.general),
                 _buildSettingsTile(
                   context,
