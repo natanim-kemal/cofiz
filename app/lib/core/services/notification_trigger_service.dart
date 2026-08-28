@@ -104,27 +104,17 @@ class NotificationTriggerService {
   }
 
   /// Check and notify admins if worker balance drops below threshold after
-  /// a purchase. Collector-facing alert removed per product decision -
-  /// admins act on it, the collector shouldn't be nagged.
+  /// a purchase. Admin echo removed — bells are ping-only (collector/viewer
+  /// → admin via PingService). Kept as no-op for backward compat.
   Future<void> checkLowBalance({
     required String workerId,
     required String workerUserId,
     required String workerName,
     required double newBalance,
   }) async {
-    if (newBalance < lowBalanceThreshold && newBalance >= 0) {
-      await _notifyAllAdmins(
-        title: 'Low Balance: $workerName',
-        body:
-            '$workerName has low balance (ETB ${newBalance.toStringAsFixed(0)})',
-        type: NotificationType.lowBalance,
-        metadata: {
-          'workerId': workerId,
-          'workerName': workerName,
-          'balance': newBalance,
-        },
-      );
-    }
+    // no-op: admin echo removed — bells are ping-only.
+    // Intentionally does not create notifications or mail.
+    return;
   }
 
   /// Notify worker when they earn commission
@@ -147,7 +137,7 @@ class NotificationTriggerService {
     );
   }
 
-  /// Notify admins about a large purchase
+  /// Notify admins about a large purchase. Admin echo removed — ping-only.
   Future<void> checkLargePurchase({
     required String workerId,
     required String workerName,
@@ -155,21 +145,8 @@ class NotificationTriggerService {
     String? coffeeType,
     double? weight,
   }) async {
-    if (amount >= largePurchaseThreshold) {
-      await _notifyAllAdmins(
-        title: 'Large Purchase: $workerName',
-        body:
-            '$workerName purchased ETB ${amount.toStringAsFixed(0)} ${coffeeType != null ? "($coffeeType)" : ""} - ${weight?.toStringAsFixed(1) ?? ""} Kg',
-        type: NotificationType.purchaseRecorded,
-        metadata: {
-          'workerId': workerId,
-          'workerName': workerName,
-          'amount': amount,
-          'coffeeType': coffeeType,
-          'weight': weight,
-        },
-      );
-    }
+    // no-op: admin echo removed — bells are ping-only.
+    return;
   }
 
   /// Notify all admin users

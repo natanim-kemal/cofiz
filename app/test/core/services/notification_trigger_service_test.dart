@@ -70,4 +70,49 @@ void main() {
     final mail = await firestore.collection('mail').get();
     expect(mail.docs, isEmpty);
   });
+
+  // --- Task 1: ping-only — admin echo removed (RED phase) ---
+  test('purchase does not notify admins (ping-only) — low balance', () async {
+    // Seed an admin so _notifyAllAdmins would have had a target before the fix.
+    await firestore.collection('users').doc('admin1').set({
+      'role': 'admin',
+      'email': 'admin1@example.com',
+    });
+    final svc = NotificationTriggerService(firestore: firestore);
+    await svc.checkLowBalance(
+      workerId: 'w1',
+      workerUserId: 'u1',
+      workerName: 'A',
+      newBalance: 100,
+    );
+    final notifications = await firestore.collection('notifications').get();
+    expect(notifications.docs, isEmpty,
+        reason: 'admin echo removed: lowBalance must not create notifications');
+    final mail = await firestore.collection('mail').get();
+    expect(mail.docs, isEmpty);
+  });
+
+  test('large purchase does not notify admins (ping-only)', () async {
+    await firestore.collection('users').doc('admin1').set({
+      'role': 'admin',
+      'email': 'admin1@example.com',
+    });
+    await firestore.collection('users').doc('admin2').set({
+      'role': 'admin',
+      'email': 'admin2@example.com',
+    });
+    final svc = NotificationTriggerService(firestore: firestore);
+    await svc.checkLargePurchase(
+      workerId: 'w1',
+      workerName: 'A',
+      amount: 15000,
+      coffeeType: 'Yirgacheffe',
+      weight: 10,
+    );
+    final notifications = await firestore.collection('notifications').get();
+    expect(notifications.docs, isEmpty,
+        reason: 'admin echo removed: largePurchase must not create notifications');
+    final mail = await firestore.collection('mail').get();
+    expect(mail.docs, isEmpty);
+  });
 }
