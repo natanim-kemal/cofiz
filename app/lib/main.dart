@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/services/fcm_service.dart';
-import 'core/services/area_service.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/providers/density_provider.dart';
@@ -93,7 +92,6 @@ Future<void> _initializeNetworkServices() async {
   try {
     await Future.wait([
       FCMService().initialize(),
-      AreaService().initializeDefaultAreas(),
       IncomeService().initializeDefaultSaleCategories(),
       ExpenseService().initializeDefaultExpenseCategories(),
       RelayConfig.init(),

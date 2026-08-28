@@ -80,7 +80,16 @@ class FCMService {
     return isAuthorized;
   }
 
+  DateTime? _lastSaveAt;
+  String? _lastSaveUserId;
+
   Future<void> saveTokenForUser(String userId) async {
+    if (_lastSaveUserId == userId &&
+        _lastSaveAt != null &&
+        DateTime.now().difference(_lastSaveAt!).inSeconds < 5) {
+      debugPrint('FCM saveToken deduped for $userId');
+      return;
+    }
     _boundUserId = userId;
     try {
       await requestPermission();
@@ -90,7 +99,14 @@ class FCMService {
       debugPrint('FCM getToken null for $userId');
       return;
     }
+    if (_currentToken == token && _lastSaveUserId == userId) {
+      debugPrint('FCM token unchanged for $userId');
+      _lastSaveAt = DateTime.now();
+      return;
+    }
     _currentToken = token;
+    _lastSaveUserId = userId;
+    _lastSaveAt = DateTime.now();
     await _persistToken(userId, token);
   }
 
@@ -109,6 +125,8 @@ class FCMService {
   /// Remove FCM token for a user (on logout)
   Future<void> removeTokenForUser(String userId) async {
     _boundUserId = null;
+    _lastSaveUserId = null;
+    _lastSaveAt = null;
     try {
       await _firestore.collection('users').doc(userId).set({
         'fcmToken': FieldValue.delete(),

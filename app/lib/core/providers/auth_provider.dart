@@ -66,12 +66,13 @@ class AuthProvider with ChangeNotifier {
     _authService.authStateChanges.listen((User? user) async {
       if (user != null) {
         _user = user;
-        _status = AuthStatus.authenticated;
-        notifyListeners();
-        // Restored sessions must (re)bind the FCM token - it may have
-        // rotated while the app was closed.
-        unawaited(FCMService().saveTokenForUser(user.uid));
+        if (_status != AuthStatus.loading) {
+          _status = AuthStatus.loading;
+          notifyListeners();
+        }
         await _fetchUserData(user.uid);
+        unawaited(FCMService().saveTokenForUser(user.uid));
+        _status = AuthStatus.authenticated;
         notifyListeners();
       } else {
         _user = null;
@@ -167,6 +168,9 @@ class AuthProvider with ChangeNotifier {
     required String password,
   }) async {
     try {
+      _appUser = null;
+      _userRole = null;
+      _workerId = null;
       _status = AuthStatus.loading;
       _errorMessage = null;
       notifyListeners();
