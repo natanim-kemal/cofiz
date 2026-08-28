@@ -12,6 +12,7 @@ import '../widgets/worker_transaction_tile.dart';
 import '../../../widgets/app_toast.dart';
 import '../../../widgets/custom_header.dart';
 import '../../../widgets/notification_badge.dart';
+import '../../../widgets/ping_admin_sheet.dart';
 import '../../notifications/notifications_screen.dart';
 
 class WorkerHomeTab extends StatefulWidget {
@@ -289,6 +290,9 @@ class _WorkerHomeTabState extends State<WorkerHomeTab> {
                     ],
                   ),
                 ),
+
+                // Ping Admin button — collectors only (handled inside widget)
+                const PingAdminButton(),
 
                 const SizedBox(height: 24),
 

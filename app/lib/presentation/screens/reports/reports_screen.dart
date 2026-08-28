@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/providers/transaction_provider.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/income_provider.dart';
 import '../../../core/providers/expense_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/models/user_model.dart';
+import '../../widgets/ping_admin_sheet.dart';
 import '../../../core/models/transaction_model.dart';
 import '../../../core/models/income_record_model.dart';
 import '../../../core/models/expense_record_model.dart';
@@ -259,8 +262,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         color: Colors.white,
                       ),
                     ),
-                    IconButton(
-                      onPressed: () async {
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Ping Admin — viewer only
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            if (!auth.isViewer) return const SizedBox.shrink();
+                            return IconButton(
+                              onPressed: () => showPingAdminSheet(context, UserRole.viewer),
+                              icon: const Icon(Icons.send_rounded, color: Colors.white),
+                              tooltip: 'Ping Admin',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              style: IconButton.styleFrom(
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            );
+                          },
+                        ),
+                        if (Provider.of<AuthProvider>(context).isViewer)
+                          const SizedBox(width: 12),
+                        IconButton(
+                          onPressed: () async {
                         if (entries.isEmpty) {
                           AppToast.show(
                               AppLocalizations.of(context)!.noDataToExport);
@@ -294,6 +318,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       style: IconButton.styleFrom(
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
+                    ),
+                      ],
                     ),
                   ],
                 ),

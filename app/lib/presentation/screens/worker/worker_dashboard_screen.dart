@@ -13,6 +13,7 @@ import 'tabs/worker_history_tab.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/double_back_exit.dart';
 import '../../widgets/offline_indicator.dart';
+import '../../widgets/ping_admin_sheet.dart'; // PingAdminButton lives in WorkerHomeTab below Balance Card
 
 class WorkerDashboardScreen extends StatefulWidget {
   final String workerId;
