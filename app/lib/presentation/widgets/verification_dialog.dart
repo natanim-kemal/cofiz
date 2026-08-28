@@ -47,15 +47,21 @@ class _VerifyEmailTileState extends State<VerifyEmailTile> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     if (_verified) {
-      return ListTile(
-        title: Text(l10n.emailVerified),
-        trailing: const Icon(Icons.verified, color: Colors.green),
+      return Material(
+        color: Colors.transparent,
+        child: ListTile(
+          title: Text(l10n.emailVerified),
+          trailing: const Icon(Icons.verified, color: Colors.green),
+        ),
       );
     }
-    return ListTile(
-      title: Text(l10n.verifyEmail),
-      subtitle: Text(widget.email),
-      trailing: ElevatedButton(onPressed: _verify, child: Text(l10n.verify)),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        title: Text(l10n.verifyEmail),
+        subtitle: Text(widget.email),
+        trailing: ElevatedButton(onPressed: _verify, child: Text(l10n.verify)),
+      ),
     );
   }
 }

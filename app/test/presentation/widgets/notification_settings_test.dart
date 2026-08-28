@@ -1,3 +1,4 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -11,7 +12,8 @@ void main() {
 
   test('SettingsProvider exposes no smsNotifications surface', () {
     SharedPreferences.setMockInitialValues({});
-    final p = SettingsProvider();
+    final fake = FakeFirebaseFirestore();
+    final p = SettingsProvider(firestore: fake);
     expect(() => (p as dynamic).smsNotifications,
         throwsA(isA<NoSuchMethodError>()));
     expect(() => (p as dynamic).toggleSmsNotifications(true),
@@ -21,7 +23,8 @@ void main() {
   test('SettingsProvider emailNotifications defaults true and toggles',
       () async {
     SharedPreferences.setMockInitialValues({});
-    final p = SettingsProvider();
+    final fake = FakeFirebaseFirestore();
+    final p = SettingsProvider(firestore: fake);
     await pumpEventQueue();
     expect(p.emailNotifications, true);
     await p.toggleEmailNotifications(false);
@@ -33,9 +36,10 @@ void main() {
       'gating the verify tile when email notifications are off',
       (tester) async {
     SharedPreferences.setMockInitialValues({'email_notifications': false});
+    final fake = FakeFirebaseFirestore();
     late SettingsProvider settings;
     await tester.runAsync(() async {
-      settings = SettingsProvider();
+      settings = SettingsProvider(firestore: fake);
       await Future<void>.delayed(const Duration(milliseconds: 10));
     });
     await tester.pumpWidget(

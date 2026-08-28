@@ -55,11 +55,16 @@ class NotificationSettingsScreen extends StatelessWidget {
                           : Colors.grey.shade200,
                     ),
                   ),
-                  child: Consumer<AuthProvider>(
-                    builder: (ctx, auth, _) => VerifyEmailTile(
-                      email: auth.appUser?.email ?? '',
-                      verified: auth.appUser?.emailVerified ?? false,
-                      onVerify: () => _startVerification(ctx),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    clipBehavior: Clip.antiAlias,
+                    child: Consumer<AuthProvider>(
+                      builder: (ctx, auth, _) => VerifyEmailTile(
+                        email: auth.appUser?.email ?? '',
+                        verified: auth.appUser?.emailVerified ?? false,
+                        onVerify: () => _startVerification(ctx),
+                      ),
                     ),
                   ),
                 ),
@@ -96,22 +101,27 @@ class NotificationSettingsScreen extends StatelessWidget {
           color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
         ),
       ),
-      child: SwitchListTile(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: theme.textTheme.bodyLarge?.color,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: SwitchListTile(
+          value: value,
+          onChanged: onChanged,
+          activeThumbColor: AppColors.primary,
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: theme.textTheme.bodyLarge?.color,
+            ),
           ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+            ),
           ),
         ),
       ),

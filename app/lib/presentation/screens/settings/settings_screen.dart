@@ -398,21 +398,26 @@ class SettingsScreen extends StatelessWidget {
           color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
         ),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: AppColors.primary, size: 24),
-        title: Text(
-          title,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onTap,
+          leading: Icon(icon, color: AppColors.primary, size: 24),
+          title: Text(
+            title,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
+          subtitle: subtitle != null
+              ? Text(subtitle,
+                  style: const TextStyle(
+                      color: AppColors.textMutedDark, fontSize: 12))
+              : null,
+          trailing: trailing,
         ),
-        subtitle: subtitle != null
-            ? Text(subtitle,
-                style: const TextStyle(
-                    color: AppColors.textMutedDark, fontSize: 12))
-            : null,
-        trailing: trailing,
       ),
     );
   }
