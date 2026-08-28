@@ -757,8 +757,7 @@ class OfflineSyncService {
             await _pushViaRelay(
               targetUserId: workerUserId,
               title: 'Money Received',
-              body:
-                  'You received ETB ${amount.toStringAsFixed(0)} from Admin',
+              body: 'You received ETB ${amount.toStringAsFixed(0)} from Admin',
               type: 'moneyDistributed',
             );
             break;
@@ -801,8 +800,7 @@ class OfflineSyncService {
               coffeeType: coffeeType,
               weight: coffeeWeight,
             );
-            if (amount >=
-                NotificationTriggerService.largePurchaseThreshold) {
+            if (amount >= NotificationTriggerService.largePurchaseThreshold) {
               await _pushViaRelay(
                 targetUserId: workerUserId,
                 title: 'Large Purchase',
@@ -823,15 +821,19 @@ class OfflineSyncService {
 
   /// Best-effort push through the Cloudflare relay (free FCM path, no
   /// Google billing). Silent no-op when the relay isn't configured.
+  /// Prefers Firestore-sourced config; falls back to dart-define.
   Future<void> _pushViaRelay({
     required String targetUserId,
     required String title,
     required String body,
     required String type,
   }) async {
+    try {
+      await RelayConfig.ensureInitialized(firestore: firestore);
+    } catch (_) {}
     if (!RelayConfig.isConfigured) {
       debugPrint('[Relay] SKIPPED - not configured. '
-          'Build with --dart-define=RELAY_URL=... --dart-define=RELAY_SECRET=...');
+          'Set settings/app relayUrl/relaySecret or build with --dart-define=RELAY_URL=... --dart-define=RELAY_SECRET=...');
       return;
     }
     try {
@@ -848,7 +850,8 @@ class OfflineSyncService {
           'type': type,
         }),
       );
-      debugPrint('[Relay] $type -> $targetUserId: ${res.statusCode} ${res.body}');
+      debugPrint(
+          '[Relay] $type -> $targetUserId: ${res.statusCode} ${res.body}');
     } catch (e) {
       debugPrint('[Relay] push failed: $e');
     }

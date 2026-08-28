@@ -84,9 +84,16 @@ class PingService {
       await batch.commit();
     }
 
-    // Relay push per admin (best-effort)
-    final relayUrl = _relayUrlOverride ?? RelayConfig.relayUrl;
-    final relaySecret = _relaySecretOverride ?? RelayConfig.relaySecret;
+    // Relay push per admin (best-effort) — ensure Firestore-sourced config is loaded
+    String relayUrl = _relayUrlOverride ?? RelayConfig.relayUrl;
+    String relaySecret = _relaySecretOverride ?? RelayConfig.relaySecret;
+    if (_relayUrlOverride == null || _relaySecretOverride == null) {
+      try {
+        await RelayConfig.ensureInitialized(firestore: _firestore);
+        relayUrl = _relayUrlOverride ?? RelayConfig.relayUrl;
+        relaySecret = _relaySecretOverride ?? RelayConfig.relaySecret;
+      } catch (_) {}
+    }
     final isConfigured = relayUrl.isNotEmpty && relaySecret.isNotEmpty;
     if (isConfigured) {
       for (final doc in adminSnap.docs) {

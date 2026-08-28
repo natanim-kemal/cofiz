@@ -2,6 +2,7 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
 import 'core/models/user_model.dart';
+import 'core/config/relay_config.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -81,7 +82,8 @@ void main() async {
 
   // Network-dependent initialization is deferred until after the first
   // frame so a slow connection doesn't hold up app startup. All calls run
-  // in parallel.
+  // in parallel. RelayConfig is initialized here so Firestore-sourced
+  // relayUrl/relaySecret are available without --dart-define.
   WidgetsBinding.instance.addPostFrameCallback((_) {
     _initializeNetworkServices();
   });
@@ -94,9 +96,16 @@ Future<void> _initializeNetworkServices() async {
       AreaService().initializeDefaultAreas(),
       IncomeService().initializeDefaultSaleCategories(),
       ExpenseService().initializeDefaultExpenseCategories(),
+      RelayConfig.init(),
     ]);
   } catch (e) {
     debugPrint('Background service initialization failed: $e');
+  }
+  // Ensure RelayConfig attempted even if other services failed
+  try {
+    await RelayConfig.ensureInitialized();
+  } catch (e) {
+    debugPrint('[RelayConfig] post-init ensure failed: $e');
   }
 }
 
@@ -233,8 +242,12 @@ class _AuthGateState extends State<AuthGate> {
 
         // Navigate based on auth status AND user role
         if (authProvider.isAuthenticated) {
-          // Check if user role is loaded
           if (authProvider.userRole == null) {
+            if (authProvider.status == AuthStatus.loading) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
             return Scaffold(
               body: Center(
                 child: Padding(
@@ -276,21 +289,17 @@ class _AuthGateState extends State<AuthGate> {
             );
           }
 
-          // Route based on role
           switch (authProvider.userRole!) {
             case UserRole.admin:
-              return MainLayout(key: MainLayout.mainLayoutKey);
+              return MainLayout(
+                  key: ValueKey('main-${authProvider.user!.uid}'));
             case UserRole.viewer:
-
-              // Admin and Viewer use MainLayout
-              // Viewer will have read-only restrictions in UI
-              return MainLayout(key: MainLayout.mainLayoutKey);
-
+              return MainLayout(
+                  key: ValueKey('main-${authProvider.user!.uid}'));
             case UserRole.worker:
-
-              // Workers go to their own dashboard
               if (authProvider.workerId != null) {
                 return WorkerDashboardScreen(
+                  key: ValueKey('worker-${authProvider.workerId}'),
                   workerId: authProvider.workerId!,
                 );
               } else {
