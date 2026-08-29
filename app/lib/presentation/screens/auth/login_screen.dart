@@ -7,6 +7,7 @@ import '../../../core/providers/audit_provider.dart';
 import '../../widgets/background_pattern.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import 'phone_login_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -293,6 +294,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ).animate().fadeIn(delay: 700.ms),
+
+                        const SizedBox(height: 12),
+                        TextButton.icon(
+                          icon: const Icon(Icons.phone),
+                          label: const Text('Sign in with phone'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const PhoneLoginScreen()),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),

@@ -22,6 +22,9 @@ import 'core/providers/income_provider.dart';
 import 'core/providers/expense_provider.dart';
 import 'core/services/income_service.dart';
 import 'core/services/expense_service.dart';
+import 'core/providers/phone_otp_auth_provider.dart';
+import 'core/services/auth_backend.dart';
+import 'core/services/auth_backend_firebase.dart';
 import 'presentation/widgets/custom_bottom_nav.dart';
 import 'presentation/widgets/offline_indicator.dart';
 import 'presentation/widgets/double_back_exit.dart';
@@ -122,6 +125,16 @@ class StitchWorkerApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider.value(value: notificationService),
+        ChangeNotifierProvider(
+          create: (_) => PhoneOtpAuthProvider(
+            backend: AuthBackend(
+              baseUrl: const String.fromEnvironment(
+                'RELAY_BASE_URL',
+                defaultValue: 'https://fcm-relay.example',
+              ),
+            ),
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => WorkerProvider()),
         ChangeNotifierProxyProvider<WorkerProvider, TransactionProvider>(
