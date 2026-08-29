@@ -4,3 +4,12 @@ compatibility_date = "2026-01-01"
 
 [triggers]
 crons = ["*/30 * * * *"]
+
+[[kv_namespaces]]
+binding = "OTP_KV"
+id = "REPLACE_WITH_REAL_KV_ID"
+
+# Secrets (set with `wrangler secret put`):
+#   TELEGRAM_BOT_TOKEN
+#   WHATSAPP_PHONE_ID
+#   WHATSAPP_ACCESS_TOKEN

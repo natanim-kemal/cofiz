@@ -4,6 +4,8 @@
 // FCM HTTP v1 - all authenticated with a Firebase service account passed
 // as environment variables.
 
+import { handleStart as otpStart, handleVerify as otpVerify } from './otp/index.js';
+
 
 const FIREBASE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 const FIRESTORE_HOST = "firestore.googleapis.com";
@@ -306,6 +308,14 @@ export default {
     // Shared-secret gate so only the app can hit the relay.
     if (request.headers.get("X-Relay-Secret") !== env.RELAY_SECRET) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    if (url.pathname === '/otp/start') {
+      return otpStart(request, env);
+    }
+    if (url.pathname === '/otp/verify') {
+      return otpVerify(request, env);
     }
 
     let payload;
