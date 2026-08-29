@@ -24,6 +24,17 @@ void main() {
     test('keeps existing +', () {
       expect(normalizeE164('+251911234567'), '+251911234567');
     });
+    test('strips whitespace from existing + number', () {
+      expect(normalizeE164('+251 911 234 567'), '+251911234567');
+    });
+    test('strips dashes from local number', () {
+      expect(normalizeE164('0911-234-567', defaultRegion: 'ET'),
+          '+251911234567');
+    });
+    test('throws ArgumentError for unsupported region', () {
+      expect(() => normalizeE164('0911', defaultRegion: 'XX'),
+          throwsArgumentError);
+    });
   });
 
   group('sha256Hex', () {
