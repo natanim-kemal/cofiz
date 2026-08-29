@@ -4,7 +4,6 @@
 // FCM HTTP v1 - all authenticated with a Firebase service account passed
 // as environment variables.
 
-import { handleStart as otpStart, handleVerify as otpVerify } from './otp/index.js';
 import { handleTelegramLogin, handleWhatsappStart, handleWhatsappVerify } from './auth/index.js';
 
 
@@ -320,12 +319,6 @@ export default {
     }
     if (url.pathname === '/auth/whatsapp/verify') {
       return handleWhatsappVerify(request, env);
-    }
-    if (url.pathname === '/otp/start') {
-      return otpStart(request, env);
-    }
-    if (url.pathname === '/otp/verify') {
-      return otpVerify(request, env);
     }
 
     let payload;
