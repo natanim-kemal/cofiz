@@ -15,6 +15,7 @@ import 'data_management_screen.dart';
 import 'about_screen.dart';
 import '../audit/audit_log_screen.dart';
 import '../../widgets/app_toast.dart';
+import 'pin_lock_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -233,8 +234,15 @@ class SettingsScreen extends StatelessWidget {
                 _buildSettingsTile(
                   context,
                   icon: Icons.security,
-                  title: localizations.twoFactorAuth,
+                  title: localizations.pinLock,
+                  subtitle: localizations.pinLockSubtitle,
                   trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PinLockSettingsScreen()),
+                    );
+                  },
                 ),
 
                 if (isAdmin || authProvider.isViewer) ...[

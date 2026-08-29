@@ -2881,6 +2881,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send code'**
   String get sendCode;
+
+  /// No description provided for @createPinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your PIN'**
+  String get createPinTitle;
+
+  /// No description provided for @confirmPinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your PIN'**
+  String get confirmPinTitle;
+
+  /// No description provided for @pinMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'PINs do not match'**
+  String get pinMismatch;
+
+  /// No description provided for @pinLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter PIN'**
+  String get pinLockTitle;
+
+  /// No description provided for @pinForgot.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot PIN?'**
+  String get pinForgot;
+
+  /// No description provided for @pinUseBiometric.
+  ///
+  /// In en, this message translates to:
+  /// **'Use fingerprint'**
+  String get pinUseBiometric;
+
+  /// No description provided for @pinIncorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect PIN'**
+  String get pinIncorrect;
+
+  /// No description provided for @pinTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Sign in again.'**
+  String get pinTooMany;
+
+  /// No description provided for @pinWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN is too weak — choose a less predictable code'**
+  String get pinWeak;
+
+  /// No description provided for @pinLock.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN lock'**
+  String get pinLock;
+
+  /// No description provided for @pinLockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Protect the app with a 6-digit PIN'**
+  String get pinLockSubtitle;
+
+  /// No description provided for @setPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Set PIN'**
+  String get setPin;
+
+  /// No description provided for @changePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get changePin;
+
+  /// No description provided for @removePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove PIN'**
+  String get removePin;
+
+  /// No description provided for @lockNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock now'**
+  String get lockNow;
+
+  /// No description provided for @lockAfter2Min.
+  ///
+  /// In en, this message translates to:
+  /// **'Locks after 2 minutes of inactivity'**
+  String get lockAfter2Min;
+
+  /// No description provided for @pinSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN saved'**
+  String get pinSaved;
+
+  /// No description provided for @pinRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN removed'**
+  String get pinRemoved;
+
+  /// No description provided for @confirmRemovePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove PIN?'**
+  String get confirmRemovePin;
+
+  /// No description provided for @confirmRemovePinBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone with access to this device will be able to open the app without a PIN.'**
+  String get confirmRemovePinBody;
+
+  /// No description provided for @cooldownWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait {seconds}s before retry'**
+  String cooldownWait(Object seconds);
 }
 
 class _AppLocalizationsDelegate

@@ -581,5 +581,31 @@
   "providerTelegram": "ቴሌግራም",
   "providerWhatsapp": "ዋትስአፕ",
   "resendCode": "ኮድ እንደገና ላክ",
-  "sendCode": "ኮድ ላክ"
+  "sendCode": "ኮድ ላክ",
+  "createPinTitle": "የእርስዎን PIN ይፍጠሩ",
+  "confirmPinTitle": "የእርስዎን PIN ያረጋግጡ",
+  "pinMismatch": "የግስጋሜ ቁጥሮች አይዛመዱም",
+  "pinLockTitle": "PIN ያስገቡ",
+  "pinForgot": "PIN ረስተዷል?",
+  "pinUseBiometric": "የጣት አሻራ ይጠቀሙ",
+  "pinIncorrect": "ትክክል አልሆነም",
+  "pinTooMany": "በጣም ብዙ ሙከራዎች። እንደገና ይግቡ።",
+  "pinWeak": "PIN በጣም ደካማ ነው — ሌላ ያልተለመደ ኮድ ይምረጡ",
+  "pinLock": "PIN መቆለፊያ",
+  "pinLockSubtitle": "መተግበሪያውን በ6 አሃዝ PIN ይጠብቁ",
+  "setPin": "PIN አዘጋጅ",
+  "changePin": "PIN ቀይር",
+  "removePin": "PIN አስወግድ",
+  "lockNow": "አሁን ቆልፍ",
+  "lockAfter2Min": "ከ2 ደቂቃ እረፍት በኋላ ይቆለፋል",
+  "pinSaved": "PIN ተቀምጧል",
+  "pinRemoved": "PIN ተወግዷል",
+  "confirmRemovePin": "PIN ማስወገድ ይፈልጋሉ?",
+  "confirmRemovePinBody": "ይህን መሳሪያ ያለው ማንኛውም ሰው ያለ PIN መተግበሪያውን መክፈት ይችላል።",
+  "cooldownWait": "እባክዎ {seconds} ሰከንድ ይጠብቁ",
+  "@cooldownWait": {
+    "placeholders": {
+      "seconds": {}
+    }
+  }
 }

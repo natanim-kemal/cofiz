@@ -7,7 +7,8 @@ enum NotificationType {
   lowBalance, // Worker balance below threshold
   moneyDistributed, // Worker received money from admin
   purchaseRecorded, // Admin notified of worker purchase
-  commissionEarned; // Worker earned commission
+  commissionEarned, // Worker earned commission
+  debtRecorded; // Debt recorded for collector
 
   String get displayName {
     switch (this) {
@@ -27,6 +28,8 @@ enum NotificationType {
         return 'Purchase Recorded';
       case NotificationType.commissionEarned:
         return 'Commission Earned';
+      case NotificationType.debtRecorded:
+        return 'Debt Recorded';
     }
   }
 }

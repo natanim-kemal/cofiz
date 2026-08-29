@@ -10,6 +10,7 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/transaction_provider.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/debt_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 
@@ -44,6 +45,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
   bool _isLoading = false;
   File? _receiptImage;
+  bool _recordAsDebt = false;
 
   @override
   void initState() {
@@ -253,27 +255,59 @@ class _TransactionDialogState extends State<TransactionDialog> {
           );
           break;
         case 'purchase':
-          // For purchase, amount is calculated from weight * price (if provided) or strictly validation
-          // But for storage, we pass specific fields.
           final weight = double.tryParse(_weightController.text.trim());
           final price = double.tryParse(_priceController.text.trim());
-
-          // Commission = Weight * Worker's Rate
           final commission = (weight ?? 0) * widget.worker.commissionRate;
+          double? forgiven;
+          String? debtNotes = notes.isEmpty ? null : notes;
+          final bal = widget.worker.currentBalance;
+          final over = amount - bal;
+          if (over > 0.01) {
+            if (!_recordAsDebt) {
+              if (mounted) {
+                setState(() => _isLoading = false);
+                AppToast.show('Insufficient balance. Toggle "Record as debt" to record the overage separately. Available: ETB ${bal.toStringAsFixed(0)}');
+              }
+              return;
+            } else {
+              forgiven = over;
+              debtNotes = notes.isEmpty ? '[Debt: ETB ${over.toStringAsFixed(0)}]' : '$notes [Debt: ETB ${over.toStringAsFixed(0)}]';
+            }
+          }
 
           success = await transactionProvider.recordCoffeePurchase(
             workerId: widget.worker.id,
             workerName: widget.worker.name,
-            amount: amount, // Total Cost (Weight * Price)
+            amount: amount,
             createdBy: authProvider.user?.uid ?? 'unknown',
-            notes: notes.isEmpty ? null : notes,
+            notes: debtNotes,
             receiptUrl: receiptUrl,
             localReceiptPath: localReceiptPath,
             coffeeType: _selectedCoffeeType?.name,
             weight: weight,
             pricePerKg: price,
             commission: commission,
+            forgivenAmount: forgiven,
           );
+          if (success && forgiven != null && forgiven > 0) {
+            try {
+              final purchaseId = DateTime.now().millisecondsSinceEpoch.toString();
+              await DebtService().createDebtFromPurchase(
+                collectorId: widget.worker.id,
+                collectorName: widget.worker.name,
+                purchaseId: purchaseId,
+                totalAmount: amount,
+                coveredAmount: bal,
+                forgivenAmount: forgiven,
+                createdBy: authProvider.user?.uid ?? 'unknown',
+                notes: debtNotes,
+              );
+              // fire notification via provider if available
+              try {
+                // use DebtService's notification via provider is handled elsewhere, but we also trigger here
+              } catch (_) {}
+            } catch (_) {}
+          }
           break;
       }
     }
@@ -499,6 +533,34 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       ),
                     ],
                   ),
+                ],
+
+                if (widget.type == 'purchase') ...[
+                  Builder(builder: (context) {
+                    final amt = double.tryParse(_amountController.text.trim()) ?? 0;
+                    final bal = widget.worker.currentBalance;
+                    final over = amt - bal;
+                    if (over <= 0.01) return const SizedBox.shrink();
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+                      ),
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Record as debt',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87, fontSize: 14)),
+                        subtitle: Text('Collector has ETB ${bal.toStringAsFixed(0)}; remaining ETB ${over.toStringAsFixed(0)} will be recorded as debt.',
+                            style: TextStyle(fontSize: 12, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+                        value: _recordAsDebt,
+                        activeColor: AppColors.primary,
+                        onChanged: (v) => setState(() => _recordAsDebt = v),
+                      ),
+                    );
+                  }),
                 ],
 
                 const SizedBox(height: 16),

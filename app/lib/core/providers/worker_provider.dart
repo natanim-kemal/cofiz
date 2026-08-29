@@ -192,8 +192,9 @@ class WorkerProvider with ChangeNotifier {
         ret += t.amount * m;
         break;
       case 'purchase':
-        balance -= t.amount * m;
-        purch += t.amount * m;
+        final covered = t.amount - (t.forgivenAmount ?? 0.0);
+        balance -= covered * m;
+        purch += covered * m;
         if ((t.commissionAmount ?? 0) > 0) comm += t.commissionAmount! * m;
         break;
       case 'transfer':

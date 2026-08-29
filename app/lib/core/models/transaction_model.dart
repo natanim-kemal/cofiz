@@ -28,6 +28,11 @@ class MoneyTransaction {
   final String? transferId;
   final String? transferRole; // 'sender' or 'receiver'
 
+  // Debt-related (purchase only): when amount > balance and debt toggle is on,
+  // only the covered portion hits the balance; the rest is stored as a Debt doc.
+  final double? forgivenAmount;
+  final bool isDebt;
+
   MoneyTransaction({
     required this.id,
     required this.workerId,
@@ -49,6 +54,8 @@ class MoneyTransaction {
     this.toWorkerName,
     this.transferId,
     this.transferRole,
+    this.forgivenAmount,
+    this.isDebt = false,
   });
 
   factory MoneyTransaction.fromFirestore(Map<String, dynamic> data, String id) {
@@ -81,6 +88,8 @@ class MoneyTransaction {
       toWorkerName: data['toWorkerName'],
       transferId: data['transferId'],
       transferRole: data['transferRole'],
+      forgivenAmount: (data['forgivenAmount'] ?? 0.0).toDouble() == 0.0 ? null : (data['forgivenAmount'] as num).toDouble(),
+      isDebt: data['isDebt'] == true,
     );
   }
 
@@ -105,6 +114,8 @@ class MoneyTransaction {
       'toWorkerName': toWorkerName,
       'transferId': transferId,
       'transferRole': transferRole,
+      if (forgivenAmount != null) 'forgivenAmount': forgivenAmount,
+      'isDebt': isDebt,
     };
   }
 
@@ -126,6 +137,8 @@ class MoneyTransaction {
     double? coffeeWeight,
     double? pricePerKg,
     double? commissionAmount,
+    double? forgivenAmount,
+    bool? isDebt,
   }) {
     return MoneyTransaction(
       id: id,
@@ -148,6 +161,8 @@ class MoneyTransaction {
       toWorkerName: toWorkerName,
       transferId: transferId,
       transferRole: transferRole,
+      forgivenAmount: forgivenAmount ?? this.forgivenAmount,
+      isDebt: isDebt ?? this.isDebt,
     );
   }
 
@@ -181,6 +196,8 @@ class MoneyTransaction {
       toWorkerName: json['toWorkerName'],
       transferId: json['transferId'],
       transferRole: json['transferRole'],
+      forgivenAmount: (json['forgivenAmount'] ?? 0.0).toDouble() == 0.0 ? null : (json['forgivenAmount'] as num).toDouble(),
+      isDebt: json['isDebt'] == true,
     );
   }
 

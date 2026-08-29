@@ -17,6 +17,8 @@ import '../../widgets/notification_badge.dart';
 import '../notifications/notifications_screen.dart';
 import '../income/company_income_screen.dart';
 import '../expense/expenses_screen.dart';
+import '../transaction/all_debts_screen.dart';
+import '../../../core/services/debt_service.dart';
 import '../transaction/transfer_dialog.dart';
 import '../../widgets/custom_header.dart';
 import '../../../l10n/app_localizations.dart';
@@ -223,6 +225,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 MaterialPageRoute(
                                   builder: (context) => const ExpensesScreen(),
                                 ),
+                              );
+                            },
+                          ),
+                          _buildContainerDivider(isDark),
+                          FutureBuilder<double>(
+                            future: DebtService().getOpenDebtsTotal(),
+                            builder: (context, snap) {
+                              final v = snap.data ?? 0;
+                              return _buildCompactStat(
+                                context,
+                                Icons.warning_amber_rounded,
+                                '${localizations?.currency ?? 'ETB'} ${v.toStringAsFixed(0)}',
+                                'Debt',
+                                AppColors.error,
+                                onTap: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AllDebtsScreen()));
+                                },
                               );
                             },
                           ),

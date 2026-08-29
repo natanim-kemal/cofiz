@@ -178,6 +178,26 @@ class NotificationTriggerService {
     }
   }
 
+  Future<void> notifyDebtRecorded({
+    required String collectorId,
+    required String collectorName,
+    required double forgivenAmount,
+    required double totalAmount,
+  }) async {
+    await _notifyAllAdmins(
+      title: 'Debt recorded',
+      body: 'Collector $collectorName: ETB ${forgivenAmount.toStringAsFixed(0)} added to debt (purchase ETB ${totalAmount.toStringAsFixed(0)}).',
+      type: NotificationType.debtRecorded,
+      metadata: {'collectorId': collectorId, 'forgivenAmount': forgivenAmount, 'totalAmount': totalAmount},
+    );
+    await _notifyAllViewers(
+      title: 'Debt recorded',
+      body: 'Collector $collectorName: ETB ${forgivenAmount.toStringAsFixed(0)} added to debt.',
+      type: NotificationType.debtRecorded,
+      metadata: {'collectorId': collectorId, 'forgivenAmount': forgivenAmount},
+    );
+  }
+
   /// Notify all viewers (read-only users)
   Future<void> _notifyAllViewers({
     required String title,

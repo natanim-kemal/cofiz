@@ -25,6 +25,14 @@ import 'core/services/expense_service.dart';
 import 'core/services/auth_backend.dart';
 import 'core/services/auth_backend_firebase.dart';
 import 'core/providers/phone_otp_auth_provider.dart';
+import 'core/services/pin_service.dart';
+import 'core/providers/lock_state_provider.dart';
+import 'core/services/idle_lock_service.dart';
+import 'core/services/debt_service.dart';
+import 'core/providers/debt_provider.dart';
+import 'core/services/notification_trigger_service.dart';
+import 'presentation/screens/auth/create_pin_screen.dart';
+import 'presentation/screens/auth/pin_lock_screen.dart';
 import 'presentation/widgets/custom_bottom_nav.dart';
 import 'presentation/widgets/offline_indicator.dart';
 import 'presentation/widgets/double_back_exit.dart';
@@ -111,7 +119,7 @@ Future<void> _initializeNetworkServices() async {
   }
 }
 
-class StitchWorkerApp extends StatelessWidget {
+class StitchWorkerApp extends StatefulWidget {
   final NotificationService notificationService;
   final OfflineSyncService offlineSyncService;
 
@@ -122,29 +130,52 @@ class StitchWorkerApp extends StatelessWidget {
   });
 
   @override
+  State<StitchWorkerApp> createState() => _StitchWorkerAppState();
+}
+
+class _StitchWorkerAppState extends State<StitchWorkerApp> {
+  late final PinService _pinService;
+  late final LockStateProvider _lockState;
+  late final IdleLockService _idleLock;
+  late final PhoneOtpAuthProvider _phoneAuth;
+
+  @override
+  void initState() {
+    super.initState();
+    _pinService = PinService();
+    _lockState = LockStateProvider(pinService: _pinService);
+    _phoneAuth = PhoneOtpAuthProvider(
+      backend: AuthBackend(
+        baseUrl: RelayConfig.relayUrl.isNotEmpty ? RelayConfig.relayUrl : 'https://fcm-relay.example',
+        secret: RelayConfig.relaySecret,
+      ),
+      firebaseAuth: AuthBackendFirebase(),
+      pinService: _pinService,
+    );
+    _idleLock = IdleLockService(lockState: _lockState);
+    _lockState.initialize();
+    _idleLock.attach();
+  }
+
+  @override
+  void dispose() {
+    _idleLock.detach();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider.value(value: notificationService),
-        ChangeNotifierProvider(
-          create: (_) => PhoneOtpAuthProvider(
-            backend: AuthBackend(
-              baseUrl: RelayConfig.relayUrl.isNotEmpty
-                  ? RelayConfig.relayUrl
-                  : 'https://fcm-relay.example',
-              secret: RelayConfig.relaySecret,
-            ),
-            firebaseAuth: AuthBackendFirebase(),
-          ),
-        ),
+        Provider.value(value: widget.notificationService),
+        ChangeNotifierProvider<PhoneOtpAuthProvider>.value(value: _phoneAuth),
+        ChangeNotifierProvider<LockStateProvider>.value(value: _lockState),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => WorkerProvider()),
         ChangeNotifierProxyProvider<WorkerProvider, TransactionProvider>(
           create: (_) => TransactionProvider(),
           update: (_, workerProvider, txProvider) {
-            // Optimistic creates/deletes move the worker Balance Card too.
-            txProvider!.onTransactionApplied = (tx, direction) =>
-                workerProvider.applyTransactionDelta(tx, direction);
+            txProvider!.onTransactionApplied = (tx, direction) => workerProvider.applyTransactionDelta(tx, direction);
             return txProvider;
           },
         ),
@@ -155,19 +186,15 @@ class StitchWorkerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => AuditProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => DebtProvider(debtService: DebtService(), notificationService: NotificationTriggerService())),
       ],
       child: Consumer3<ThemeProvider, SettingsProvider, DensityProvider>(
-        builder:
-            (context, themeProvider, settingsProvider, densityProvider, _) {
+        builder: (context, themeProvider, settingsProvider, densityProvider, _) {
           return MaterialApp(
             title: 'Cofiz',
-            // Locale
             locale: settingsProvider.locale,
-
-            theme: AppTheme.lightTheme
-                .copyWith(visualDensity: densityProvider.visualDensity),
-            darkTheme: AppTheme.darkTheme
-                .copyWith(visualDensity: densityProvider.visualDensity),
+            theme: AppTheme.lightTheme.copyWith(visualDensity: densityProvider.visualDensity),
+            darkTheme: AppTheme.darkTheme.copyWith(visualDensity: densityProvider.visualDensity),
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
             localizationsDelegates: const [
@@ -176,26 +203,27 @@ class StitchWorkerApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: const [
-              Locale('en'),
-              Locale('am'),
-            ],
+            supportedLocales: const [Locale('en'), Locale('am')],
             builder: (context, child) {
               final mq = MediaQuery.of(context);
-              // Scale text on top of whatever the OS font scale is, so the
-              // density preset behaves identically on every device.
               final systemScale = mq.textScaler.scale(14) / 14;
+              // Idle detection: Listener catches pointer, NotificationListener catches scroll
               return ColoredBox(
                 color: Theme.of(context).scaffoldBackgroundColor,
                 child: AppToastHost(
                   child: MediaQuery(
-                    data: mq.copyWith(
-                      textScaler: TextScaler.linear(
-                        systemScale * densityProvider.textScaleFactor,
+                    data: mq.copyWith(textScaler: TextScaler.linear(systemScale * densityProvider.textScaleFactor)),
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => _idleLock.onUserInteraction(),
+                      onPointerMove: (_) => _idleLock.onUserInteraction(),
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (n) {
+                          _idleLock.onUserInteraction();
+                          return false;
+                        },
+                        child: TelegramLoginListener(child: child!),
                       ),
-                    ),
-                    child: TelegramLoginListener(
-                      child: child!,
                     ),
                   ),
                 ),
@@ -234,25 +262,31 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, _) {
+    return Consumer2<AuthProvider, LockStateProvider>(
+      builder: (context, authProvider, lockState, _) {
+        // Re-initialize lock state when uid changes (per-user PIN).
         if (authProvider.isAuthenticated && authProvider.user != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Provider.of<NotificationProvider>(context, listen: false)
-                .init(authProvider.user!.uid);
+            Provider.of<NotificationProvider>(context, listen: false).init(authProvider.user!.uid);
+            lockState.initialize(uid: authProvider.user!.uid);
           });
         } else {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Provider.of<NotificationProvider>(context, listen: false)
-                .disposeListener();
+            Provider.of<NotificationProvider>(context, listen: false).disposeListener();
           });
         }
-        // Show the branded animated splash while checking auth state, and
-        // for at least the minimum splash duration so the logo animation
-        // is always visible on startup.
-        if (authProvider.status == AuthStatus.uninitialized ||
-            !_splashElapsed) {
+        if (authProvider.status == AuthStatus.uninitialized || !_splashElapsed) {
           return const AnimatedSplashScreen();
+        }
+
+        // PIN lock gates — forced after auth.
+        if (authProvider.isAuthenticated) {
+          if (lockState.state == PinLockState.awaitingFirstSetup) {
+            return const CreatePinScreen();
+          }
+          if (lockState.state == PinLockState.locked) {
+            return const PinLockScreen();
+          }
         }
 
         // Navigate based on auth status AND user role

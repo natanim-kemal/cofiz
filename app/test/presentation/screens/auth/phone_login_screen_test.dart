@@ -24,9 +24,11 @@ void main() {
         ),
       ),
     );
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.text('Telegram'), findsOneWidget);
     expect(find.text('WhatsApp'), findsOneWidget);
     expect(find.byKey(const Key('sendCodeButton')), findsOneWidget);
     expect(find.byKey(const Key('continueWithTelegramButton')), findsOneWidget);
+    await tester.pumpAndSettle();
   });
 }

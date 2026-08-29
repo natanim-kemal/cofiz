@@ -1496,4 +1496,70 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get sendCode => 'ኮድ ላክ';
+
+  @override
+  String get createPinTitle => 'የእርስዎን PIN ይፍጠሩ';
+
+  @override
+  String get confirmPinTitle => 'የእርስዎን PIN ያረጋግጡ';
+
+  @override
+  String get pinMismatch => 'የግስጋሜ ቁጥሮች አይዛመዱም';
+
+  @override
+  String get pinLockTitle => 'PIN ያስገቡ';
+
+  @override
+  String get pinForgot => 'PIN ረስተዷል?';
+
+  @override
+  String get pinUseBiometric => 'የጣት አሻራ ይጠቀሙ';
+
+  @override
+  String get pinIncorrect => 'ትክክል አልሆነም';
+
+  @override
+  String get pinTooMany => 'በጣም ብዙ ሙከራዎች። እንደገና ይግቡ።';
+
+  @override
+  String get pinWeak => 'PIN በጣም ደካማ ነው — ሌላ ያልተለመደ ኮድ ይምረጡ';
+
+  @override
+  String get pinLock => 'PIN መቆለፊያ';
+
+  @override
+  String get pinLockSubtitle => 'መተግበሪያውን በ6 አሃዝ PIN ይጠብቁ';
+
+  @override
+  String get setPin => 'PIN አዘጋጅ';
+
+  @override
+  String get changePin => 'PIN ቀይር';
+
+  @override
+  String get removePin => 'PIN አስወግድ';
+
+  @override
+  String get lockNow => 'አሁን ቆልፍ';
+
+  @override
+  String get lockAfter2Min => 'ከ2 ደቂቃ እረፍት በኋላ ይቆለፋል';
+
+  @override
+  String get pinSaved => 'PIN ተቀምጧል';
+
+  @override
+  String get pinRemoved => 'PIN ተወግዷል';
+
+  @override
+  String get confirmRemovePin => 'PIN ማስወገድ ይፈልጋሉ?';
+
+  @override
+  String get confirmRemovePinBody =>
+      'ይህን መሳሪያ ያለው ማንኛውም ሰው ያለ PIN መተግበሪያውን መክፈት ይችላል።';
+
+  @override
+  String cooldownWait(Object seconds) {
+    return 'እባክዎ $seconds ሰከንድ ይጠብቁ';
+  }
 }

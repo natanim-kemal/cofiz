@@ -426,6 +426,7 @@ class TransactionProvider with ChangeNotifier {
     double? weight,
     double? pricePerKg,
     double? commission,
+    double? forgivenAmount,
   }) async {
     if (amount <= 0) {
       _errorMessage = 'Amount must be greater than 0';
@@ -453,6 +454,8 @@ class TransactionProvider with ChangeNotifier {
         coffeeWeight: weight,
         pricePerKg: pricePerKg,
         commissionAmount: commission,
+        forgivenAmount: forgivenAmount,
+        isDebt: (forgivenAmount ?? 0) > 0,
       );
 
       final docId3 = await _transactionService.addTransaction(transaction,
@@ -473,6 +476,8 @@ class TransactionProvider with ChangeNotifier {
           coffeeWeight: transaction.coffeeWeight,
           pricePerKg: transaction.pricePerKg,
           commissionAmount: transaction.commissionAmount,
+          forgivenAmount: transaction.forgivenAmount,
+          isDebt: transaction.isDebt,
         ));
       }
 

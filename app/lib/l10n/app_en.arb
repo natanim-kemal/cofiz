@@ -581,5 +581,31 @@
   "providerTelegram": "Telegram",
   "providerWhatsapp": "WhatsApp",
   "resendCode": "Resend code",
-  "sendCode": "Send code"
+  "sendCode": "Send code",
+  "createPinTitle": "Create your PIN",
+  "confirmPinTitle": "Confirm your PIN",
+  "pinMismatch": "PINs do not match",
+  "pinLockTitle": "Enter PIN",
+  "pinForgot": "Forgot PIN?",
+  "pinUseBiometric": "Use fingerprint",
+  "pinIncorrect": "Incorrect PIN",
+  "pinTooMany": "Too many attempts. Sign in again.",
+  "pinWeak": "PIN is too weak — choose a less predictable code",
+  "pinLock": "PIN lock",
+  "pinLockSubtitle": "Protect the app with a 6-digit PIN",
+  "setPin": "Set PIN",
+  "changePin": "Change PIN",
+  "removePin": "Remove PIN",
+  "lockNow": "Lock now",
+  "lockAfter2Min": "Locks after 2 minutes of inactivity",
+  "pinSaved": "PIN saved",
+  "pinRemoved": "PIN removed",
+  "confirmRemovePin": "Remove PIN?",
+  "confirmRemovePinBody": "Anyone with access to this device will be able to open the app without a PIN.",
+  "cooldownWait": "Wait {seconds}s before retry",
+  "@cooldownWait": {
+    "placeholders": {
+      "seconds": {}
+    }
+  }
 }

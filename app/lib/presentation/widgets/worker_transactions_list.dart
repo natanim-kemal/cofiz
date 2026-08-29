@@ -15,6 +15,7 @@ import '../../l10n/app_localizations.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/number_formatter.dart';
 import '../screens/transaction/transaction_dialog.dart';
+import '../screens/transaction/collector_debts_screen.dart';
 import 'offline_indicator.dart';
 import 'sync_outbox_banner.dart';
 import 'app_toast.dart';
@@ -263,18 +264,23 @@ class _WorkerTransactionsListState extends State<WorkerTransactionsList> {
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
-                // Pending/failed sync counts - right end of the header row.
                 const SyncOutboxBanner(),
+                // Debt button — to the left of the filter
+                IconButton(
+                  tooltip: 'Debt',
+                  icon: const Icon(Icons.receipt_long, color: AppColors.error),
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => CollectorDebtsScreen(collectorId: widget.worker.id, collectorName: widget.worker.name),
+                    ));
+                  },
+                ),
                 if (_selectedDate != null)
                   TextButton.icon(
                     onPressed: _clearDate,
                     icon: const Icon(Icons.close, size: 16),
-                    label: Text(
-                      DateFormat('MMM d, yyyy').format(_selectedDate!),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                    ),
+                    label: Text(DateFormat('MMM d, yyyy').format(_selectedDate!)),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.primary),
                   )
                 else
                   IconButton(

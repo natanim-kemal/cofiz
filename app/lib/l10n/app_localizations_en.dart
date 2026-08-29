@@ -1509,4 +1509,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sendCode => 'Send code';
+
+  @override
+  String get createPinTitle => 'Create your PIN';
+
+  @override
+  String get confirmPinTitle => 'Confirm your PIN';
+
+  @override
+  String get pinMismatch => 'PINs do not match';
+
+  @override
+  String get pinLockTitle => 'Enter PIN';
+
+  @override
+  String get pinForgot => 'Forgot PIN?';
+
+  @override
+  String get pinUseBiometric => 'Use fingerprint';
+
+  @override
+  String get pinIncorrect => 'Incorrect PIN';
+
+  @override
+  String get pinTooMany => 'Too many attempts. Sign in again.';
+
+  @override
+  String get pinWeak => 'PIN is too weak — choose a less predictable code';
+
+  @override
+  String get pinLock => 'PIN lock';
+
+  @override
+  String get pinLockSubtitle => 'Protect the app with a 6-digit PIN';
+
+  @override
+  String get setPin => 'Set PIN';
+
+  @override
+  String get changePin => 'Change PIN';
+
+  @override
+  String get removePin => 'Remove PIN';
+
+  @override
+  String get lockNow => 'Lock now';
+
+  @override
+  String get lockAfter2Min => 'Locks after 2 minutes of inactivity';
+
+  @override
+  String get pinSaved => 'PIN saved';
+
+  @override
+  String get pinRemoved => 'PIN removed';
+
+  @override
+  String get confirmRemovePin => 'Remove PIN?';
+
+  @override
+  String get confirmRemovePinBody =>
+      'Anyone with access to this device will be able to open the app without a PIN.';
+
+  @override
+  String cooldownWait(Object seconds) {
+    return 'Wait ${seconds}s before retry';
+  }
 }

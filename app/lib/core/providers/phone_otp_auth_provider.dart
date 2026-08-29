@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_backend.dart';
 import '../services/auth_backend_firebase.dart';
+import '../services/pin_service.dart';
 
 enum OtpAuthState {
   unauthenticated,
@@ -12,10 +13,12 @@ enum OtpAuthState {
 }
 
 class PhoneOtpAuthProvider extends ChangeNotifier {
-  PhoneOtpAuthProvider({required this.backend, AuthBackendFirebase? firebaseAuth})
-      : _firebaseAuth = firebaseAuth;
+  PhoneOtpAuthProvider({required this.backend, AuthBackendFirebase? firebaseAuth, PinService? pinService})
+      : _firebaseAuth = firebaseAuth,
+        _pinService = pinService;
   final AuthBackend backend;
   final AuthBackendFirebase? _firebaseAuth;
+  final PinService? _pinService;
 
   OtpAuthState _state = OtpAuthState.unauthenticated;
   String? _phone;
@@ -126,10 +129,11 @@ class PhoneOtpAuthProvider extends ChangeNotifier {
     if (fb != null) {
       try {
         await fb.signOut();
-      } catch (_) {
-        // Best-effort: even if Firebase signOut throws, we still clear local state.
-      }
+      } catch (_) {}
     }
+    try {
+      await _pinService?.clearAll();
+    } catch (_) {}
     _state = OtpAuthState.unauthenticated;
     _phone = null;
     _provider = null;
