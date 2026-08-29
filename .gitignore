@@ -3,3 +3,6 @@
 
 # Flutter / Dart build output
 build/.relay_secret
+
+# Plan documents
+docs
