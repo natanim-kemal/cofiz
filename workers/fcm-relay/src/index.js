@@ -5,6 +5,7 @@
 // as environment variables.
 
 import { handleStart as otpStart, handleVerify as otpVerify } from './otp/index.js';
+import { handleTelegramLogin, handleWhatsappStart, handleWhatsappVerify } from './auth/index.js';
 
 
 const FIREBASE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
@@ -311,6 +312,15 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (url.pathname === '/auth/telegram') {
+      return handleTelegramLogin(request, env);
+    }
+    if (url.pathname === '/auth/whatsapp/start') {
+      return handleWhatsappStart(request, env);
+    }
+    if (url.pathname === '/auth/whatsapp/verify') {
+      return handleWhatsappVerify(request, env);
+    }
     if (url.pathname === '/otp/start') {
       return otpStart(request, env);
     }
