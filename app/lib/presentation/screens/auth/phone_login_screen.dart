@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:cofiz/l10n/app_localizations.dart';
 import '../../../core/providers/phone_otp_auth_provider.dart';
 import '../../../core/services/auth_backend.dart';
@@ -14,8 +15,13 @@ class PhoneLoginScreen extends StatefulWidget {
 }
 
 class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
+  static const String _telegramBotId = String.fromEnvironment(
+    'TELEGRAM_BOT_ID',
+    defaultValue: '',
+  );
+
   final _phoneCtl = TextEditingController();
-  OtpProvider _provider = OtpProvider.telegram;
+  OtpProvider _provider = OtpProvider.whatsapp;
   bool _sending = false;
 
   @override
@@ -49,6 +55,32 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     }
   }
 
+  Future<void> _continueWithTelegram() async {
+    if (_telegramBotId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Telegram sign-in is not configured.')),
+      );
+      return;
+    }
+    final url =
+        'https://oauth.telegram.org/auth?bot_id=$_telegramBotId'
+        '&origin=${Uri.encodeComponent('cofiz')}'
+        '&return_to=${Uri.encodeComponent('cofiz://auth/telegram')}'
+        '&request_access=write';
+    // Telegram posts back to cofiz://auth/telegram when the user signs in;
+    // TelegramLoginListener (mounted at app root) picks it up and calls
+    // completeTelegramLogin on the provider.
+    final ok = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Telegram.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
@@ -59,6 +91,16 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Telegram one-tap sign-in. No phone number needed.
+            OutlinedButton.icon(
+              key: const Key('continueWithTelegramButton'),
+              icon: const Icon(Icons.telegram),
+              label: const Text('Continue with Telegram'),
+              onPressed: _continueWithTelegram,
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
             SegmentedButton<OtpProvider>(
               segments: [
                 ButtonSegment(value: OtpProvider.telegram, label: Text(t.providerTelegram)),

@@ -1,11 +1,21 @@
 import 'package:flutter/foundation.dart';
 import '../services/auth_backend.dart';
+import '../services/auth_backend_firebase.dart';
 
-enum OtpAuthState { unauthenticated, awaitingCode, verifying, authenticated, error }
+enum OtpAuthState {
+  unauthenticated,
+  awaitingCode,
+  verifying,
+  authenticated,
+  error,
+  awaitingTelegramReturn,
+}
 
 class PhoneOtpAuthProvider extends ChangeNotifier {
-  PhoneOtpAuthProvider({required this.backend});
+  PhoneOtpAuthProvider({required this.backend, AuthBackendFirebase? firebaseAuth})
+      : _firebaseAuth = firebaseAuth;
   final AuthBackend backend;
+  final AuthBackendFirebase? _firebaseAuth;
 
   OtpAuthState _state = OtpAuthState.unauthenticated;
   String? _phone;
@@ -58,6 +68,50 @@ class PhoneOtpAuthProvider extends ChangeNotifier {
         code: code,
       );
       _uid = r.uid;
+      // Exchange the custom token for a real Firebase session.
+      if (_firebaseAuth != null) {
+        try {
+          await _firebaseAuth.signInWithCustomToken(r.customToken);
+        } catch (e) {
+          _lastErrorCode = 'firebase_signin_failed';
+          _lastErrorMessage = e.toString();
+          _state = OtpAuthState.error;
+          notifyListeners();
+          return;
+        }
+      }
+      _state = OtpAuthState.authenticated;
+    } on AuthBackendException catch (e) {
+      _lastErrorCode = e.errorCode;
+      _lastErrorMessage = e.message;
+      _state = OtpAuthState.error;
+    }
+    notifyListeners();
+  }
+
+  /// Telegram Login Widget one-tap sign-in.
+  /// [fields] are the query parameters Telegram posts to the deep link
+  /// (`cofiz://auth/telegram?...`): id, first_name, last_name, username,
+  /// photo_url, auth_date, hash.
+  Future<void> completeTelegramLogin({required Map<String, String> fields}) async {
+    _state = OtpAuthState.verifying;
+    _lastErrorCode = null;
+    _lastErrorMessage = null;
+    notifyListeners();
+    try {
+      final r = await backend.authTelegram(fields);
+      _uid = r.uid;
+      if (_firebaseAuth != null) {
+        try {
+          await _firebaseAuth.signInWithCustomToken(r.customToken);
+        } catch (e) {
+          _lastErrorCode = 'firebase_signin_failed';
+          _lastErrorMessage = e.toString();
+          _state = OtpAuthState.error;
+          notifyListeners();
+          return;
+        }
+      }
       _state = OtpAuthState.authenticated;
     } on AuthBackendException catch (e) {
       _lastErrorCode = e.errorCode;
@@ -68,6 +122,14 @@ class PhoneOtpAuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    final fb = _firebaseAuth;
+    if (fb != null) {
+      try {
+        await fb.signOut();
+      } catch (_) {
+        // Best-effort: even if Firebase signOut throws, we still clear local state.
+      }
+    }
     _state = OtpAuthState.unauthenticated;
     _phone = null;
     _provider = null;

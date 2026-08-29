@@ -10,7 +10,7 @@ import '../../../_support/mock_http_client.dart';
 void main() {
   testWidgets('OtpVerifyScreen shows 6 inputs', (tester) async {
     final mock = MockHttpClient();
-    mock.onPost('/otp/start', (_) => {'verificationId': 'v1', 'expiresInSeconds': 300});
+    mock.onPost('/auth/whatsapp/start', (_) => {'verificationId': 'v1', 'expiresInSeconds': 300});
     final p = PhoneOtpAuthProvider(
       backend: AuthBackend(baseUrl: 'https://x', client: mock),
     );

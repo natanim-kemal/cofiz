@@ -22,14 +22,15 @@ import 'core/providers/income_provider.dart';
 import 'core/providers/expense_provider.dart';
 import 'core/services/income_service.dart';
 import 'core/services/expense_service.dart';
-import 'core/providers/phone_otp_auth_provider.dart';
 import 'core/services/auth_backend.dart';
 import 'core/services/auth_backend_firebase.dart';
+import 'core/providers/phone_otp_auth_provider.dart';
 import 'presentation/widgets/custom_bottom_nav.dart';
 import 'presentation/widgets/offline_indicator.dart';
 import 'presentation/widgets/double_back_exit.dart';
 import 'presentation/widgets/app_toast.dart';
 import 'presentation/widgets/animated_splash_screen.dart';
+import 'presentation/widgets/telegram_login_listener.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/widgets/background_pattern.dart';
 import 'presentation/screens/reports/reports_screen.dart';
@@ -128,11 +129,12 @@ class StitchWorkerApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => PhoneOtpAuthProvider(
             backend: AuthBackend(
-              baseUrl: const String.fromEnvironment(
-                'RELAY_BASE_URL',
-                defaultValue: 'https://fcm-relay.example',
-              ),
+              baseUrl: RelayConfig.relayUrl.isNotEmpty
+                  ? RelayConfig.relayUrl
+                  : 'https://fcm-relay.example',
+              secret: RelayConfig.relaySecret,
             ),
+            firebaseAuth: AuthBackendFirebase(),
           ),
         ),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -192,7 +194,9 @@ class StitchWorkerApp extends StatelessWidget {
                         systemScale * densityProvider.textScaleFactor,
                       ),
                     ),
-                    child: child!,
+                    child: TelegramLoginListener(
+                      child: child!,
+                    ),
                   ),
                 ),
               );

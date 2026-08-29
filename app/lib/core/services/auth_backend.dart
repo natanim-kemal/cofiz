@@ -27,18 +27,29 @@ class VerifyOtpResult {
 }
 
 class AuthBackend {
-  AuthBackend({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  AuthBackend({
+    required this.baseUrl,
+    this.secret,
+    http.Client? client,
+  }) : _client = client ?? http.Client();
   final String baseUrl;
+  final String? secret;
   final http.Client _client;
+
+  Map<String, String> _headers({bool json = true}) {
+    return {
+      if (json) 'content-type': 'application/json',
+      if (secret != null && secret!.isNotEmpty) 'x-relay-secret': secret!,
+    };
+  }
 
   Future<RequestOtpResult> requestOtp({
     required String phone,
     required OtpProvider provider,
   }) async {
     final res = await _client.post(
-      Uri.parse('$baseUrl/otp/start'),
-      headers: {'content-type': 'application/json'},
+      Uri.parse('$baseUrl/auth/whatsapp/start'),
+      headers: _headers(),
       body: jsonEncode({
         'phone': phone,
         'provider': provider.name,
@@ -61,8 +72,8 @@ class AuthBackend {
     required String code,
   }) async {
     final res = await _client.post(
-      Uri.parse('$baseUrl/otp/verify'),
-      headers: {'content-type': 'application/json'},
+      Uri.parse('$baseUrl/auth/whatsapp/verify'),
+      headers: _headers(),
       body: jsonEncode({
         'phone': phone,
         'provider': provider.name,
@@ -73,6 +84,27 @@ class AuthBackend {
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode >= 400) {
       throw AuthBackendException(res.statusCode, body['error']?.toString() ?? 'unknown', body['message']?.toString() ?? '');
+    }
+    return VerifyOtpResult(
+      customToken: body['customToken'] as String,
+      uid: body['uid'] as String,
+      isNewUser: body['isNewUser'] as bool,
+    );
+  }
+
+  Future<VerifyOtpResult> authTelegram(Map<String, String> fields) async {
+    final res = await _client.post(
+      Uri.parse('$baseUrl/auth/telegram'),
+      headers: _headers(),
+      body: jsonEncode(fields),
+    );
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode >= 400) {
+      throw AuthBackendException(
+        res.statusCode,
+        body['error']?.toString() ?? 'unknown',
+        body['message']?.toString() ?? '',
+      );
     }
     return VerifyOtpResult(
       customToken: body['customToken'] as String,

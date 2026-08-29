@@ -82,6 +82,7 @@ dependencies:
   local_auth: ^3.0.0
   flutter_secure_storage: ^10.0.0
   uuid: ^4.6.0
+  app_links: ^6.3.0
 
 dev_dependencies:
   flutter_test:

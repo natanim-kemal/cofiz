@@ -8,9 +8,9 @@ import 'package:cofiz/presentation/screens/auth/phone_login_screen.dart';
 import '../../../_support/mock_http_client.dart';
 
 void main() {
-  testWidgets('PhoneLoginScreen shows Send Code button and provider toggle', (tester) async {
+  testWidgets('PhoneLoginScreen shows Send Code button, Telegram button and provider toggle', (tester) async {
     final mock = MockHttpClient();
-    mock.onPost('/otp/start', (_) => {'verificationId': 'v1', 'expiresInSeconds': 300});
+    mock.onPost('/auth/whatsapp/start', (_) => {'verificationId': 'v1', 'expiresInSeconds': 300});
     final provider = PhoneOtpAuthProvider(
       backend: AuthBackend(baseUrl: 'https://x', client: mock),
     );
@@ -27,5 +27,6 @@ void main() {
     expect(find.text('Telegram'), findsOneWidget);
     expect(find.text('WhatsApp'), findsOneWidget);
     expect(find.byKey(const Key('sendCodeButton')), findsOneWidget);
+    expect(find.byKey(const Key('continueWithTelegramButton')), findsOneWidget);
   });
 }
