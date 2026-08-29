@@ -570,5 +570,16 @@
   "reasonLabel": "Reason",
   "reasonHint": "Why are you changing this entry?",
   "reasonRequired": "A reason is required to override a locked entry.",
-  "transactionUpdated": "Transaction updated"
+  "transactionUpdated": "Transaction updated",
+
+  "botOptInBannerBody": "Tap to open Telegram and press Start, then return to the app.",
+  "botOptInBannerTitle": "One-time setup",
+  "codeExpired": "Code expired. Tap to resend.",
+  "enterPhoneNumber": "Phone number",
+  "enterSixDigitCode": "Enter 6-digit code",
+  "invalidPhoneNumber": "Enter a valid phone number (e.g. +251911234567)",
+  "providerTelegram": "Telegram",
+  "providerWhatsapp": "WhatsApp",
+  "resendCode": "Resend code",
+  "sendCode": "Send code"
 }

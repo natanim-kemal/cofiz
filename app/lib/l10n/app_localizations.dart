@@ -1517,7 +1517,7 @@ abstract class AppLocalizations {
   /// No description provided for @codeExpired.
   ///
   /// In en, this message translates to:
-  /// **'Code expired. Please resend a new code.'**
+  /// **'Code expired. Tap to resend.'**
   String get codeExpired;
 
   /// No description provided for @tooManyAttempts.
@@ -2833,6 +2833,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Transaction updated'**
   String get transactionUpdated;
+
+  /// No description provided for @botOptInBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to open Telegram and press Start, then return to the app.'**
+  String get botOptInBannerBody;
+
+  /// No description provided for @botOptInBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time setup'**
+  String get botOptInBannerTitle;
+
+  /// No description provided for @enterPhoneNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get enterPhoneNumber;
+
+  /// No description provided for @enterSixDigitCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 6-digit code'**
+  String get enterSixDigitCode;
+
+  /// No description provided for @invalidPhoneNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid phone number (e.g. +251911234567)'**
+  String get invalidPhoneNumber;
+
+  /// No description provided for @providerTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get providerTelegram;
+
+  /// No description provided for @providerWhatsapp.
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp'**
+  String get providerWhatsapp;
+
+  /// No description provided for @sendCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get sendCode;
 }
 
 class _AppLocalizationsDelegate

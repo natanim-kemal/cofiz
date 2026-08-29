@@ -755,7 +755,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invalidCode => 'Invalid code. Try again.';
 
   @override
-  String get codeExpired => 'Code expired. Please resend a new code.';
+  String get codeExpired => 'Code expired. Tap to resend.';
 
   @override
   String get tooManyAttempts => 'Too many attempts - resend code';
@@ -1483,4 +1483,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get transactionUpdated => 'Transaction updated';
+
+  @override
+  String get botOptInBannerBody =>
+      'Tap to open Telegram and press Start, then return to the app.';
+
+  @override
+  String get botOptInBannerTitle => 'One-time setup';
+
+  @override
+  String get enterPhoneNumber => 'Phone number';
+
+  @override
+  String get enterSixDigitCode => 'Enter 6-digit code';
+
+  @override
+  String get invalidPhoneNumber =>
+      'Enter a valid phone number (e.g. +251911234567)';
+
+  @override
+  String get providerTelegram => 'Telegram';
+
+  @override
+  String get providerWhatsapp => 'WhatsApp';
+
+  @override
+  String get sendCode => 'Send code';
 }

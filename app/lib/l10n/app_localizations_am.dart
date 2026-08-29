@@ -751,7 +751,7 @@ class AppLocalizationsAm extends AppLocalizations {
   String get invalidCode => 'የተሳሳተ ኮድ። እንደገና ይሞክሩ';
 
   @override
-  String get codeExpired => 'ኮድ ጊዜው አልፏል። እባክዎ አዲስ ኮድ ይላኩ';
+  String get codeExpired => 'ኮዱ ጊዜው አልፏል። እንደገና ለመላክ ይንኩ።';
 
   @override
   String get tooManyAttempts => 'በጣም ብዙ ሙከራዎች - ኮድ እንደገና ይላኩ';
@@ -1471,4 +1471,29 @@ class AppLocalizationsAm extends AppLocalizations {
 
   @override
   String get transactionUpdated => 'ግብይት ተሻሽሏል';
+
+  @override
+  String get botOptInBannerBody =>
+      'ቴሌግራም ለመክፈት ይጫኑ እና Start የሚለውን ይጫኑ፣ ከዚያ ወደ መተግበሪያው ይመለሱ።';
+
+  @override
+  String get botOptInBannerTitle => 'አንድ ጊዜ ዝግጅት';
+
+  @override
+  String get enterPhoneNumber => 'ስልክ ቁጥር';
+
+  @override
+  String get enterSixDigitCode => '6 አሃዝ ኮድ ያስገቡ';
+
+  @override
+  String get invalidPhoneNumber => 'ትክክለኛ ስልክ ቁጥር ያስገቡ (ለምሳሌ +251911234567)';
+
+  @override
+  String get providerTelegram => 'ቴሌግራም';
+
+  @override
+  String get providerWhatsapp => 'ዋትስአፕ';
+
+  @override
+  String get sendCode => 'ኮድ ላክ';
 }

@@ -570,5 +570,16 @@
   "reasonLabel": "ምክንያት",
   "reasonHint": "ይህን ግብይት የሚያስተካክሉበት ምክንያት ምንድን ነው?",
   "reasonRequired": "የተቆለፈ ግብይትን ለማስተካከል ምክንያት ያስፈልጋል።",
-  "transactionUpdated": "ግብይት ተሻሽሏል"
+  "transactionUpdated": "ግብይት ተሻሽሏል",
+
+  "botOptInBannerBody": "ቴሌግራም ለመክፈት ይጫኑ እና Start የሚለውን ይጫኑ፣ ከዚያ ወደ መተግበሪያው ይመለሱ።",
+  "botOptInBannerTitle": "አንድ ጊዜ ዝግጅት",
+  "codeExpired": "ኮዱ ጊዜው አልፏል። እንደገና ለመላክ ይንኩ።",
+  "enterPhoneNumber": "ስልክ ቁጥር",
+  "enterSixDigitCode": "6 አሃዝ ኮድ ያስገቡ",
+  "invalidPhoneNumber": "ትክክለኛ ስልክ ቁጥር ያስገቡ (ለምሳሌ +251911234567)",
+  "providerTelegram": "ቴሌግራም",
+  "providerWhatsapp": "ዋትስአፕ",
+  "resendCode": "ኮድ እንደገና ላክ",
+  "sendCode": "ኮድ ላክ"
 }
